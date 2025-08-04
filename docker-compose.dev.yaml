@@ -1,0 +1,64 @@
+version: "3.8"
+
+services:
+  ollama:
+    image: ollama/ollama
+    ports:
+      - "11434:11434"
+    volumes:
+      - ollama_data:/root/.ollama
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:11434/api/tags || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+
+  ollama-init:
+    image: ollama/ollama
+    depends_on:
+      - ollama
+    volumes:
+      - ollama_data:/root/.ollama
+    environment:
+      - OLLAMA_HOST=http://ollama:11434
+    entrypoint: []
+    command: >
+      sh -c "
+        echo 'Waiting for Ollama to be ready...' &&
+        sleep 3 &&
+        echo 'Checking if model qwen:7b exists...' &&
+        if ! OLLAMA_HOST=http://ollama:11434 ollama list | grep -q 'qwen:7b'; then
+          echo 'Model qwen:7b not found, pulling...' &&
+          OLLAMA_HOST=http://ollama:11434 ollama pull qwen:7b
+        else
+          echo 'Model qwen:7b already exists, skipping pull.'
+        fi &&
+        echo 'Model setup complete!'
+      "
+    restart: "no"
+
+  # backend:
+  #   build:
+  #     context: ./backend
+  #     dockerfile: ../docker/backend/Dockerfile
+  #   ports:
+  #     - "8000:8000"
+  #   env_file: .env
+  #   depends_on:
+  #     ollama-init:
+  #       condition: service_completed_successfully
+
+  # frontend:
+  #   build:
+  #     context: ./frontend
+  #     dockerfile: ../docker/frontend/Dockerfile
+  #   ports:
+  #     - "3000:3000"
+  #   env_file: .env
+  #   depends_on:
+  #     - backend
+
+volumes:
+  ollama_data:
