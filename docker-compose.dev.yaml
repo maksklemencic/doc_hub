@@ -22,18 +22,21 @@ services:
     volumes:
       - ollama_data:/root/.ollama
     environment:
-      - OLLAMA_HOST=http://ollama:11434
+      - OLLAMA_HOST=${OLLAMA_URL}
+      - LLM_MODEL_NAME=${LLM_MODEL_NAME}
     entrypoint: []
+    env_file:
+      - .env.dev
     command: >
       sh -c "
         echo 'Waiting for Ollama to be ready...' &&
         sleep 3 &&
-        echo 'Checking if model qwen:7b exists...' &&
-        if ! OLLAMA_HOST=http://ollama:11434 ollama list | grep -q 'qwen:7b'; then
-          echo 'Model qwen:7b not found, pulling...' &&
-          OLLAMA_HOST=http://ollama:11434 ollama pull qwen:7b
+        echo 'Checking if model ${LLM_MODEL_NAME} exists...' &&
+        if ! OLLAMA_HOST=${OLLAMA_URL} ollama list | grep -q '${LLM_MODEL_NAME}'; then
+          echo 'Model ${LLM_MODEL_NAME} not found, pulling...' &&
+          OLLAMA_HOST=${OLLAMA_URL} ollama pull ${LLM_MODEL_NAME}
         else
-          echo 'Model qwen:7b already exists, skipping pull.'
+          echo 'Model ${LLM_MODEL_NAME} already exists, skipping pull.'
         fi &&
         echo 'Model setup complete!'
       "
