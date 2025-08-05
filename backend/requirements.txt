@@ -1,0 +1,8 @@
+fastapi
+uvicorn[standard]
+httpx
+qdrant-client>=1.6.0
+requests
+sentence_transformers
+tf-keras
+langchain
