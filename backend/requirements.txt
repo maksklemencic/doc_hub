@@ -6,3 +6,8 @@ requests
 sentence_transformers
 tf-keras
 langchain
+pymupdf
+pytesseract
+pillow
+keybert
+langdetect

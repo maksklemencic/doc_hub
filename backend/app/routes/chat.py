@@ -7,13 +7,13 @@ from app.services.qdrant_client import query_top_k
 
 router = APIRouter()
 
-class QueryRequest(BaseModel):
+class PostQueryRequest(BaseModel):
     query: str
     stream: bool = False
     top_k: int = 5
 
 @router.post("/query")
-def create_query(data: QueryRequest):
+def create_query(data: PostQueryRequest):
     try:
         # Step 1: Embed the user's query
         query_embedding = get_embeddings([data.query])[0]
