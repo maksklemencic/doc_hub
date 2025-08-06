@@ -12,19 +12,17 @@ class PostQueryRequest(BaseModel):
     stream: bool = False
     top_k: int = 5
 
-@router.post("/query")
-def create_query(data: PostQueryRequest):
+@router.post("/query/{user_id}")
+def create_query(data: PostQueryRequest, user_id: str):
     try:
-        # Step 1: Embed the user's query
+        if user_id is None:
+            raise HTTPException(status_code=404, detail="No user_id provided!")
+        
         query_embedding = get_embeddings([data.query])[0]
         
-        # Step 2: Search for top-k relevant chunks in Qdrant
-        top_k_chunks = query_top_k(query_embedding, k=data.top_k)
-        
-        # Step 3: Build context from payloads
+        top_k_chunks = query_top_k(query_embedding, user_id=user_id, k=data.top_k)
         context = "\n".join([res.payload["text"] for res in top_k_chunks])
         
-        # Step 4: Call Ollama to get response
         response = generate_response(query=data.query, context=context, stream=data.stream)
 
         return {"response": response}

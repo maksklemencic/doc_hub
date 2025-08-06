@@ -17,9 +17,6 @@ def store_document(
         chunks: list, 
         embeddings: list, 
         metadata: list[dict],
-        document_id: uuid,
-        filename: str,
-        file_type: str
     ):
     ensure_collection()
     
@@ -31,9 +28,6 @@ def store_document(
                 vector=embedding,
                 payload={
                     "text": chunk,
-                    "document_id": document_id,
-                    "filename": filename,
-                    "file_type": file_type,
                     **item_metadata
                 }
             )
@@ -41,13 +35,19 @@ def store_document(
         ]
     )
     
-def query_top_k(query_vector, k=5):
+def query_top_k(query_vector, user_id, k=5):
     ensure_collection()
     
+    # TODO Use metadata to better search
     results = client.search(
         collection_name=COLLECTION_NAME,
         query_vector=query_vector,
         limit=k,
         with_payload=True,
+        query_filter={
+            "must": [
+                {"key": "user_id", "match": {"value": user_id}}
+            ]
+        }
     )
     return results  # Each result has `.payload` and `.score`

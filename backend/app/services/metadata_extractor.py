@@ -1,6 +1,7 @@
 from langdetect import detect
 from keybert import KeyBERT
 import re
+import uuid
 
 kw_model = KeyBERT()
 
@@ -25,10 +26,16 @@ def infer_heading_from_context(chunk: str, previous_lines: list[str]) -> str:
     return ""
 
 
-def create_metadata(chunks: list[str]) -> list[dict]:
+def create_metadata(
+    chunks: list[str], 
+    page_numbers: list[int], 
+    doc_id: uuid,
+    filename: str,
+    file_type: str
+) -> list[dict]:
     
     metadata_list = []
-    for i, chunk in enumerate(chunks):
+    for i, (chunk, page_number) in enumerate(zip(chunks, page_numbers)):
         heading = infer_heading_from_context(chunk, chunks[:i])
         lang = detect_language(chunk)
         topics = extract_topics(chunk)
@@ -38,7 +45,10 @@ def create_metadata(chunks: list[str]) -> list[dict]:
             "language": lang,
             "heading": heading,
             "topics": topics,
-            # "page_number": (optional - if you track this in preprocessor)
+            "page_number": page_number,
+            "document_id": doc_id,
+            "filename": filename,
+            "file_type": file_type
         })
 
     return metadata_list

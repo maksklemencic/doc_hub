@@ -1,0 +1,745 @@
+[
+    {
+        "label": "numpy",
+        "kind": 6,
+        "isExtraImport": true,
+        "importPath": "numpy",
+        "description": "numpy",
+        "detail": "numpy",
+        "documentation": {}
+    },
+    {
+        "label": "SentenceTransformer",
+        "importPath": "sentence_transformers",
+        "description": "sentence_transformers",
+        "isExtraImport": true,
+        "detail": "sentence_transformers",
+        "documentation": {}
+    },
+    {
+        "label": "SentenceTransformer",
+        "importPath": "sentence_transformers",
+        "description": "sentence_transformers",
+        "isExtraImport": true,
+        "detail": "sentence_transformers",
+        "documentation": {}
+    },
+    {
+        "label": "RecursiveCharacterTextSplitter",
+        "importPath": "langchain.text_splitter",
+        "description": "langchain.text_splitter",
+        "isExtraImport": true,
+        "detail": "langchain.text_splitter",
+        "documentation": {}
+    },
+    {
+        "label": "RecursiveCharacterTextSplitter",
+        "importPath": "langchain.text_splitter",
+        "description": "langchain.text_splitter",
+        "isExtraImport": true,
+        "detail": "langchain.text_splitter",
+        "documentation": {}
+    },
+    {
+        "label": "os",
+        "kind": 6,
+        "isExtraImport": true,
+        "importPath": "os",
+        "description": "os",
+        "detail": "os",
+        "documentation": {}
+    },
+    {
+        "label": "app.services.embedding",
+        "kind": 6,
+        "isExtraImport": true,
+        "importPath": "app.services.embedding",
+        "description": "app.services.embedding",
+        "detail": "app.services.embedding",
+        "documentation": {}
+    },
+    {
+        "label": "get_embeddings",
+        "importPath": "app.services.embedding",
+        "description": "app.services.embedding",
+        "isExtraImport": true,
+        "detail": "app.services.embedding",
+        "documentation": {}
+    },
+    {
+        "label": "get_embeddings",
+        "importPath": "app.services.embedding",
+        "description": "app.services.embedding",
+        "isExtraImport": true,
+        "detail": "app.services.embedding",
+        "documentation": {}
+    },
+    {
+        "label": "structure_aware_chunk",
+        "importPath": "app.services.embedding",
+        "description": "app.services.embedding",
+        "isExtraImport": true,
+        "detail": "app.services.embedding",
+        "documentation": {}
+    },
+    {
+        "label": "APIRouter",
+        "importPath": "fastapi",
+        "description": "fastapi",
+        "isExtraImport": true,
+        "detail": "fastapi",
+        "documentation": {}
+    },
+    {
+        "label": "HTTPException",
+        "importPath": "fastapi",
+        "description": "fastapi",
+        "isExtraImport": true,
+        "detail": "fastapi",
+        "documentation": {}
+    },
+    {
+        "label": "APIRouter",
+        "importPath": "fastapi",
+        "description": "fastapi",
+        "isExtraImport": true,
+        "detail": "fastapi",
+        "documentation": {}
+    },
+    {
+        "label": "HTTPException",
+        "importPath": "fastapi",
+        "description": "fastapi",
+        "isExtraImport": true,
+        "detail": "fastapi",
+        "documentation": {}
+    },
+    {
+        "label": "APIRouter",
+        "importPath": "fastapi",
+        "description": "fastapi",
+        "isExtraImport": true,
+        "detail": "fastapi",
+        "documentation": {}
+    },
+    {
+        "label": "File",
+        "importPath": "fastapi",
+        "description": "fastapi",
+        "isExtraImport": true,
+        "detail": "fastapi",
+        "documentation": {}
+    },
+    {
+        "label": "UploadFile",
+        "importPath": "fastapi",
+        "description": "fastapi",
+        "isExtraImport": true,
+        "detail": "fastapi",
+        "documentation": {}
+    },
+    {
+        "label": "Form",
+        "importPath": "fastapi",
+        "description": "fastapi",
+        "isExtraImport": true,
+        "detail": "fastapi",
+        "documentation": {}
+    },
+    {
+        "label": "HTTPException",
+        "importPath": "fastapi",
+        "description": "fastapi",
+        "isExtraImport": true,
+        "detail": "fastapi",
+        "documentation": {}
+    },
+    {
+        "label": "FastAPI",
+        "importPath": "fastapi",
+        "description": "fastapi",
+        "isExtraImport": true,
+        "detail": "fastapi",
+        "documentation": {}
+    },
+    {
+        "label": "BaseModel",
+        "importPath": "pydantic",
+        "description": "pydantic",
+        "isExtraImport": true,
+        "detail": "pydantic",
+        "documentation": {}
+    },
+    {
+        "label": "BaseModel",
+        "importPath": "pydantic",
+        "description": "pydantic",
+        "isExtraImport": true,
+        "detail": "pydantic",
+        "documentation": {}
+    },
+    {
+        "label": "BaseModel",
+        "importPath": "pydantic",
+        "description": "pydantic",
+        "isExtraImport": true,
+        "detail": "pydantic",
+        "documentation": {}
+    },
+    {
+        "label": "generate_response",
+        "importPath": "app.services.ollama_client",
+        "description": "app.services.ollama_client",
+        "isExtraImport": true,
+        "detail": "app.services.ollama_client",
+        "documentation": {}
+    },
+    {
+        "label": "query_top_k",
+        "importPath": "app.services.qdrant_client",
+        "description": "app.services.qdrant_client",
+        "isExtraImport": true,
+        "detail": "app.services.qdrant_client",
+        "documentation": {}
+    },
+    {
+        "label": "store_document",
+        "importPath": "app.services.qdrant_client",
+        "description": "app.services.qdrant_client",
+        "isExtraImport": true,
+        "detail": "app.services.qdrant_client",
+        "documentation": {}
+    },
+    {
+        "label": "QdrantClient",
+        "importPath": "qdrant_client",
+        "description": "qdrant_client",
+        "isExtraImport": true,
+        "detail": "qdrant_client",
+        "documentation": {}
+    },
+    {
+        "label": "QdrantClient",
+        "importPath": "qdrant_client",
+        "description": "qdrant_client",
+        "isExtraImport": true,
+        "detail": "qdrant_client",
+        "documentation": {}
+    },
+    {
+        "label": "Filter",
+        "importPath": "qdrant_client.http.models",
+        "description": "qdrant_client.http.models",
+        "isExtraImport": true,
+        "detail": "qdrant_client.http.models",
+        "documentation": {}
+    },
+    {
+        "label": "FieldCondition",
+        "importPath": "qdrant_client.http.models",
+        "description": "qdrant_client.http.models",
+        "isExtraImport": true,
+        "detail": "qdrant_client.http.models",
+        "documentation": {}
+    },
+    {
+        "label": "MatchValue",
+        "importPath": "qdrant_client.http.models",
+        "description": "qdrant_client.http.models",
+        "isExtraImport": true,
+        "detail": "qdrant_client.http.models",
+        "documentation": {}
+    },
+    {
+        "label": "SearchRequest",
+        "importPath": "qdrant_client.http.models",
+        "description": "qdrant_client.http.models",
+        "isExtraImport": true,
+        "detail": "qdrant_client.http.models",
+        "documentation": {}
+    },
+    {
+        "label": "VectorParams",
+        "importPath": "qdrant_client.http.models",
+        "description": "qdrant_client.http.models",
+        "isExtraImport": true,
+        "detail": "qdrant_client.http.models",
+        "documentation": {}
+    },
+    {
+        "label": "Distance",
+        "importPath": "qdrant_client.http.models",
+        "description": "qdrant_client.http.models",
+        "isExtraImport": true,
+        "detail": "qdrant_client.http.models",
+        "documentation": {}
+    },
+    {
+        "label": "PointStruct",
+        "importPath": "qdrant_client.http.models",
+        "description": "qdrant_client.http.models",
+        "isExtraImport": true,
+        "detail": "qdrant_client.http.models",
+        "documentation": {}
+    },
+    {
+        "label": "uuid",
+        "kind": 6,
+        "isExtraImport": true,
+        "importPath": "uuid",
+        "description": "uuid",
+        "detail": "uuid",
+        "documentation": {}
+    },
+    {
+        "label": "base64_to_bytes",
+        "importPath": "app.services.document_processor",
+        "description": "app.services.document_processor",
+        "isExtraImport": true,
+        "detail": "app.services.document_processor",
+        "documentation": {}
+    },
+    {
+        "label": "extract_text_with_structure",
+        "importPath": "app.services.document_processor",
+        "description": "app.services.document_processor",
+        "isExtraImport": true,
+        "detail": "app.services.document_processor",
+        "documentation": {}
+    },
+    {
+        "label": "clean_text",
+        "importPath": "app.services.document_processor",
+        "description": "app.services.document_processor",
+        "isExtraImport": true,
+        "detail": "app.services.document_processor",
+        "documentation": {}
+    },
+    {
+        "label": "create_metadata",
+        "importPath": "app.services.metadata_extractor",
+        "description": "app.services.metadata_extractor",
+        "isExtraImport": true,
+        "detail": "app.services.metadata_extractor",
+        "documentation": {}
+    },
+    {
+        "label": "io",
+        "kind": 6,
+        "isExtraImport": true,
+        "importPath": "io",
+        "description": "io",
+        "detail": "io",
+        "documentation": {}
+    },
+    {
+        "label": "base64",
+        "kind": 6,
+        "isExtraImport": true,
+        "importPath": "base64",
+        "description": "base64",
+        "detail": "base64",
+        "documentation": {}
+    },
+    {
+        "label": "fitz",
+        "kind": 6,
+        "isExtraImport": true,
+        "importPath": "fitz",
+        "description": "fitz",
+        "detail": "fitz",
+        "documentation": {}
+    },
+    {
+        "label": "re",
+        "kind": 6,
+        "isExtraImport": true,
+        "importPath": "re",
+        "description": "re",
+        "detail": "re",
+        "documentation": {}
+    },
+    {
+        "label": "List",
+        "importPath": "typing",
+        "description": "typing",
+        "isExtraImport": true,
+        "detail": "typing",
+        "documentation": {}
+    },
+    {
+        "label": "Image",
+        "importPath": "PIL",
+        "description": "PIL",
+        "isExtraImport": true,
+        "detail": "PIL",
+        "documentation": {}
+    },
+    {
+        "label": "pytesseract",
+        "kind": 6,
+        "isExtraImport": true,
+        "importPath": "pytesseract",
+        "description": "pytesseract",
+        "detail": "pytesseract",
+        "documentation": {}
+    },
+    {
+        "label": "detect",
+        "importPath": "langdetect",
+        "description": "langdetect",
+        "isExtraImport": true,
+        "detail": "langdetect",
+        "documentation": {}
+    },
+    {
+        "label": "KeyBERT",
+        "importPath": "keybert",
+        "description": "keybert",
+        "isExtraImport": true,
+        "detail": "keybert",
+        "documentation": {}
+    },
+    {
+        "label": "requests",
+        "kind": 6,
+        "isExtraImport": true,
+        "importPath": "requests",
+        "description": "requests",
+        "detail": "requests",
+        "documentation": {}
+    },
+    {
+        "label": "chunk_text",
+        "kind": 2,
+        "importPath": "backend.app.debug.doc_pipline",
+        "description": "backend.app.debug.doc_pipline",
+        "peekOfCode": "def chunk_text(text: str, chunk_size=500, chunk_overlap=50):\n    text_splitter = RecursiveCharacterTextSplitter(\n        chunk_size=chunk_size,\n        chunk_overlap=chunk_overlap\n    )\n    chunks = text_splitter.split_text(text)\n    return chunks\ndef get_embeddings(chunks: list) -> list:\n    return model.encode(chunks)\nwith open(\"./backend/app/debug/document_sample.txt\", \"r\", encoding=\"utf-8\") as f:",
+        "detail": "backend.app.debug.doc_pipline",
+        "documentation": {}
+    },
+    {
+        "label": "get_embeddings",
+        "kind": 2,
+        "importPath": "backend.app.debug.doc_pipline",
+        "description": "backend.app.debug.doc_pipline",
+        "peekOfCode": "def get_embeddings(chunks: list) -> list:\n    return model.encode(chunks)\nwith open(\"./backend/app/debug/document_sample.txt\", \"r\", encoding=\"utf-8\") as f:\n    text = f.read()\nchunks = chunk_text(text)\nprint(f\"Total chunks created: {len(chunks)}\")\n# print(chunks[0])\nembeddings = get_embeddings(chunks)\n# list (125, 384)\nprint(\"Done\")",
+        "detail": "backend.app.debug.doc_pipline",
+        "documentation": {}
+    },
+    {
+        "label": "model",
+        "kind": 5,
+        "importPath": "backend.app.debug.doc_pipline",
+        "description": "backend.app.debug.doc_pipline",
+        "peekOfCode": "model = SentenceTransformer(\"all-MiniLM-L6-v2\")\ndef chunk_text(text: str, chunk_size=500, chunk_overlap=50):\n    text_splitter = RecursiveCharacterTextSplitter(\n        chunk_size=chunk_size,\n        chunk_overlap=chunk_overlap\n    )\n    chunks = text_splitter.split_text(text)\n    return chunks\ndef get_embeddings(chunks: list) -> list:\n    return model.encode(chunks)",
+        "detail": "backend.app.debug.doc_pipline",
+        "documentation": {}
+    },
+    {
+        "label": "chunks",
+        "kind": 5,
+        "importPath": "backend.app.debug.doc_pipline",
+        "description": "backend.app.debug.doc_pipline",
+        "peekOfCode": "chunks = chunk_text(text)\nprint(f\"Total chunks created: {len(chunks)}\")\n# print(chunks[0])\nembeddings = get_embeddings(chunks)\n# list (125, 384)\nprint(\"Done\")",
+        "detail": "backend.app.debug.doc_pipline",
+        "documentation": {}
+    },
+    {
+        "label": "embeddings",
+        "kind": 5,
+        "importPath": "backend.app.debug.doc_pipline",
+        "description": "backend.app.debug.doc_pipline",
+        "peekOfCode": "embeddings = get_embeddings(chunks)\n# list (125, 384)\nprint(\"Done\")",
+        "detail": "backend.app.debug.doc_pipline",
+        "documentation": {}
+    },
+    {
+        "label": "PostQueryRequest",
+        "kind": 6,
+        "importPath": "backend.app.routes.chat",
+        "description": "backend.app.routes.chat",
+        "peekOfCode": "class PostQueryRequest(BaseModel):\n    query: str\n    stream: bool = False\n    top_k: int = 5\n@router.post(\"/query\")\ndef create_query(data: PostQueryRequest):\n    try:\n        # Step 1: Embed the user's query\n        query_embedding = get_embeddings([data.query])[0]\n        # Step 2: Search for top-k relevant chunks in Qdrant",
+        "detail": "backend.app.routes.chat",
+        "documentation": {}
+    },
+    {
+        "label": "create_query",
+        "kind": 2,
+        "importPath": "backend.app.routes.chat",
+        "description": "backend.app.routes.chat",
+        "peekOfCode": "def create_query(data: PostQueryRequest):\n    try:\n        # Step 1: Embed the user's query\n        query_embedding = get_embeddings([data.query])[0]\n        # Step 2: Search for top-k relevant chunks in Qdrant\n        top_k_chunks = query_top_k(query_embedding, k=data.top_k)\n        # Step 3: Build context from payloads\n        context = \"\\n\".join([res.payload[\"text\"] for res in top_k_chunks])\n        # Step 4: Call Ollama to get response\n        response = generate_response(query=data.query, context=context, stream=data.stream)",
+        "detail": "backend.app.routes.chat",
+        "documentation": {}
+    },
+    {
+        "label": "router",
+        "kind": 5,
+        "importPath": "backend.app.routes.chat",
+        "description": "backend.app.routes.chat",
+        "peekOfCode": "router = APIRouter()\nclass PostQueryRequest(BaseModel):\n    query: str\n    stream: bool = False\n    top_k: int = 5\n@router.post(\"/query\")\ndef create_query(data: PostQueryRequest):\n    try:\n        # Step 1: Embed the user's query\n        query_embedding = get_embeddings([data.query])[0]",
+        "detail": "backend.app.routes.chat",
+        "documentation": {}
+    },
+    {
+        "label": "GetDocumentRequest",
+        "kind": 6,
+        "importPath": "backend.app.routes.documents",
+        "description": "backend.app.routes.documents",
+        "peekOfCode": "class GetDocumentRequest(BaseModel):\n    documentId: str\n@router.get(\"/{doc_id}\")\ndef get_document(data: GetDocumentRequest):\n    pass",
+        "detail": "backend.app.routes.documents",
+        "documentation": {}
+    },
+    {
+        "label": "get_document",
+        "kind": 2,
+        "importPath": "backend.app.routes.documents",
+        "description": "backend.app.routes.documents",
+        "peekOfCode": "def get_document(data: GetDocumentRequest):\n    pass",
+        "detail": "backend.app.routes.documents",
+        "documentation": {}
+    },
+    {
+        "label": "router",
+        "kind": 5,
+        "importPath": "backend.app.routes.documents",
+        "description": "backend.app.routes.documents",
+        "peekOfCode": "router = APIRouter()\nclass GetDocumentRequest(BaseModel):\n    documentId: str\n@router.get(\"/{doc_id}\")\ndef get_document(data: GetDocumentRequest):\n    pass",
+        "detail": "backend.app.routes.documents",
+        "documentation": {}
+    },
+    {
+        "label": "Base64UploadRequest",
+        "kind": 6,
+        "importPath": "backend.app.routes.upload",
+        "description": "backend.app.routes.upload",
+        "peekOfCode": "class Base64UploadRequest(BaseModel):\n    filename: str\n    file_type: str\n    content_base64: str\n@router.post(\"/base64\")\ndef upload_base64(request: Base64UploadRequest):\n    try:\n        pdf_text = base64_to_bytes(base64=request.content_base64)\n        clean_text = clean_text(pdf_text)\n        chunks, document_id = save_to_db(text=clean_text)",
+        "detail": "backend.app.routes.upload",
+        "documentation": {}
+    },
+    {
+        "label": "upload_base64",
+        "kind": 2,
+        "importPath": "backend.app.routes.upload",
+        "description": "backend.app.routes.upload",
+        "peekOfCode": "def upload_base64(request: Base64UploadRequest):\n    try:\n        pdf_text = base64_to_bytes(base64=request.content_base64)\n        clean_text = clean_text(pdf_text)\n        chunks, document_id = save_to_db(text=clean_text)\n        return {\n            \"status\": \"Success\",\n            \"document_id\": document_id,\n            \"document_name\": request.filename,\n            \"chunk_count\": len(chunks) ",
+        "detail": "backend.app.routes.upload",
+        "documentation": {}
+    },
+    {
+        "label": "save_to_db",
+        "kind": 2,
+        "importPath": "backend.app.routes.upload",
+        "description": "backend.app.routes.upload",
+        "peekOfCode": "def save_to_db(text: str, filename: str, file_type: str):\n    chunks = structure_aware_chunk(text=text)\n    embeddings = get_embeddings(chunks=chunks)\n    document_id = str(uuid.uuid4())\n    metadata = create_metadata(chunks=chunks)\n    store_document(\n        embeddings=embeddings, \n        chunks=chunks, \n        metadata=metadata\n    )",
+        "detail": "backend.app.routes.upload",
+        "documentation": {}
+    },
+    {
+        "label": "router",
+        "kind": 5,
+        "importPath": "backend.app.routes.upload",
+        "description": "backend.app.routes.upload",
+        "peekOfCode": "router = APIRouter()\nclass Base64UploadRequest(BaseModel):\n    filename: str\n    file_type: str\n    content_base64: str\n@router.post(\"/base64\")\ndef upload_base64(request: Base64UploadRequest):\n    try:\n        pdf_text = base64_to_bytes(base64=request.content_base64)\n        clean_text = clean_text(pdf_text)",
+        "detail": "backend.app.routes.upload",
+        "documentation": {}
+    },
+    {
+        "label": "base64_to_bytes",
+        "kind": 2,
+        "importPath": "backend.app.services.document_processor",
+        "description": "backend.app.services.document_processor",
+        "peekOfCode": "def base64_to_bytes(base64_text: str):\n    file_bytes = base64.b64decode(base64_text)\n    return extract_text_with_structure(file_bytes)\ndef extract_text_with_structure(file_bytes: bytes) -> str:\n    doc = fitz.open(stream=file_bytes, filetype=\"pdf\")\n    full_text = []\n    for page in doc:\n        text = page.get_text()\n        if not text.strip():\n            pix = page.get_pixmap(dpi=300)",
+        "detail": "backend.app.services.document_processor",
+        "documentation": {}
+    },
+    {
+        "label": "extract_text_with_structure",
+        "kind": 2,
+        "importPath": "backend.app.services.document_processor",
+        "description": "backend.app.services.document_processor",
+        "peekOfCode": "def extract_text_with_structure(file_bytes: bytes) -> str:\n    doc = fitz.open(stream=file_bytes, filetype=\"pdf\")\n    full_text = []\n    for page in doc:\n        text = page.get_text()\n        if not text.strip():\n            pix = page.get_pixmap(dpi=300)\n            img_bytes = pix.tobytes(\"png\")\n            image = Image.open(io.BytesIO(img_bytes))\n            text = pytesseract.image_to_string(image)",
+        "detail": "backend.app.services.document_processor",
+        "documentation": {}
+    },
+    {
+        "label": "clean_text",
+        "kind": 2,
+        "importPath": "backend.app.services.document_processor",
+        "description": "backend.app.services.document_processor",
+        "peekOfCode": "def clean_text(text: str) -> str:\n    text = re.sub(r\"-\\n\", \"\", text)\n    text = re.sub(r\"\\n{2,}\", \"\\n\", text)\n    text = re.sub(r\"[ \\t]+\", \" \", text)\n    return text.strip()",
+        "detail": "backend.app.services.document_processor",
+        "documentation": {}
+    },
+    {
+        "label": "chunk_text_recursive",
+        "kind": 2,
+        "importPath": "backend.app.services.embedding",
+        "description": "backend.app.services.embedding",
+        "peekOfCode": "def chunk_text_recursive(text: str, chunk_size=500, chunk_overlap=50) -> list[str]:\n    text_splitter = RecursiveCharacterTextSplitter(\n        chunk_size=chunk_size,\n        chunk_overlap=chunk_overlap\n    )\n    chunks = text_splitter.split_text(text)\n    return chunks\ndef structure_aware_chunk(text: str, max_length=500, overlap=50) -> list[str]:\n    paragraphs = text.split(\"\\n\")\n    chunks = []",
+        "detail": "backend.app.services.embedding",
+        "documentation": {}
+    },
+    {
+        "label": "structure_aware_chunk",
+        "kind": 2,
+        "importPath": "backend.app.services.embedding",
+        "description": "backend.app.services.embedding",
+        "peekOfCode": "def structure_aware_chunk(text: str, max_length=500, overlap=50) -> list[str]:\n    paragraphs = text.split(\"\\n\")\n    chunks = []\n    current_chunk = \"\"\n    for para in paragraphs:\n        if not para.strip():\n            continue\n        if len(current_chunk.split()) + len(para.split()) <= max_length:\n            current_chunk += \" \" + para.strip()\n        else:",
+        "detail": "backend.app.services.embedding",
+        "documentation": {}
+    },
+    {
+        "label": "get_embeddings",
+        "kind": 2,
+        "importPath": "backend.app.services.embedding",
+        "description": "backend.app.services.embedding",
+        "peekOfCode": "def get_embeddings(chunks: list) -> list:\n    return model.encode(chunks)",
+        "detail": "backend.app.services.embedding",
+        "documentation": {}
+    },
+    {
+        "label": "model",
+        "kind": 5,
+        "importPath": "backend.app.services.embedding",
+        "description": "backend.app.services.embedding",
+        "peekOfCode": "model = SentenceTransformer(\"all-MiniLM-L6-v2\")\ndef chunk_text_recursive(text: str, chunk_size=500, chunk_overlap=50) -> list[str]:\n    text_splitter = RecursiveCharacterTextSplitter(\n        chunk_size=chunk_size,\n        chunk_overlap=chunk_overlap\n    )\n    chunks = text_splitter.split_text(text)\n    return chunks\ndef structure_aware_chunk(text: str, max_length=500, overlap=50) -> list[str]:\n    paragraphs = text.split(\"\\n\")",
+        "detail": "backend.app.services.embedding",
+        "documentation": {}
+    },
+    {
+        "label": "detect_language",
+        "kind": 2,
+        "importPath": "backend.app.services.metadata_extractor",
+        "description": "backend.app.services.metadata_extractor",
+        "peekOfCode": "def detect_language(text: str) -> str:\n    try:\n        return detect(text)\n    except:\n        return \"unknown\"\ndef extract_topics(text: str, top_n=3) -> list:\n    try:\n        keywords = kw_model.extract_keywords(text, top_n=top_n)\n        return [kw[0] for kw in keywords]\n    except:",
+        "detail": "backend.app.services.metadata_extractor",
+        "documentation": {}
+    },
+    {
+        "label": "extract_topics",
+        "kind": 2,
+        "importPath": "backend.app.services.metadata_extractor",
+        "description": "backend.app.services.metadata_extractor",
+        "peekOfCode": "def extract_topics(text: str, top_n=3) -> list:\n    try:\n        keywords = kw_model.extract_keywords(text, top_n=top_n)\n        return [kw[0] for kw in keywords]\n    except:\n        return []\ndef infer_heading_from_context(chunk: str, previous_lines: list[str]) -> str:\n    for line in reversed(previous_lines[-5:]):\n        if len(line.strip()) < 100:\n            if line.isupper() or re.match(r'^[A-Z][A-Za-z0-9\\s\\-:]{2,}$', line):",
+        "detail": "backend.app.services.metadata_extractor",
+        "documentation": {}
+    },
+    {
+        "label": "infer_heading_from_context",
+        "kind": 2,
+        "importPath": "backend.app.services.metadata_extractor",
+        "description": "backend.app.services.metadata_extractor",
+        "peekOfCode": "def infer_heading_from_context(chunk: str, previous_lines: list[str]) -> str:\n    for line in reversed(previous_lines[-5:]):\n        if len(line.strip()) < 100:\n            if line.isupper() or re.match(r'^[A-Z][A-Za-z0-9\\s\\-:]{2,}$', line):\n                return line.strip()\n    return \"\"\ndef create_metadata(chunks: list[str]) -> list[dict]:\n    metadata_list = []\n    for i, chunk in enumerate(chunks):\n        heading = infer_heading_from_context(chunk, chunks[:i])",
+        "detail": "backend.app.services.metadata_extractor",
+        "documentation": {}
+    },
+    {
+        "label": "create_metadata",
+        "kind": 2,
+        "importPath": "backend.app.services.metadata_extractor",
+        "description": "backend.app.services.metadata_extractor",
+        "peekOfCode": "def create_metadata(chunks: list[str]) -> list[dict]:\n    metadata_list = []\n    for i, chunk in enumerate(chunks):\n        heading = infer_heading_from_context(chunk, chunks[:i])\n        lang = detect_language(chunk)\n        topics = extract_topics(chunk)\n        metadata_list.append({\n            \"chunk_index\": i,\n            \"language\": lang,\n            \"heading\": heading,",
+        "detail": "backend.app.services.metadata_extractor",
+        "documentation": {}
+    },
+    {
+        "label": "kw_model",
+        "kind": 5,
+        "importPath": "backend.app.services.metadata_extractor",
+        "description": "backend.app.services.metadata_extractor",
+        "peekOfCode": "kw_model = KeyBERT()\ndef detect_language(text: str) -> str:\n    try:\n        return detect(text)\n    except:\n        return \"unknown\"\ndef extract_topics(text: str, top_n=3) -> list:\n    try:\n        keywords = kw_model.extract_keywords(text, top_n=top_n)\n        return [kw[0] for kw in keywords]",
+        "detail": "backend.app.services.metadata_extractor",
+        "documentation": {}
+    },
+    {
+        "label": "generate_response",
+        "kind": 2,
+        "importPath": "backend.app.services.ollama_client",
+        "description": "backend.app.services.ollama_client",
+        "peekOfCode": "def generate_response(query: str, context: str, stream: bool) -> str:\n    promt = f\"\"\"Instruction: Use the context to answer the question. If there is no sufficient information in context, use your knowledge.\n    Question: {query}\n    Context: {context}\"\"\"\n    response = requests.post(f\"{OLLAMA_URL}/api/generate\", json={\n        \"model\": MODEL,\n        \"prompt\": promt,\n        \"stream\": stream\n    })\n    response.raise_for_status()",
+        "detail": "backend.app.services.ollama_client",
+        "documentation": {}
+    },
+    {
+        "label": "OLLAMA_URL",
+        "kind": 5,
+        "importPath": "backend.app.services.ollama_client",
+        "description": "backend.app.services.ollama_client",
+        "peekOfCode": "OLLAMA_URL = os.getenv(\"OLLAMA_URL\", \"http://localhost:11434\")\nMODEL = os.getenv(\"LLM_MODEL_NAME\", \"qwen3:0.6b\")\ndef generate_response(query: str, context: str, stream: bool) -> str:\n    promt = f\"\"\"Instruction: Use the context to answer the question. If there is no sufficient information in context, use your knowledge.\n    Question: {query}\n    Context: {context}\"\"\"\n    response = requests.post(f\"{OLLAMA_URL}/api/generate\", json={\n        \"model\": MODEL,\n        \"prompt\": promt,\n        \"stream\": stream",
+        "detail": "backend.app.services.ollama_client",
+        "documentation": {}
+    },
+    {
+        "label": "MODEL",
+        "kind": 5,
+        "importPath": "backend.app.services.ollama_client",
+        "description": "backend.app.services.ollama_client",
+        "peekOfCode": "MODEL = os.getenv(\"LLM_MODEL_NAME\", \"qwen3:0.6b\")\ndef generate_response(query: str, context: str, stream: bool) -> str:\n    promt = f\"\"\"Instruction: Use the context to answer the question. If there is no sufficient information in context, use your knowledge.\n    Question: {query}\n    Context: {context}\"\"\"\n    response = requests.post(f\"{OLLAMA_URL}/api/generate\", json={\n        \"model\": MODEL,\n        \"prompt\": promt,\n        \"stream\": stream\n    })",
+        "detail": "backend.app.services.ollama_client",
+        "documentation": {}
+    },
+    {
+        "label": "ensure_collection",
+        "kind": 2,
+        "importPath": "backend.app.services.qdrant_client",
+        "description": "backend.app.services.qdrant_client",
+        "peekOfCode": "def ensure_collection():\n    if COLLECTION_NAME not in [c.name for c in client.get_collections().collections]:\n        client.create_collection(\n            collection_name=COLLECTION_NAME,\n            vectors_config=VectorParams(size=384, distance=Distance.COSINE)\n        )\ndef store_document(\n        chunks: list, \n        embeddings: list, \n        metadata: list[dict],",
+        "detail": "backend.app.services.qdrant_client",
+        "documentation": {}
+    },
+    {
+        "label": "store_document",
+        "kind": 2,
+        "importPath": "backend.app.services.qdrant_client",
+        "description": "backend.app.services.qdrant_client",
+        "peekOfCode": "def store_document(\n        chunks: list, \n        embeddings: list, \n        metadata: list[dict],\n        document_id: uuid,\n        filename: str,\n        file_type: str\n    ):\n    ensure_collection()\n    client.upsert(",
+        "detail": "backend.app.services.qdrant_client",
+        "documentation": {}
+    },
+    {
+        "label": "query_top_k",
+        "kind": 2,
+        "importPath": "backend.app.services.qdrant_client",
+        "description": "backend.app.services.qdrant_client",
+        "peekOfCode": "def query_top_k(query_vector, k=5):\n    ensure_collection()\n    results = client.search(\n        collection_name=COLLECTION_NAME,\n        query_vector=query_vector,\n        limit=k,\n        with_payload=True,\n    )\n    return results  # Each result has `.payload` and `.score`",
+        "detail": "backend.app.services.qdrant_client",
+        "documentation": {}
+    },
+    {
+        "label": "client",
+        "kind": 5,
+        "importPath": "backend.app.services.qdrant_client",
+        "description": "backend.app.services.qdrant_client",
+        "peekOfCode": "client = QdrantClient(host=\"qdrant\", port=6333)\nCOLLECTION_NAME = \"documents\"\ndef ensure_collection():\n    if COLLECTION_NAME not in [c.name for c in client.get_collections().collections]:\n        client.create_collection(\n            collection_name=COLLECTION_NAME,\n            vectors_config=VectorParams(size=384, distance=Distance.COSINE)\n        )\ndef store_document(\n        chunks: list, ",
+        "detail": "backend.app.services.qdrant_client",
+        "documentation": {}
+    },
+    {
+        "label": "COLLECTION_NAME",
+        "kind": 5,
+        "importPath": "backend.app.services.qdrant_client",
+        "description": "backend.app.services.qdrant_client",
+        "peekOfCode": "COLLECTION_NAME = \"documents\"\ndef ensure_collection():\n    if COLLECTION_NAME not in [c.name for c in client.get_collections().collections]:\n        client.create_collection(\n            collection_name=COLLECTION_NAME,\n            vectors_config=VectorParams(size=384, distance=Distance.COSINE)\n        )\ndef store_document(\n        chunks: list, \n        embeddings: list, ",
+        "detail": "backend.app.services.qdrant_client",
+        "documentation": {}
+    },
+    {
+        "label": "read_root",
+        "kind": 2,
+        "importPath": "backend.app.main",
+        "description": "backend.app.main",
+        "peekOfCode": "def read_root():\n    return {\"message\": \"FastAPI is running!\"}\n# @app.get(\"/items/{item_id}\")\n# def read_item(item_id: int, q: str = None):\n#     return {\"item_id\": item_id, \"q\": q}",
+        "detail": "backend.app.main",
+        "documentation": {}
+    },
+    {
+        "label": "app",
+        "kind": 5,
+        "importPath": "backend.app.main",
+        "description": "backend.app.main",
+        "peekOfCode": "app = FastAPI()\napp.include_router(upload.router, prefix=\"/upload\")\napp.include_router(chat.router, prefix=\"/chat\")\napp.include_router(documents.router, prefix=\"/documents\")\n@app.get(\"/\")\ndef read_root():\n    return {\"message\": \"FastAPI is running!\"}\n# @app.get(\"/items/{item_id}\")\n# def read_item(item_id: int, q: str = None):\n#     return {\"item_id\": item_id, \"q\": q}",
+        "detail": "backend.app.main",
+        "documentation": {}
+    }
+]
