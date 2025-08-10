@@ -2,10 +2,10 @@ from fastapi import APIRouter, File, UploadFile, Form, HTTPException
 from pydantic import BaseModel
 import uuid
 
-from app.services.embedding import get_embeddings, structure_aware_chunk
-from app.services.qdrant_client import store_document
-from app.services.document_processor import base64_to_text, extract_text_with_structure
-from app.services.metadata_extractor import create_metadata
+from ..services.embedding import get_embeddings, structure_aware_chunk
+from ..services.qdrant_client import store_document
+from ..services.metadata_extractor import create_metadata
+from ..services.document_processor import base64_to_text, process_document_for_text
 
 router = APIRouter()
 
@@ -18,7 +18,7 @@ class Base64UploadRequest(BaseModel):
 @router.post("/base64")
 def upload_base64(request: Base64UploadRequest):
     try:
-        pages = base64_to_text(base64=request.content_base64)
+        pages = base64_to_text(base64_text=request.content_base64, file_type=request.file_type)
         chunks, document_id = save_to_db(pages, request.filename, request.file_type)
 
         return {
@@ -37,11 +37,9 @@ async def upload_file_multipart(
             filename: str = Form(...),
             file_type: str = Form(...),
         ):
-    if file.content_type != "application/pdf":
-        raise HTTPException(status_code=400, detail="Only the following file types are supported: pdf")
     try:
         contents = await file.read()        
-        pages = extract_text_with_structure(contents)
+        pages = process_document_for_text(contents, file_type)
         chunks, document_id = save_to_db(pages, filename, file_type)
 
         return {
@@ -63,7 +61,7 @@ def save_to_db(pages: list[(int, str)], filename: str, file_type: str):
     metadata = create_metadata(
         chunks=chunks, 
         page_numbers=page_numbers, 
-        document_id=document_id,
+        doc_id=document_id,
         filename=filename,
         file_type=file_type
     )

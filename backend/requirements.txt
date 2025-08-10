@@ -4,10 +4,12 @@ httpx
 qdrant-client>=1.6.0
 requests
 sentence_transformers
-tf-keras
 langchain
 pymupdf
 pytesseract
 pillow
 keybert
 langdetect
+python-docx
+python-multipart
+debugpy

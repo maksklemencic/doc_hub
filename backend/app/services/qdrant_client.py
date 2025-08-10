@@ -44,10 +44,10 @@ def query_top_k(query_vector, user_id, k=5):
         query_vector=query_vector,
         limit=k,
         with_payload=True,
-        query_filter={
-            "must": [
-                {"key": "user_id", "match": {"value": user_id}}
-            ]
-        }
+        # query_filter={
+        #     "must": [
+        #         {"key": "user_id", "match": {"value": user_id}}
+        #     ]
+        # }
     )
     return results  # Each result has `.payload` and `.score`

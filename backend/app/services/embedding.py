@@ -3,7 +3,6 @@ from sentence_transformers import SentenceTransformer
 from langchain.text_splitter import RecursiveCharacterTextSplitter
 from typing import List, Tuple
 
-
 model = SentenceTransformer("all-MiniLM-L6-v2")
 
 def chunk_text_recursive(text: str, chunk_size=500, chunk_overlap=50) -> list[str]:

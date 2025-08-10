@@ -1,9 +1,8 @@
-import app.services.embedding
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
-from app.services.ollama_client import generate_response
-from app.services.embedding import get_embeddings
-from app.services.qdrant_client import query_top_k
+from ..services.ollama_client import generate_response
+from ..services.embedding import get_embeddings
+from ..services.qdrant_client import query_top_k
 
 router = APIRouter()
 

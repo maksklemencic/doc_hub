@@ -1,5 +1,8 @@
 from fastapi import FastAPI
+import debugpy
 from .routes import upload, chat, documents
+
+debugpy.listen(("0.0.0.0", 5678))
 
 app = FastAPI()
 app.include_router(upload.router, prefix="/upload")
