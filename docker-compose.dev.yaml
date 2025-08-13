@@ -61,6 +61,7 @@ services:
       - PYTHONPATH=/app
     volumes:
       - ./backend:/app/backend
+      - model_cache:/app/models
     depends_on:
       ollama-init:
         condition: service_completed_successfully
@@ -78,3 +79,4 @@ services:
 volumes:
   ollama_data:
   qdrant_data:
+  model_cache:

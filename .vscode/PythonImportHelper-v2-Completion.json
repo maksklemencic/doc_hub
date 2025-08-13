@@ -33,53 +33,12 @@
         "documentation": {}
     },
     {
-        "label": "RecursiveCharacterTextSplitter",
-        "importPath": "langchain.text_splitter",
-        "description": "langchain.text_splitter",
-        "isExtraImport": true,
-        "detail": "langchain.text_splitter",
-        "documentation": {}
-    },
-    {
         "label": "os",
         "kind": 6,
         "isExtraImport": true,
         "importPath": "os",
         "description": "os",
         "detail": "os",
-        "documentation": {}
-    },
-    {
-        "label": "app.services.embedding",
-        "kind": 6,
-        "isExtraImport": true,
-        "importPath": "app.services.embedding",
-        "description": "app.services.embedding",
-        "detail": "app.services.embedding",
-        "documentation": {}
-    },
-    {
-        "label": "get_embeddings",
-        "importPath": "app.services.embedding",
-        "description": "app.services.embedding",
-        "isExtraImport": true,
-        "detail": "app.services.embedding",
-        "documentation": {}
-    },
-    {
-        "label": "get_embeddings",
-        "importPath": "app.services.embedding",
-        "description": "app.services.embedding",
-        "isExtraImport": true,
-        "detail": "app.services.embedding",
-        "documentation": {}
-    },
-    {
-        "label": "structure_aware_chunk",
-        "importPath": "app.services.embedding",
-        "description": "app.services.embedding",
-        "isExtraImport": true,
-        "detail": "app.services.embedding",
         "documentation": {}
     },
     {
@@ -187,140 +146,12 @@
         "documentation": {}
     },
     {
-        "label": "generate_response",
-        "importPath": "app.services.ollama_client",
-        "description": "app.services.ollama_client",
-        "isExtraImport": true,
-        "detail": "app.services.ollama_client",
-        "documentation": {}
-    },
-    {
-        "label": "query_top_k",
-        "importPath": "app.services.qdrant_client",
-        "description": "app.services.qdrant_client",
-        "isExtraImport": true,
-        "detail": "app.services.qdrant_client",
-        "documentation": {}
-    },
-    {
-        "label": "store_document",
-        "importPath": "app.services.qdrant_client",
-        "description": "app.services.qdrant_client",
-        "isExtraImport": true,
-        "detail": "app.services.qdrant_client",
-        "documentation": {}
-    },
-    {
-        "label": "QdrantClient",
-        "importPath": "qdrant_client",
-        "description": "qdrant_client",
-        "isExtraImport": true,
-        "detail": "qdrant_client",
-        "documentation": {}
-    },
-    {
-        "label": "QdrantClient",
-        "importPath": "qdrant_client",
-        "description": "qdrant_client",
-        "isExtraImport": true,
-        "detail": "qdrant_client",
-        "documentation": {}
-    },
-    {
-        "label": "Filter",
-        "importPath": "qdrant_client.http.models",
-        "description": "qdrant_client.http.models",
-        "isExtraImport": true,
-        "detail": "qdrant_client.http.models",
-        "documentation": {}
-    },
-    {
-        "label": "FieldCondition",
-        "importPath": "qdrant_client.http.models",
-        "description": "qdrant_client.http.models",
-        "isExtraImport": true,
-        "detail": "qdrant_client.http.models",
-        "documentation": {}
-    },
-    {
-        "label": "MatchValue",
-        "importPath": "qdrant_client.http.models",
-        "description": "qdrant_client.http.models",
-        "isExtraImport": true,
-        "detail": "qdrant_client.http.models",
-        "documentation": {}
-    },
-    {
-        "label": "SearchRequest",
-        "importPath": "qdrant_client.http.models",
-        "description": "qdrant_client.http.models",
-        "isExtraImport": true,
-        "detail": "qdrant_client.http.models",
-        "documentation": {}
-    },
-    {
-        "label": "VectorParams",
-        "importPath": "qdrant_client.http.models",
-        "description": "qdrant_client.http.models",
-        "isExtraImport": true,
-        "detail": "qdrant_client.http.models",
-        "documentation": {}
-    },
-    {
-        "label": "Distance",
-        "importPath": "qdrant_client.http.models",
-        "description": "qdrant_client.http.models",
-        "isExtraImport": true,
-        "detail": "qdrant_client.http.models",
-        "documentation": {}
-    },
-    {
-        "label": "PointStruct",
-        "importPath": "qdrant_client.http.models",
-        "description": "qdrant_client.http.models",
-        "isExtraImport": true,
-        "detail": "qdrant_client.http.models",
-        "documentation": {}
-    },
-    {
         "label": "uuid",
         "kind": 6,
         "isExtraImport": true,
         "importPath": "uuid",
         "description": "uuid",
         "detail": "uuid",
-        "documentation": {}
-    },
-    {
-        "label": "base64_to_bytes",
-        "importPath": "app.services.document_processor",
-        "description": "app.services.document_processor",
-        "isExtraImport": true,
-        "detail": "app.services.document_processor",
-        "documentation": {}
-    },
-    {
-        "label": "extract_text_with_structure",
-        "importPath": "app.services.document_processor",
-        "description": "app.services.document_processor",
-        "isExtraImport": true,
-        "detail": "app.services.document_processor",
-        "documentation": {}
-    },
-    {
-        "label": "clean_text",
-        "importPath": "app.services.document_processor",
-        "description": "app.services.document_processor",
-        "isExtraImport": true,
-        "detail": "app.services.document_processor",
-        "documentation": {}
-    },
-    {
-        "label": "create_metadata",
-        "importPath": "app.services.metadata_extractor",
-        "description": "app.services.metadata_extractor",
-        "isExtraImport": true,
-        "detail": "app.services.metadata_extractor",
         "documentation": {}
     },
     {
@@ -368,6 +199,38 @@
         "documentation": {}
     },
     {
+        "label": "Tuple",
+        "importPath": "typing",
+        "description": "typing",
+        "isExtraImport": true,
+        "detail": "typing",
+        "documentation": {}
+    },
+    {
+        "label": "List",
+        "importPath": "typing",
+        "description": "typing",
+        "isExtraImport": true,
+        "detail": "typing",
+        "documentation": {}
+    },
+    {
+        "label": "Tuple",
+        "importPath": "typing",
+        "description": "typing",
+        "isExtraImport": true,
+        "detail": "typing",
+        "documentation": {}
+    },
+    {
+        "label": "Optional",
+        "importPath": "typing",
+        "description": "typing",
+        "isExtraImport": true,
+        "detail": "typing",
+        "documentation": {}
+    },
+    {
         "label": "Image",
         "importPath": "PIL",
         "description": "PIL",
@@ -382,6 +245,46 @@
         "importPath": "pytesseract",
         "description": "pytesseract",
         "detail": "pytesseract",
+        "documentation": {}
+    },
+    {
+        "label": "Document",
+        "importPath": "docx",
+        "description": "docx",
+        "isExtraImport": true,
+        "detail": "docx",
+        "documentation": {}
+    },
+    {
+        "label": "Path",
+        "importPath": "pathlib",
+        "description": "pathlib",
+        "isExtraImport": true,
+        "detail": "pathlib",
+        "documentation": {}
+    },
+    {
+        "label": "distill",
+        "importPath": "model2vec",
+        "description": "model2vec",
+        "isExtraImport": true,
+        "detail": "model2vec",
+        "documentation": {}
+    },
+    {
+        "label": "StaticModel",
+        "importPath": "model2vec",
+        "description": "model2vec",
+        "isExtraImport": true,
+        "detail": "model2vec",
+        "documentation": {}
+    },
+    {
+        "label": "RecursiveChunker",
+        "importPath": "chonkie",
+        "description": "chonkie",
+        "isExtraImport": true,
+        "detail": "chonkie",
         "documentation": {}
     },
     {
@@ -407,6 +310,47 @@
         "importPath": "requests",
         "description": "requests",
         "detail": "requests",
+        "documentation": {}
+    },
+    {
+        "label": "QdrantClient",
+        "importPath": "qdrant_client",
+        "description": "qdrant_client",
+        "isExtraImport": true,
+        "detail": "qdrant_client",
+        "documentation": {}
+    },
+    {
+        "label": "VectorParams",
+        "importPath": "qdrant_client.http.models",
+        "description": "qdrant_client.http.models",
+        "isExtraImport": true,
+        "detail": "qdrant_client.http.models",
+        "documentation": {}
+    },
+    {
+        "label": "Distance",
+        "importPath": "qdrant_client.http.models",
+        "description": "qdrant_client.http.models",
+        "isExtraImport": true,
+        "detail": "qdrant_client.http.models",
+        "documentation": {}
+    },
+    {
+        "label": "PointStruct",
+        "importPath": "qdrant_client.http.models",
+        "description": "qdrant_client.http.models",
+        "isExtraImport": true,
+        "detail": "qdrant_client.http.models",
+        "documentation": {}
+    },
+    {
+        "label": "debugpy",
+        "kind": 6,
+        "isExtraImport": true,
+        "importPath": "debugpy",
+        "description": "debugpy",
+        "detail": "debugpy",
         "documentation": {}
     },
     {
@@ -459,7 +403,7 @@
         "kind": 6,
         "importPath": "backend.app.routes.chat",
         "description": "backend.app.routes.chat",
-        "peekOfCode": "class PostQueryRequest(BaseModel):\n    query: str\n    stream: bool = False\n    top_k: int = 5\n@router.post(\"/query\")\ndef create_query(data: PostQueryRequest):\n    try:\n        # Step 1: Embed the user's query\n        query_embedding = get_embeddings([data.query])[0]\n        # Step 2: Search for top-k relevant chunks in Qdrant",
+        "peekOfCode": "class PostQueryRequest(BaseModel):\n    query: str\n    stream: bool = False\n    top_k: int = 5\n@router.post(\"/query/{user_id}\")\ndef create_query(data: PostQueryRequest, user_id: str):\n    try:\n        if user_id is None:\n            raise HTTPException(status_code=404, detail=\"No user_id provided!\")\n        query_embedding = get_embeddings([data.query])[0]",
         "detail": "backend.app.routes.chat",
         "documentation": {}
     },
@@ -468,7 +412,7 @@
         "kind": 2,
         "importPath": "backend.app.routes.chat",
         "description": "backend.app.routes.chat",
-        "peekOfCode": "def create_query(data: PostQueryRequest):\n    try:\n        # Step 1: Embed the user's query\n        query_embedding = get_embeddings([data.query])[0]\n        # Step 2: Search for top-k relevant chunks in Qdrant\n        top_k_chunks = query_top_k(query_embedding, k=data.top_k)\n        # Step 3: Build context from payloads\n        context = \"\\n\".join([res.payload[\"text\"] for res in top_k_chunks])\n        # Step 4: Call Ollama to get response\n        response = generate_response(query=data.query, context=context, stream=data.stream)",
+        "peekOfCode": "def create_query(data: PostQueryRequest, user_id: str):\n    try:\n        if user_id is None:\n            raise HTTPException(status_code=404, detail=\"No user_id provided!\")\n        query_embedding = get_embeddings([data.query])[0]\n        top_k_chunks = query_top_k(query_embedding, user_id=user_id, k=data.top_k)\n        context = \"\\n\".join([res.payload[\"text\"] for res in top_k_chunks])\n        response = generate_response(query=data.query, context=context, stream=data.stream)\n        return {\"response\": response}\n    except Exception as e:",
         "detail": "backend.app.routes.chat",
         "documentation": {}
     },
@@ -477,7 +421,7 @@
         "kind": 5,
         "importPath": "backend.app.routes.chat",
         "description": "backend.app.routes.chat",
-        "peekOfCode": "router = APIRouter()\nclass PostQueryRequest(BaseModel):\n    query: str\n    stream: bool = False\n    top_k: int = 5\n@router.post(\"/query\")\ndef create_query(data: PostQueryRequest):\n    try:\n        # Step 1: Embed the user's query\n        query_embedding = get_embeddings([data.query])[0]",
+        "peekOfCode": "router = APIRouter()\nclass PostQueryRequest(BaseModel):\n    query: str\n    stream: bool = False\n    top_k: int = 5\n@router.post(\"/query/{user_id}\")\ndef create_query(data: PostQueryRequest, user_id: str):\n    try:\n        if user_id is None:\n            raise HTTPException(status_code=404, detail=\"No user_id provided!\")",
         "detail": "backend.app.routes.chat",
         "documentation": {}
     },
@@ -513,7 +457,7 @@
         "kind": 6,
         "importPath": "backend.app.routes.upload",
         "description": "backend.app.routes.upload",
-        "peekOfCode": "class Base64UploadRequest(BaseModel):\n    filename: str\n    file_type: str\n    content_base64: str\n@router.post(\"/base64\")\ndef upload_base64(request: Base64UploadRequest):\n    try:\n        pdf_text = base64_to_bytes(base64=request.content_base64)\n        clean_text = clean_text(pdf_text)\n        chunks, document_id = save_to_db(text=clean_text)",
+        "peekOfCode": "class Base64UploadRequest(BaseModel):\n    filename: str\n    file_type: str\n    content_base64: str\n@router.post(\"/base64\")\ndef upload_base64(request: Base64UploadRequest):\n    try:\n        pages = base64_to_text(base64_text=request.content_base64, file_type=request.file_type)\n        chunks, document_id = save_to_db(pages, request.filename, request.file_type)\n        return {",
         "detail": "backend.app.routes.upload",
         "documentation": {}
     },
@@ -522,7 +466,7 @@
         "kind": 2,
         "importPath": "backend.app.routes.upload",
         "description": "backend.app.routes.upload",
-        "peekOfCode": "def upload_base64(request: Base64UploadRequest):\n    try:\n        pdf_text = base64_to_bytes(base64=request.content_base64)\n        clean_text = clean_text(pdf_text)\n        chunks, document_id = save_to_db(text=clean_text)\n        return {\n            \"status\": \"Success\",\n            \"document_id\": document_id,\n            \"document_name\": request.filename,\n            \"chunk_count\": len(chunks) ",
+        "peekOfCode": "def upload_base64(request: Base64UploadRequest):\n    try:\n        pages = base64_to_text(base64_text=request.content_base64, file_type=request.file_type)\n        chunks, document_id = save_to_db(pages, request.filename, request.file_type)\n        return {\n            \"status\": \"Success\",\n            \"document_id\": document_id,\n            \"document_name\": request.filename,\n            \"chunk_count\": len(chunks) \n        }",
         "detail": "backend.app.routes.upload",
         "documentation": {}
     },
@@ -531,7 +475,7 @@
         "kind": 2,
         "importPath": "backend.app.routes.upload",
         "description": "backend.app.routes.upload",
-        "peekOfCode": "def save_to_db(text: str, filename: str, file_type: str):\n    chunks = structure_aware_chunk(text=text)\n    embeddings = get_embeddings(chunks=chunks)\n    document_id = str(uuid.uuid4())\n    metadata = create_metadata(chunks=chunks)\n    store_document(\n        embeddings=embeddings, \n        chunks=chunks, \n        metadata=metadata\n    )",
+        "peekOfCode": "def save_to_db(pages: list[(int, str)], filename: str, file_type: str):\n    chunks, page_numbers = structure_aware_chunk(pages=pages)\n    embeddings = get_embeddings(chunks=chunks)\n    document_id = str(uuid.uuid4())\n    metadata = create_metadata(\n        chunks=chunks, \n        page_numbers=page_numbers, \n        doc_id=document_id,\n        filename=filename,\n        file_type=file_type",
         "detail": "backend.app.routes.upload",
         "documentation": {}
     },
@@ -540,26 +484,8 @@
         "kind": 5,
         "importPath": "backend.app.routes.upload",
         "description": "backend.app.routes.upload",
-        "peekOfCode": "router = APIRouter()\nclass Base64UploadRequest(BaseModel):\n    filename: str\n    file_type: str\n    content_base64: str\n@router.post(\"/base64\")\ndef upload_base64(request: Base64UploadRequest):\n    try:\n        pdf_text = base64_to_bytes(base64=request.content_base64)\n        clean_text = clean_text(pdf_text)",
+        "peekOfCode": "router = APIRouter()\nclass Base64UploadRequest(BaseModel):\n    filename: str\n    file_type: str\n    content_base64: str\n@router.post(\"/base64\")\ndef upload_base64(request: Base64UploadRequest):\n    try:\n        pages = base64_to_text(base64_text=request.content_base64, file_type=request.file_type)\n        chunks, document_id = save_to_db(pages, request.filename, request.file_type)",
         "detail": "backend.app.routes.upload",
-        "documentation": {}
-    },
-    {
-        "label": "base64_to_bytes",
-        "kind": 2,
-        "importPath": "backend.app.services.document_processor",
-        "description": "backend.app.services.document_processor",
-        "peekOfCode": "def base64_to_bytes(base64_text: str):\n    file_bytes = base64.b64decode(base64_text)\n    return extract_text_with_structure(file_bytes)\ndef extract_text_with_structure(file_bytes: bytes) -> str:\n    doc = fitz.open(stream=file_bytes, filetype=\"pdf\")\n    full_text = []\n    for page in doc:\n        text = page.get_text()\n        if not text.strip():\n            pix = page.get_pixmap(dpi=300)",
-        "detail": "backend.app.services.document_processor",
-        "documentation": {}
-    },
-    {
-        "label": "extract_text_with_structure",
-        "kind": 2,
-        "importPath": "backend.app.services.document_processor",
-        "description": "backend.app.services.document_processor",
-        "peekOfCode": "def extract_text_with_structure(file_bytes: bytes) -> str:\n    doc = fitz.open(stream=file_bytes, filetype=\"pdf\")\n    full_text = []\n    for page in doc:\n        text = page.get_text()\n        if not text.strip():\n            pix = page.get_pixmap(dpi=300)\n            img_bytes = pix.tobytes(\"png\")\n            image = Image.open(io.BytesIO(img_bytes))\n            text = pytesseract.image_to_string(image)",
-        "detail": "backend.app.services.document_processor",
         "documentation": {}
     },
     {
@@ -567,8 +493,62 @@
         "kind": 2,
         "importPath": "backend.app.services.document_processor",
         "description": "backend.app.services.document_processor",
-        "peekOfCode": "def clean_text(text: str) -> str:\n    text = re.sub(r\"-\\n\", \"\", text)\n    text = re.sub(r\"\\n{2,}\", \"\\n\", text)\n    text = re.sub(r\"[ \\t]+\", \" \", text)\n    return text.strip()",
+        "peekOfCode": "def clean_text(text: str) -> str:\n    text = re.sub(r\"-\\n\", \"\", text)\n    text = re.sub(r\"\\n{2,}\", \"\\n\", text)\n    text = re.sub(r\"[ \\t]+\", \" \", text)\n    return text.strip()\ndef extract_text_from_pdf(file_bytes: bytes) -> List[Tuple[int, str]]:\n    try:\n        doc = fitz.open(stream=file_bytes, filetype=\"pdf\")\n    except Exception as e:\n        raise ValueError(f\"Failed to open PDF file: {e}\")",
         "detail": "backend.app.services.document_processor",
+        "documentation": {}
+    },
+    {
+        "label": "extract_text_from_pdf",
+        "kind": 2,
+        "importPath": "backend.app.services.document_processor",
+        "description": "backend.app.services.document_processor",
+        "peekOfCode": "def extract_text_from_pdf(file_bytes: bytes) -> List[Tuple[int, str]]:\n    try:\n        doc = fitz.open(stream=file_bytes, filetype=\"pdf\")\n    except Exception as e:\n        raise ValueError(f\"Failed to open PDF file: {e}\")\n    page_texts = []\n    for i, page in enumerate(doc):\n        text = page.get_text()\n        if not text.strip():\n            pix = page.get_pixmap(dpi=300)",
+        "detail": "backend.app.services.document_processor",
+        "documentation": {}
+    },
+    {
+        "label": "extract_text_from_docx",
+        "kind": 2,
+        "importPath": "backend.app.services.document_processor",
+        "description": "backend.app.services.document_processor",
+        "peekOfCode": "def extract_text_from_docx(file_bytes: bytes) -> List[Tuple[int, str]]:\n    try:\n        doc = Document(io.BytesIO(file_bytes))\n    except Exception as e:\n        raise ValueError(f\"Failed to open DOCX file: {e}\")\n    full_text = []\n    for paragraph in doc.paragraphs:\n        full_text.append(paragraph.text)\n    text_content = \"\\n\".join(full_text)\n    return [(1, clean_text(text_content))]",
+        "detail": "backend.app.services.document_processor",
+        "documentation": {}
+    },
+    {
+        "label": "process_document_for_text",
+        "kind": 2,
+        "importPath": "backend.app.services.document_processor",
+        "description": "backend.app.services.document_processor",
+        "peekOfCode": "def process_document_for_text(file_bytes: bytes, file_type: str) -> List[Tuple[int, str]]:\n    handlers = {\n        \"pdf\": extract_text_from_pdf,\n        \"docx\": extract_text_from_docx\n        # Add more handlers here as you support new file types\n    }\n    handler = handlers.get(file_type.lower())\n    if not handler:\n        raise ValueError(f\"Unsupported document type: '{file_type}'. Supported types are: {', '.join(handlers.keys())}\")\n    return handler(file_bytes)",
+        "detail": "backend.app.services.document_processor",
+        "documentation": {}
+    },
+    {
+        "label": "base64_to_text",
+        "kind": 2,
+        "importPath": "backend.app.services.document_processor",
+        "description": "backend.app.services.document_processor",
+        "peekOfCode": "def base64_to_text(base64_text: str, file_type: str) -> List[Tuple[int, str]]:\n    file_bytes = base64.b64decode(base64_text)\n    return process_document_for_text(file_bytes, file_type)",
+        "detail": "backend.app.services.document_processor",
+        "documentation": {}
+    },
+    {
+        "label": "get_static_model",
+        "kind": 2,
+        "importPath": "backend.app.services.embedding",
+        "description": "backend.app.services.embedding",
+        "peekOfCode": "def get_static_model() -> StaticModel:\n    global _static_model\n    if _static_model is None:\n        _static_model = load_or_distill_model(\n            model_path=STATIC_MODEL_PATH,\n            source_model=EMBEDDING_MODEL_NAME,\n            pca_dims=PCA_DIMS\n        )\n    return _static_model\ndef load_or_distill_model(model_path: str, source_model: str, pca_dims: int) -> StaticModel:",
+        "detail": "backend.app.services.embedding",
+        "documentation": {}
+    },
+    {
+        "label": "load_or_distill_model",
+        "kind": 2,
+        "importPath": "backend.app.services.embedding",
+        "description": "backend.app.services.embedding",
+        "peekOfCode": "def load_or_distill_model(model_path: str, source_model: str, pca_dims: int) -> StaticModel:\n    try:\n        model_path_obj = Path(model_path)\n        if model_path_obj.exists() and any(model_path_obj.iterdir()):\n            print(f\"Loading StaticModel from {model_path}\")\n            return StaticModel.from_pretrained(model_path)\n        else:\n            print(f\"No model found at {model_path}. Distilling new model from {source_model}\")\n            # Ensure directory exists\n            model_path_obj.mkdir(parents=True, exist_ok=True)",
+        "detail": "backend.app.services.embedding",
         "documentation": {}
     },
     {
@@ -576,7 +556,7 @@
         "kind": 2,
         "importPath": "backend.app.services.embedding",
         "description": "backend.app.services.embedding",
-        "peekOfCode": "def chunk_text_recursive(text: str, chunk_size=500, chunk_overlap=50) -> list[str]:\n    text_splitter = RecursiveCharacterTextSplitter(\n        chunk_size=chunk_size,\n        chunk_overlap=chunk_overlap\n    )\n    chunks = text_splitter.split_text(text)\n    return chunks\ndef structure_aware_chunk(text: str, max_length=500, overlap=50) -> list[str]:\n    paragraphs = text.split(\"\\n\")\n    chunks = []",
+        "peekOfCode": "def chunk_text_recursive(text: str, chunk_size=500, chunk_overlap=50) -> list[str]:\n    chunker = RecursiveChunker(chunk_size=chunk_size, overlap=chunk_overlap)\n    chunks = chunker(text)\n    return [chunk.text for chunk in chunks]\ndef structure_aware_chunk(pages: List[Tuple[int, str]], max_length=500, overlap=50) -> Tuple[List[str], List[int]]:\n    chunks = []\n    page_numbers = []\n    for page_number, page_text in pages:\n        paragraphs = page_text.split(\"\\n\")\n        current_chunk = \"\"",
         "detail": "backend.app.services.embedding",
         "documentation": {}
     },
@@ -585,7 +565,7 @@
         "kind": 2,
         "importPath": "backend.app.services.embedding",
         "description": "backend.app.services.embedding",
-        "peekOfCode": "def structure_aware_chunk(text: str, max_length=500, overlap=50) -> list[str]:\n    paragraphs = text.split(\"\\n\")\n    chunks = []\n    current_chunk = \"\"\n    for para in paragraphs:\n        if not para.strip():\n            continue\n        if len(current_chunk.split()) + len(para.split()) <= max_length:\n            current_chunk += \" \" + para.strip()\n        else:",
+        "peekOfCode": "def structure_aware_chunk(pages: List[Tuple[int, str]], max_length=500, overlap=50) -> Tuple[List[str], List[int]]:\n    chunks = []\n    page_numbers = []\n    for page_number, page_text in pages:\n        paragraphs = page_text.split(\"\\n\")\n        current_chunk = \"\"\n        for para in paragraphs:\n            if not para.strip():\n                continue\n            if len(current_chunk.split()) + len(para.split()) <= max_length:",
         "detail": "backend.app.services.embedding",
         "documentation": {}
     },
@@ -594,16 +574,43 @@
         "kind": 2,
         "importPath": "backend.app.services.embedding",
         "description": "backend.app.services.embedding",
-        "peekOfCode": "def get_embeddings(chunks: list) -> list:\n    return model.encode(chunks)",
+        "peekOfCode": "def get_embeddings(chunks: list) -> list:\n    model = get_static_model()\n    embeddings = model.encode(chunks)\n    return embeddings.tolist()",
         "detail": "backend.app.services.embedding",
         "documentation": {}
     },
     {
-        "label": "model",
+        "label": "EMBEDDING_MODEL_NAME",
         "kind": 5,
         "importPath": "backend.app.services.embedding",
         "description": "backend.app.services.embedding",
-        "peekOfCode": "model = SentenceTransformer(\"all-MiniLM-L6-v2\")\ndef chunk_text_recursive(text: str, chunk_size=500, chunk_overlap=50) -> list[str]:\n    text_splitter = RecursiveCharacterTextSplitter(\n        chunk_size=chunk_size,\n        chunk_overlap=chunk_overlap\n    )\n    chunks = text_splitter.split_text(text)\n    return chunks\ndef structure_aware_chunk(text: str, max_length=500, overlap=50) -> list[str]:\n    paragraphs = text.split(\"\\n\")",
+        "peekOfCode": "EMBEDDING_MODEL_NAME = os.getenv(\"EMBEDDING_MODEL\", \"all-MiniLM-L6-v2\")\nMODEL_BASE_DIR = os.getenv(\"MODEL_BASE_DIR\", \"/app/models\")\nSTATIC_MODEL_PATH = os.path.join(MODEL_BASE_DIR, f\"static_embedding_model_{EMBEDDING_MODEL_NAME}\")\nPCA_DIMS = 256\n_static_model: Optional[StaticModel] = None\ndef get_static_model() -> StaticModel:\n    global _static_model\n    if _static_model is None:\n        _static_model = load_or_distill_model(\n            model_path=STATIC_MODEL_PATH,",
+        "detail": "backend.app.services.embedding",
+        "documentation": {}
+    },
+    {
+        "label": "MODEL_BASE_DIR",
+        "kind": 5,
+        "importPath": "backend.app.services.embedding",
+        "description": "backend.app.services.embedding",
+        "peekOfCode": "MODEL_BASE_DIR = os.getenv(\"MODEL_BASE_DIR\", \"/app/models\")\nSTATIC_MODEL_PATH = os.path.join(MODEL_BASE_DIR, f\"static_embedding_model_{EMBEDDING_MODEL_NAME}\")\nPCA_DIMS = 256\n_static_model: Optional[StaticModel] = None\ndef get_static_model() -> StaticModel:\n    global _static_model\n    if _static_model is None:\n        _static_model = load_or_distill_model(\n            model_path=STATIC_MODEL_PATH,\n            source_model=EMBEDDING_MODEL_NAME,",
+        "detail": "backend.app.services.embedding",
+        "documentation": {}
+    },
+    {
+        "label": "STATIC_MODEL_PATH",
+        "kind": 5,
+        "importPath": "backend.app.services.embedding",
+        "description": "backend.app.services.embedding",
+        "peekOfCode": "STATIC_MODEL_PATH = os.path.join(MODEL_BASE_DIR, f\"static_embedding_model_{EMBEDDING_MODEL_NAME}\")\nPCA_DIMS = 256\n_static_model: Optional[StaticModel] = None\ndef get_static_model() -> StaticModel:\n    global _static_model\n    if _static_model is None:\n        _static_model = load_or_distill_model(\n            model_path=STATIC_MODEL_PATH,\n            source_model=EMBEDDING_MODEL_NAME,\n            pca_dims=PCA_DIMS",
+        "detail": "backend.app.services.embedding",
+        "documentation": {}
+    },
+    {
+        "label": "PCA_DIMS",
+        "kind": 5,
+        "importPath": "backend.app.services.embedding",
+        "description": "backend.app.services.embedding",
+        "peekOfCode": "PCA_DIMS = 256\n_static_model: Optional[StaticModel] = None\ndef get_static_model() -> StaticModel:\n    global _static_model\n    if _static_model is None:\n        _static_model = load_or_distill_model(\n            model_path=STATIC_MODEL_PATH,\n            source_model=EMBEDDING_MODEL_NAME,\n            pca_dims=PCA_DIMS\n        )",
         "detail": "backend.app.services.embedding",
         "documentation": {}
     },
@@ -630,7 +637,7 @@
         "kind": 2,
         "importPath": "backend.app.services.metadata_extractor",
         "description": "backend.app.services.metadata_extractor",
-        "peekOfCode": "def infer_heading_from_context(chunk: str, previous_lines: list[str]) -> str:\n    for line in reversed(previous_lines[-5:]):\n        if len(line.strip()) < 100:\n            if line.isupper() or re.match(r'^[A-Z][A-Za-z0-9\\s\\-:]{2,}$', line):\n                return line.strip()\n    return \"\"\ndef create_metadata(chunks: list[str]) -> list[dict]:\n    metadata_list = []\n    for i, chunk in enumerate(chunks):\n        heading = infer_heading_from_context(chunk, chunks[:i])",
+        "peekOfCode": "def infer_heading_from_context(chunk: str, previous_lines: list[str]) -> str:\n    for line in reversed(previous_lines[-5:]):\n        if len(line.strip()) < 100:\n            if line.isupper() or re.match(r'^[A-Z][A-Za-z0-9\\s\\-:]{2,}$', line):\n                return line.strip()\n    return \"\"\ndef create_metadata(\n    chunks: list[str], \n    page_numbers: list[int], \n    doc_id: uuid,",
         "detail": "backend.app.services.metadata_extractor",
         "documentation": {}
     },
@@ -639,7 +646,7 @@
         "kind": 2,
         "importPath": "backend.app.services.metadata_extractor",
         "description": "backend.app.services.metadata_extractor",
-        "peekOfCode": "def create_metadata(chunks: list[str]) -> list[dict]:\n    metadata_list = []\n    for i, chunk in enumerate(chunks):\n        heading = infer_heading_from_context(chunk, chunks[:i])\n        lang = detect_language(chunk)\n        topics = extract_topics(chunk)\n        metadata_list.append({\n            \"chunk_index\": i,\n            \"language\": lang,\n            \"heading\": heading,",
+        "peekOfCode": "def create_metadata(\n    chunks: list[str], \n    page_numbers: list[int], \n    doc_id: uuid,\n    filename: str,\n    file_type: str\n) -> list[dict]:\n    metadata_list = []\n    for i, (chunk, page_number) in enumerate(zip(chunks, page_numbers)):\n        heading = infer_heading_from_context(chunk, chunks[:i])",
         "detail": "backend.app.services.metadata_extractor",
         "documentation": {}
     },
@@ -693,7 +700,7 @@
         "kind": 2,
         "importPath": "backend.app.services.qdrant_client",
         "description": "backend.app.services.qdrant_client",
-        "peekOfCode": "def store_document(\n        chunks: list, \n        embeddings: list, \n        metadata: list[dict],\n        document_id: uuid,\n        filename: str,\n        file_type: str\n    ):\n    ensure_collection()\n    client.upsert(",
+        "peekOfCode": "def store_document(\n        chunks: list, \n        embeddings: list, \n        metadata: list[dict],\n    ):\n    ensure_collection()\n    client.upsert(\n        collection_name=COLLECTION_NAME,\n        points=[\n            PointStruct(",
         "detail": "backend.app.services.qdrant_client",
         "documentation": {}
     },
@@ -702,7 +709,7 @@
         "kind": 2,
         "importPath": "backend.app.services.qdrant_client",
         "description": "backend.app.services.qdrant_client",
-        "peekOfCode": "def query_top_k(query_vector, k=5):\n    ensure_collection()\n    results = client.search(\n        collection_name=COLLECTION_NAME,\n        query_vector=query_vector,\n        limit=k,\n        with_payload=True,\n    )\n    return results  # Each result has `.payload` and `.score`",
+        "peekOfCode": "def query_top_k(query_vector, user_id, k=5):\n    ensure_collection()\n    # TODO Use metadata to better search\n    results = client.search(\n        collection_name=COLLECTION_NAME,\n        query_vector=query_vector,\n        limit=k,\n        with_payload=True,\n        # query_filter={\n        #     \"must\": [",
         "detail": "backend.app.services.qdrant_client",
         "documentation": {}
     },
