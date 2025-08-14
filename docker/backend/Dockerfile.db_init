@@ -1,0 +1,13 @@
+FROM python:3.12-slim
+
+ENV PYTHONUNBUFFERED=1
+
+WORKDIR /app
+
+RUN apt-get update && apt-get install -y postgresql-client
+
+COPY backend/db_init/requirements_db_init.txt ./requirements_db_init.txt
+
+RUN pip install --no-cache-dir -r requirements_db_init.txt
+
+CMD ["python", "/app/db_init/db_init.py"]

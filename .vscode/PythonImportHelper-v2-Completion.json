@@ -331,6 +331,86 @@
         "documentation": {}
     },
     {
+        "label": "create_engine",
+        "importPath": "sqlalchemy",
+        "description": "sqlalchemy",
+        "isExtraImport": true,
+        "detail": "sqlalchemy",
+        "documentation": {}
+    },
+    {
+        "label": "Column",
+        "importPath": "sqlalchemy",
+        "description": "sqlalchemy",
+        "isExtraImport": true,
+        "detail": "sqlalchemy",
+        "documentation": {}
+    },
+    {
+        "label": "String",
+        "importPath": "sqlalchemy",
+        "description": "sqlalchemy",
+        "isExtraImport": true,
+        "detail": "sqlalchemy",
+        "documentation": {}
+    },
+    {
+        "label": "TIMESTAMP",
+        "importPath": "sqlalchemy",
+        "description": "sqlalchemy",
+        "isExtraImport": true,
+        "detail": "sqlalchemy",
+        "documentation": {}
+    },
+    {
+        "label": "ForeignKey",
+        "importPath": "sqlalchemy",
+        "description": "sqlalchemy",
+        "isExtraImport": true,
+        "detail": "sqlalchemy",
+        "documentation": {}
+    },
+    {
+        "label": "inspect",
+        "importPath": "sqlalchemy",
+        "description": "sqlalchemy",
+        "isExtraImport": true,
+        "detail": "sqlalchemy",
+        "documentation": {}
+    },
+    {
+        "label": "text",
+        "importPath": "sqlalchemy",
+        "description": "sqlalchemy",
+        "isExtraImport": true,
+        "detail": "sqlalchemy",
+        "documentation": {}
+    },
+    {
+        "label": "UUID",
+        "importPath": "sqlalchemy.dialects.postgresql",
+        "description": "sqlalchemy.dialects.postgresql",
+        "isExtraImport": true,
+        "detail": "sqlalchemy.dialects.postgresql",
+        "documentation": {}
+    },
+    {
+        "label": "declarative_base",
+        "importPath": "sqlalchemy.ext.declarative",
+        "description": "sqlalchemy.ext.declarative",
+        "isExtraImport": true,
+        "detail": "sqlalchemy.ext.declarative",
+        "documentation": {}
+    },
+    {
+        "label": "sessionmaker",
+        "importPath": "sqlalchemy.orm",
+        "description": "sqlalchemy.orm",
+        "isExtraImport": true,
+        "detail": "sqlalchemy.orm",
+        "documentation": {}
+    },
+    {
         "label": "chunk_text",
         "kind": 2,
         "importPath": "backend.app.debug.doc_pipline",
@@ -688,6 +768,78 @@
         "description": "backend.app.main",
         "peekOfCode": "app = FastAPI()\napp.include_router(upload.router, prefix=\"/upload\")\napp.include_router(chat.router, prefix=\"/chat\")\napp.include_router(documents.router, prefix=\"/documents\")\n@app.get(\"/\")\ndef read_root():\n    return {\"message\": \"FastAPI is running!\"}\n# @app.get(\"/items/{item_id}\")\n# def read_item(item_id: int, q: str = None):\n#     return {\"item_id\": item_id, \"q\": q}",
         "detail": "backend.app.main",
+        "documentation": {}
+    },
+    {
+        "label": "User",
+        "kind": 6,
+        "importPath": "backend.db_init.db_init",
+        "description": "backend.db_init.db_init",
+        "peekOfCode": "class User(Base):\n    __tablename__ = \"users\"\n    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)\n    email = Column(String, unique=True, nullable=False)\n    first_name = Column(String)\n    last_name = Column(String)\n    created_at = Column(TIMESTAMP, server_default=\"NOW()\")\nclass Document(Base):\n    __tablename__ = \"documents\"\n    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)",
+        "detail": "backend.db_init.db_init",
+        "documentation": {}
+    },
+    {
+        "label": "Document",
+        "kind": 6,
+        "importPath": "backend.db_init.db_init",
+        "description": "backend.db_init.db_init",
+        "peekOfCode": "class Document(Base):\n    __tablename__ = \"documents\"\n    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)\n    filename = Column(String, nullable=False)\n    file_path = Column(String, nullable=False)\n    file_type = Column(String, nullable=False)\n    uploaded_by = Column(UUID(as_uuid=True), ForeignKey(\"users.id\"))\n    upload_date = Column(TIMESTAMP, server_default=\"NOW()\")\ndef database_is_empty(engine):\n    inspector = inspect(engine)",
+        "detail": "backend.db_init.db_init",
+        "documentation": {}
+    },
+    {
+        "label": "database_is_empty",
+        "kind": 2,
+        "importPath": "backend.db_init.db_init",
+        "description": "backend.db_init.db_init",
+        "peekOfCode": "def database_is_empty(engine):\n    inspector = inspect(engine)\n    tables = inspector.get_table_names()\n    return not any(t in tables for t in [\"users\", \"documents\"])\ndef create_tables():\n    with engine.connect() as conn:\n        conn.execute(text(\"CREATE EXTENSION IF NOT EXISTS pgcrypto;\"))\n    Base.metadata.create_all(engine)\n    print(\"Tables created successfully!\")\nif __name__ == \"__main__\":",
+        "detail": "backend.db_init.db_init",
+        "documentation": {}
+    },
+    {
+        "label": "create_tables",
+        "kind": 2,
+        "importPath": "backend.db_init.db_init",
+        "description": "backend.db_init.db_init",
+        "peekOfCode": "def create_tables():\n    with engine.connect() as conn:\n        conn.execute(text(\"CREATE EXTENSION IF NOT EXISTS pgcrypto;\"))\n    Base.metadata.create_all(engine)\n    print(\"Tables created successfully!\")\nif __name__ == \"__main__\":\n    if database_is_empty(engine):\n        print(\"Database is empty. Creating tables...\")\n        create_tables()\n    else:",
+        "detail": "backend.db_init.db_init",
+        "documentation": {}
+    },
+    {
+        "label": "DATABASE_URL",
+        "kind": 5,
+        "importPath": "backend.db_init.db_init",
+        "description": "backend.db_init.db_init",
+        "peekOfCode": "DATABASE_URL = os.environ.get(\"DATABASE_URL\")\nif not DATABASE_URL:\n    raise ValueError(\"DATABASE_URL is not set in environment\")\nengine = create_engine(DATABASE_URL)\nSessionLocal = sessionmaker(bind=engine)\nBase = declarative_base()\nclass User(Base):\n    __tablename__ = \"users\"\n    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)\n    email = Column(String, unique=True, nullable=False)",
+        "detail": "backend.db_init.db_init",
+        "documentation": {}
+    },
+    {
+        "label": "engine",
+        "kind": 5,
+        "importPath": "backend.db_init.db_init",
+        "description": "backend.db_init.db_init",
+        "peekOfCode": "engine = create_engine(DATABASE_URL)\nSessionLocal = sessionmaker(bind=engine)\nBase = declarative_base()\nclass User(Base):\n    __tablename__ = \"users\"\n    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)\n    email = Column(String, unique=True, nullable=False)\n    first_name = Column(String)\n    last_name = Column(String)\n    created_at = Column(TIMESTAMP, server_default=\"NOW()\")",
+        "detail": "backend.db_init.db_init",
+        "documentation": {}
+    },
+    {
+        "label": "SessionLocal",
+        "kind": 5,
+        "importPath": "backend.db_init.db_init",
+        "description": "backend.db_init.db_init",
+        "peekOfCode": "SessionLocal = sessionmaker(bind=engine)\nBase = declarative_base()\nclass User(Base):\n    __tablename__ = \"users\"\n    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)\n    email = Column(String, unique=True, nullable=False)\n    first_name = Column(String)\n    last_name = Column(String)\n    created_at = Column(TIMESTAMP, server_default=\"NOW()\")\nclass Document(Base):",
+        "detail": "backend.db_init.db_init",
+        "documentation": {}
+    },
+    {
+        "label": "Base",
+        "kind": 5,
+        "importPath": "backend.db_init.db_init",
+        "description": "backend.db_init.db_init",
+        "peekOfCode": "Base = declarative_base()\nclass User(Base):\n    __tablename__ = \"users\"\n    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)\n    email = Column(String, unique=True, nullable=False)\n    first_name = Column(String)\n    last_name = Column(String)\n    created_at = Column(TIMESTAMP, server_default=\"NOW()\")\nclass Document(Base):\n    __tablename__ = \"documents\"",
+        "detail": "backend.db_init.db_init",
         "documentation": {}
     }
 ]

@@ -47,6 +47,48 @@ services:
     volumes:
       - qdrant_data:/qdrant/storage
     restart: unless-stopped
+    # healthcheck:
+    #   test: ["CMD-SHELL", "curl -f http://localhost:6333/health || exit 1"]
+    #   interval: 10s
+    #   retries: 5
+    #   start_period: 5s
+
+
+  postgres:
+    image: postgres:15
+    container_name: postgres
+    env_file:
+      - .env.dev
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    restart: unless-stopped
+    # healthcheck:
+    #   test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
+    #   interval: 5s
+    #   retries: 5
+    #   start_period: 5s
+
+  db_init:
+    build:
+      context: .
+      dockerfile: docker/backend/Dockerfile.db_init
+    depends_on:
+      - postgres
+    env_file:
+      - .env.dev
+    volumes:
+      - ./backend/db_init:/app/db_init
+    command: >
+      sh -c "
+        until pg_isready -h $POSTGRES_HOST -p 5432; do
+          echo 'Waiting for Postgres...'
+          sleep 1
+        done
+        python /app/db_init/db_init.py
+      "
+    restart: "no"
 
   backend:
     build:
@@ -59,12 +101,20 @@ services:
       - .env.dev
     environment:
       - PYTHONPATH=/app
+      - DATABASE_URL=${DATABASE_URL}
     volumes:
       - ./backend:/app/backend
-      - model_cache:/app/models
+      - ./uploads:/app/uploads
     depends_on:
       ollama-init:
         condition: service_completed_successfully
+      # qdrant:
+      #   condition: service_healthy
+      # postgres:
+      #   condition: service_healthy
+      db_init:
+        condition: service_completed_successfully
+
 
   # frontend:
   #   build:
@@ -79,4 +129,4 @@ services:
 volumes:
   ollama_data:
   qdrant_data:
-  model_cache:
+  postgres_data:
