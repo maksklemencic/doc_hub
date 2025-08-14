@@ -154,6 +154,23 @@
         "documentation": {}
     },
     {
+        "label": "FileResponse",
+        "importPath": "fastapi.responses",
+        "description": "fastapi.responses",
+        "isExtraImport": true,
+        "detail": "fastapi.responses",
+        "documentation": {}
+    },
+    {
+        "label": "mimetypes",
+        "kind": 6,
+        "isExtraImport": true,
+        "importPath": "mimetypes",
+        "description": "mimetypes",
+        "detail": "mimetypes",
+        "documentation": {}
+    },
+    {
         "label": "uuid",
         "kind": 6,
         "isExtraImport": true,
@@ -527,7 +544,7 @@
         "kind": 6,
         "importPath": "backend.app.routes.documents",
         "description": "backend.app.routes.documents",
-        "peekOfCode": "class GetDocumentRequest(BaseModel):\n    documentId: str\n@router.get(\"/{doc_id}\")\ndef get_document(data: GetDocumentRequest):\n    pass",
+        "peekOfCode": "class GetDocumentRequest(BaseModel):\n    documentId: str\n@router.get(\"/{doc_id}\")\ndef get_document(data: GetDocumentRequest):\n    pass\n@router.get(\"/view/{doc_id}\")\ndef view_document(doc_id: str):\n    try:\n        doc_uuid = uuid.UUID(doc_id)\n    except ValueError:",
         "detail": "backend.app.routes.documents",
         "documentation": {}
     },
@@ -536,7 +553,16 @@
         "kind": 2,
         "importPath": "backend.app.routes.documents",
         "description": "backend.app.routes.documents",
-        "peekOfCode": "def get_document(data: GetDocumentRequest):\n    pass",
+        "peekOfCode": "def get_document(data: GetDocumentRequest):\n    pass\n@router.get(\"/view/{doc_id}\")\ndef view_document(doc_id: str):\n    try:\n        doc_uuid = uuid.UUID(doc_id)\n    except ValueError:\n        raise HTTPException(status_code=400, detail=\"Invalid document ID format\")\n    document = db_handler.get_document_by_id(doc_uuid)\n    if not document:",
+        "detail": "backend.app.routes.documents",
+        "documentation": {}
+    },
+    {
+        "label": "view_document",
+        "kind": 2,
+        "importPath": "backend.app.routes.documents",
+        "description": "backend.app.routes.documents",
+        "peekOfCode": "def view_document(doc_id: str):\n    try:\n        doc_uuid = uuid.UUID(doc_id)\n    except ValueError:\n        raise HTTPException(status_code=400, detail=\"Invalid document ID format\")\n    document = db_handler.get_document_by_id(doc_uuid)\n    if not document:\n        raise HTTPException(status_code=404, detail=\"Document not found\")\n    file_path = document.file_path\n    mime_type, _ = mimetypes.guess_type(document.filename)",
         "detail": "backend.app.routes.documents",
         "documentation": {}
     },
@@ -545,7 +571,7 @@
         "kind": 5,
         "importPath": "backend.app.routes.documents",
         "description": "backend.app.routes.documents",
-        "peekOfCode": "router = APIRouter()\nclass GetDocumentRequest(BaseModel):\n    documentId: str\n@router.get(\"/{doc_id}\")\ndef get_document(data: GetDocumentRequest):\n    pass",
+        "peekOfCode": "router = APIRouter()\nclass GetDocumentRequest(BaseModel):\n    documentId: str\n@router.get(\"/{doc_id}\")\ndef get_document(data: GetDocumentRequest):\n    pass\n@router.get(\"/view/{doc_id}\")\ndef view_document(doc_id: str):\n    try:\n        doc_uuid = uuid.UUID(doc_id)",
         "detail": "backend.app.routes.documents",
         "documentation": {}
     },
@@ -554,7 +580,7 @@
         "kind": 6,
         "importPath": "backend.app.routes.upload",
         "description": "backend.app.routes.upload",
-        "peekOfCode": "class Base64UploadRequest(BaseModel):\n    filename: str\n    file_type: str\n    content_base64: str\n    user_id: uuid.UUID\n@router.post(\"/base64\")\ndef upload_base64(request: Base64UploadRequest):\n    try:\n        pages = document_processor.base64_to_text(base64_text=request.content_base64, file_type=request.file_type)\n        chunks, document_id = save_to_vector_db(pages, request.filename, request.file_type)",
+        "peekOfCode": "class Base64UploadRequest(BaseModel):\n    filename: str\n    mime_type: str\n    content_base64: str\n    user_id: uuid.UUID\n@router.post(\"/base64\")\ndef upload_base64(request: Base64UploadRequest):\n    try:\n        pages = document_processor.base64_to_text(base64_text=request.content_base64, mime_type=request.mime_type)\n        chunks, document_id = save_to_vector_db(pages, request.filename, request.mime_type)",
         "detail": "backend.app.routes.upload",
         "documentation": {}
     },
@@ -563,7 +589,7 @@
         "kind": 2,
         "importPath": "backend.app.routes.upload",
         "description": "backend.app.routes.upload",
-        "peekOfCode": "def upload_base64(request: Base64UploadRequest):\n    try:\n        pages = document_processor.base64_to_text(base64_text=request.content_base64, file_type=request.file_type)\n        chunks, document_id = save_to_vector_db(pages, request.filename, request.file_type)\n        saved_file_path = file_service.save_base64_file(request.content_base64, request.filename, user_id)\n        _ = db_handler.add_document(\n            filename=request.filename,\n            file_path=saved_file_path,\n            file_type=request.file_type,\n            uploaded_by=request.user_id",
+        "peekOfCode": "def upload_base64(request: Base64UploadRequest):\n    try:\n        pages = document_processor.base64_to_text(base64_text=request.content_base64, mime_type=request.mime_type)\n        chunks, document_id = save_to_vector_db(pages, request.filename, request.mime_type)\n        saved_file_path = file_service.save_base64_file(request.content_base64, request.filename, request.user_id)\n        doc_id = db_handler.add_document(\n            filename=request.filename,\n            file_path=saved_file_path,\n            mime_type=request.mime_type,\n            uploaded_by=request.user_id",
         "detail": "backend.app.routes.upload",
         "documentation": {}
     },
@@ -572,7 +598,7 @@
         "kind": 2,
         "importPath": "backend.app.routes.upload",
         "description": "backend.app.routes.upload",
-        "peekOfCode": "def save_to_vector_db(pages: list[(int, str)], filename: str, file_type: str):\n    # chunks, page_numbers = structure_aware_chunk(pages=pages)\n    chunks, page_numbers = embedding.chunk_pages_with_recursive_chunker(pages=pages)\n    embeddings = embedding.get_embeddings(chunks=chunks)\n    document_id = str(uuid.uuid4())\n    metadata = metadata_extractor.create_metadata(\n        chunks=chunks, \n        page_numbers=page_numbers, \n        doc_id=document_id,\n        filename=filename,",
+        "peekOfCode": "def save_to_vector_db(pages: list[(int, str)], filename: str, mime_type: str):\n    # chunks, page_numbers = structure_aware_chunk(pages=pages)\n    chunks, page_numbers = embedding.chunk_pages_with_recursive_chunker(pages=pages)\n    embeddings = embedding.get_embeddings(chunks=chunks)\n    document_id = str(uuid.uuid4())\n    metadata = metadata_extractor.create_metadata(\n        chunks=chunks, \n        page_numbers=page_numbers, \n        doc_id=document_id,\n        filename=filename,",
         "detail": "backend.app.routes.upload",
         "documentation": {}
     },
@@ -581,8 +607,17 @@
         "kind": 5,
         "importPath": "backend.app.routes.upload",
         "description": "backend.app.routes.upload",
-        "peekOfCode": "router = APIRouter()\nclass Base64UploadRequest(BaseModel):\n    filename: str\n    file_type: str\n    content_base64: str\n    user_id: uuid.UUID\n@router.post(\"/base64\")\ndef upload_base64(request: Base64UploadRequest):\n    try:\n        pages = document_processor.base64_to_text(base64_text=request.content_base64, file_type=request.file_type)",
+        "peekOfCode": "router = APIRouter()\nclass Base64UploadRequest(BaseModel):\n    filename: str\n    mime_type: str\n    content_base64: str\n    user_id: uuid.UUID\n@router.post(\"/base64\")\ndef upload_base64(request: Base64UploadRequest):\n    try:\n        pages = document_processor.base64_to_text(base64_text=request.content_base64, mime_type=request.mime_type)",
         "detail": "backend.app.routes.upload",
+        "documentation": {}
+    },
+    {
+        "label": "get_document_by_id",
+        "kind": 2,
+        "importPath": "backend.app.services.db_handler",
+        "description": "backend.app.services.db_handler",
+        "peekOfCode": "def get_document_by_id(doc_id: uuid.UUID) -> Document | None:\n    session = SessionLocal()\n    try:\n        doc = session.query(Document).filter(Document.id == doc_id).first()\n        return doc\n    finally:\n        session.close()\ndef add_document(filename: str, file_path: str, mime_type: str, uploaded_by: uuid.UUID) -> uuid.UUID:\n    session = SessionLocal()\n    try:",
+        "detail": "backend.app.services.db_handler",
         "documentation": {}
     },
     {
@@ -590,7 +625,7 @@
         "kind": 2,
         "importPath": "backend.app.services.db_handler",
         "description": "backend.app.services.db_handler",
-        "peekOfCode": "def add_document(filename: str, file_path: str, file_type: str, uploaded_by: uuid.UUID) -> Document:\n    session = SessionLocal()\n    try:\n        doc = Document(\n            filename=filename,\n            file_path=file_path,\n            file_type=file_type,\n            uploaded_by=uploaded_by\n        )\n        session.add(doc)",
+        "peekOfCode": "def add_document(filename: str, file_path: str, mime_type: str, uploaded_by: uuid.UUID) -> uuid.UUID:\n    session = SessionLocal()\n    try:\n        doc = Document(\n            filename=filename,\n            file_path=file_path,\n            mime_type=mime_type,\n            uploaded_by=uploaded_by\n        )\n        session.add(doc)",
         "detail": "backend.app.services.db_handler",
         "documentation": {}
     },
@@ -617,7 +652,7 @@
         "kind": 5,
         "importPath": "backend.app.services.db_handler",
         "description": "backend.app.services.db_handler",
-        "peekOfCode": "DATABASE_URL = os.environ.get(\"DATABASE_URL\")\nif not DATABASE_URL:\n    raise ValueError(\"DATABASE_URL is not set in environment\")\nengine = create_engine(DATABASE_URL)\nSessionLocal = sessionmaker(bind=engine)\ndef add_document(filename: str, file_path: str, file_type: str, uploaded_by: uuid.UUID) -> Document:\n    session = SessionLocal()\n    try:\n        doc = Document(\n            filename=filename,",
+        "peekOfCode": "DATABASE_URL = os.environ.get(\"DATABASE_URL\")\nif not DATABASE_URL:\n    raise ValueError(\"DATABASE_URL is not set in environment\")\nengine = create_engine(DATABASE_URL)\nSessionLocal = sessionmaker(bind=engine)\ndef get_document_by_id(doc_id: uuid.UUID) -> Document | None:\n    session = SessionLocal()\n    try:\n        doc = session.query(Document).filter(Document.id == doc_id).first()\n        return doc",
         "detail": "backend.app.services.db_handler",
         "documentation": {}
     },
@@ -626,7 +661,7 @@
         "kind": 5,
         "importPath": "backend.app.services.db_handler",
         "description": "backend.app.services.db_handler",
-        "peekOfCode": "engine = create_engine(DATABASE_URL)\nSessionLocal = sessionmaker(bind=engine)\ndef add_document(filename: str, file_path: str, file_type: str, uploaded_by: uuid.UUID) -> Document:\n    session = SessionLocal()\n    try:\n        doc = Document(\n            filename=filename,\n            file_path=file_path,\n            file_type=file_type,\n            uploaded_by=uploaded_by",
+        "peekOfCode": "engine = create_engine(DATABASE_URL)\nSessionLocal = sessionmaker(bind=engine)\ndef get_document_by_id(doc_id: uuid.UUID) -> Document | None:\n    session = SessionLocal()\n    try:\n        doc = session.query(Document).filter(Document.id == doc_id).first()\n        return doc\n    finally:\n        session.close()\ndef add_document(filename: str, file_path: str, mime_type: str, uploaded_by: uuid.UUID) -> uuid.UUID:",
         "detail": "backend.app.services.db_handler",
         "documentation": {}
     },
@@ -635,7 +670,7 @@
         "kind": 5,
         "importPath": "backend.app.services.db_handler",
         "description": "backend.app.services.db_handler",
-        "peekOfCode": "SessionLocal = sessionmaker(bind=engine)\ndef add_document(filename: str, file_path: str, file_type: str, uploaded_by: uuid.UUID) -> Document:\n    session = SessionLocal()\n    try:\n        doc = Document(\n            filename=filename,\n            file_path=file_path,\n            file_type=file_type,\n            uploaded_by=uploaded_by\n        )",
+        "peekOfCode": "SessionLocal = sessionmaker(bind=engine)\ndef get_document_by_id(doc_id: uuid.UUID) -> Document | None:\n    session = SessionLocal()\n    try:\n        doc = session.query(Document).filter(Document.id == doc_id).first()\n        return doc\n    finally:\n        session.close()\ndef add_document(filename: str, file_path: str, mime_type: str, uploaded_by: uuid.UUID) -> uuid.UUID:\n    session = SessionLocal()",
         "detail": "backend.app.services.db_handler",
         "documentation": {}
     },
@@ -671,7 +706,16 @@
         "kind": 2,
         "importPath": "backend.app.services.document_processor",
         "description": "backend.app.services.document_processor",
-        "peekOfCode": "def extract_text_from_image(image_bytes: bytes) -> List[Tuple[int, str]]:\n    image = Image.open(io.BytesIO(image_bytes))\n    text = pytesseract.image_to_string(image).strip()\n    clean = clean_text(text)\n    return [(1, clean)]\ndef process_document_for_text(file_bytes: bytes, file_type: str) -> List[Tuple[int, str]]:\n    handlers = {\n        \"pdf\": extract_text_from_pdf,\n        \"docx\": extract_text_from_docx,\n        \"img\": extract_text_from_image",
+        "peekOfCode": "def extract_text_from_image(image_bytes: bytes) -> List[Tuple[int, str]]:\n    image = Image.open(io.BytesIO(image_bytes))\n    text = pytesseract.image_to_string(image).strip()\n    clean = clean_text(text)\n    return [(1, clean)]\ndef normalize_file_type(mime_type: str) -> str:\n    if mime_type.startswith(\"image/\"):\n        return \"image\"\n    ext = mimetypes.guess_extension(mime_type)\n    if not ext:",
+        "detail": "backend.app.services.document_processor",
+        "documentation": {}
+    },
+    {
+        "label": "normalize_file_type",
+        "kind": 2,
+        "importPath": "backend.app.services.document_processor",
+        "description": "backend.app.services.document_processor",
+        "peekOfCode": "def normalize_file_type(mime_type: str) -> str:\n    if mime_type.startswith(\"image/\"):\n        return \"image\"\n    ext = mimetypes.guess_extension(mime_type)\n    if not ext:\n        raise ValueError(f\"Unknown MIME type: {mime_type}\")\n    ext = ext.lstrip(\".\").lower()\n    return ext\ndef process_document_for_text(file_bytes: bytes, mime_type: str) -> List[Tuple[int, str]]:\n    handlers = {",
         "detail": "backend.app.services.document_processor",
         "documentation": {}
     },
@@ -680,7 +724,7 @@
         "kind": 2,
         "importPath": "backend.app.services.document_processor",
         "description": "backend.app.services.document_processor",
-        "peekOfCode": "def process_document_for_text(file_bytes: bytes, file_type: str) -> List[Tuple[int, str]]:\n    handlers = {\n        \"pdf\": extract_text_from_pdf,\n        \"docx\": extract_text_from_docx,\n        \"img\": extract_text_from_image\n        # Add more handlers here as you support new file types\n    }\n    handler = handlers.get(file_type.lower())\n    if not handler:\n        raise ValueError(f\"Unsupported document type: '{file_type}'. Supported types are: {', '.join(handlers.keys())}\")",
+        "peekOfCode": "def process_document_for_text(file_bytes: bytes, mime_type: str) -> List[Tuple[int, str]]:\n    handlers = {\n        \"pdf\": extract_text_from_pdf,\n        \"docx\": extract_text_from_docx,\n        \"img\": extract_text_from_image\n        # Add more handlers here as you support new file types\n    }\n    file_type = normalize_file_type(mime_type)\n    handler = handlers.get(file_type)\n    if not handler:",
         "detail": "backend.app.services.document_processor",
         "documentation": {}
     },
@@ -689,7 +733,7 @@
         "kind": 2,
         "importPath": "backend.app.services.document_processor",
         "description": "backend.app.services.document_processor",
-        "peekOfCode": "def base64_to_text(base64_text: str, file_type: str) -> List[Tuple[int, str]]:\n    file_bytes = base64.b64decode(base64_text)\n    return process_document_for_text(file_bytes, file_type)",
+        "peekOfCode": "def base64_to_text(base64_text: str, mime_type: str) -> List[Tuple[int, str]]:\n    file_bytes = base64.b64decode(base64_text)\n    return process_document_for_text(file_bytes, mime_type)",
         "detail": "backend.app.services.document_processor",
         "documentation": {}
     },
@@ -698,7 +742,7 @@
         "kind": 2,
         "importPath": "backend.app.services.embedding",
         "description": "backend.app.services.embedding",
-        "peekOfCode": "def chunk_pages_with_recursive_chunker(\n    pages: List[Tuple[int, str]],\n    chunk_size: int = 500,\n    chunk_overlap: int = 50\n) -> List[Tuple[int, str]]:\n    chunker = RecursiveChunker(chunk_size=chunk_size, overlap=chunk_overlap)\n    chunks = []\n    page_numbers = []\n    for page_number, page_text in pages:\n        if not page_text.strip():",
+        "peekOfCode": "def chunk_pages_with_recursive_chunker(\n    pages: List[Tuple[int, str]],\n    chunk_size: int = 500,\n    chunk_overlap: int = 50\n) -> List[Tuple[int, str]]:\n    chunker = RecursiveChunker(chunk_size=chunk_size)\n    chunks = []\n    page_numbers = []\n    for page_number, page_text in pages:\n        if not page_text.strip():",
         "detail": "backend.app.services.embedding",
         "documentation": {}
     },
@@ -734,7 +778,7 @@
         "kind": 2,
         "importPath": "backend.app.services.file_service",
         "description": "backend.app.services.file_service",
-        "peekOfCode": "def save_file(upload_file: UploadFile, user_id: uuid.UUID) -> str:\n    extension = Path(upload_file.filename).suffix\n    unique_filename = f\"{uuid.uuid4()}_{extension}\"\n    user_dir = Path(UPLOAD_DIR) / str(user_id)\n    user_dir.mkdir(parents=True, exist_ok=True)\n    file_path = user_dir / unique_filename\n    with file_path.open(\"wb\") as f:\n        f.write(upload_file.file.read())\n    return str(file_path)\ndef save_base64_file(content_base64: str, filename: str, user_id: uuid.UUID) -> str:",
+        "peekOfCode": "def save_file(upload_file: UploadFile, user_id: uuid.UUID) -> str:\n    extension = Path(upload_file.filename).suffix\n    unique_filename = f\"{upload_file.filename}\"\n    user_dir = Path(UPLOAD_DIR) / str(user_id)\n    user_dir.mkdir(parents=True, exist_ok=True)\n    file_path = user_dir / unique_filename\n    upload_file.file.seek(0)\n    file_bytes = upload_file.file.read()\n    if not file_bytes:\n        raise ValueError(\"Uploaded file is empty\")",
         "detail": "backend.app.services.file_service",
         "documentation": {}
     },
@@ -743,7 +787,7 @@
         "kind": 2,
         "importPath": "backend.app.services.file_service",
         "description": "backend.app.services.file_service",
-        "peekOfCode": "def save_base64_file(content_base64: str, filename: str, user_id: uuid.UUID) -> str:\n    user_folder = UPLOAD_DIR / str(user_id)\n    user_folder.mkdir(parents=True, exist_ok=True)\n    extension = Path(filename).suffix\n    unique_filename = f\"{uuid.uuid4()}{extension}\"\n    file_path = user_folder / unique_filename\n    file_bytes = base64.b64decode(content_base64)\n    with file_path.open(\"wb\") as f:\n        f.write(file_bytes)\n    return str(file_path)",
+        "peekOfCode": "def save_base64_file(content_base64: str, filename: str, user_id: uuid.UUID) -> str:\n    user_folder = Path(UPLOAD_DIR) / str(user_id)\n    user_folder.mkdir(parents=True, exist_ok=True)\n    extension = Path(filename).suffix\n    # unique_filename = f\"{uuid.uuid4()}{extension}\"\n    unique_filename = f\"{filename}\"\n    file_path = user_folder / unique_filename\n    file_bytes = base64.b64decode(content_base64)\n    with file_path.open(\"wb\") as f:\n        f.write(file_bytes)",
         "detail": "backend.app.services.file_service",
         "documentation": {}
     },
@@ -752,7 +796,7 @@
         "kind": 5,
         "importPath": "backend.app.services.file_service",
         "description": "backend.app.services.file_service",
-        "peekOfCode": "UPLOAD_DIR = os.getenv(\"UPLOAD_DIR\", \"/app/uploads\")\nPath(UPLOAD_DIR).mkdir(parents=True, exist_ok=True)\ndef save_file(upload_file: UploadFile, user_id: uuid.UUID) -> str:\n    extension = Path(upload_file.filename).suffix\n    unique_filename = f\"{uuid.uuid4()}_{extension}\"\n    user_dir = Path(UPLOAD_DIR) / str(user_id)\n    user_dir.mkdir(parents=True, exist_ok=True)\n    file_path = user_dir / unique_filename\n    with file_path.open(\"wb\") as f:\n        f.write(upload_file.file.read())",
+        "peekOfCode": "UPLOAD_DIR = os.getenv(\"UPLOAD_DIR\", \"/app/uploads\")\nPath(UPLOAD_DIR).mkdir(parents=True, exist_ok=True)\ndef save_file(upload_file: UploadFile, user_id: uuid.UUID) -> str:\n    extension = Path(upload_file.filename).suffix\n    unique_filename = f\"{upload_file.filename}\"\n    user_dir = Path(UPLOAD_DIR) / str(user_id)\n    user_dir.mkdir(parents=True, exist_ok=True)\n    file_path = user_dir / unique_filename\n    upload_file.file.seek(0)\n    file_bytes = upload_file.file.read()",
         "detail": "backend.app.services.file_service",
         "documentation": {}
     },
@@ -788,7 +832,7 @@
         "kind": 2,
         "importPath": "backend.app.services.metadata_extractor",
         "description": "backend.app.services.metadata_extractor",
-        "peekOfCode": "def create_metadata(\n    chunks: list[str], \n    page_numbers: list[int], \n    doc_id: uuid,\n    filename: str,\n    file_type: str\n) -> list[dict]:\n    metadata_list = []\n    for i, (chunk, page_number) in enumerate(zip(chunks, page_numbers)):\n        heading = infer_heading_from_context(chunk, chunks[:i])",
+        "peekOfCode": "def create_metadata(\n    chunks: list[str], \n    page_numbers: list[int], \n    doc_id: uuid,\n    filename: str,\n    mime_type: str\n) -> list[dict]:\n    metadata_list = []\n    for i, (chunk, page_number) in enumerate(zip(chunks, page_numbers)):\n        heading = infer_heading_from_context(chunk, chunks[:i])",
         "detail": "backend.app.services.metadata_extractor",
         "documentation": {}
     },
@@ -905,7 +949,7 @@
         "kind": 6,
         "importPath": "backend.db_init.db_init",
         "description": "backend.db_init.db_init",
-        "peekOfCode": "class Document(Base):\n    __tablename__ = \"documents\"\n    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)\n    filename = Column(String, nullable=False)\n    file_path = Column(String, nullable=False)\n    file_type = Column(String, nullable=False)\n    uploaded_by = Column(UUID(as_uuid=True), ForeignKey(\"users.id\"))\n    upload_date = Column(TIMESTAMP, server_default=\"NOW()\")\ndef database_is_empty(engine):\n    inspector = inspect(engine)",
+        "peekOfCode": "class Document(Base):\n    __tablename__ = \"documents\"\n    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)\n    filename = Column(String, nullable=False)\n    file_path = Column(String, nullable=False)\n    mime_type = Column(String, nullable=False)\n    uploaded_by = Column(UUID(as_uuid=True), ForeignKey(\"users.id\"))\n    upload_date = Column(TIMESTAMP, server_default=\"NOW()\")\ndef database_is_empty(engine):\n    inspector = inspect(engine)",
         "detail": "backend.db_init.db_init",
         "documentation": {}
     },

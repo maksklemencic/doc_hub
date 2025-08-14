@@ -7,6 +7,7 @@ import pytesseract
 from docx import Document
 import unicodedata
 import base64
+import mimetypes
 
 def clean_text(text: str) -> str:
     text = re.sub(r"-\n", "", text)
@@ -77,7 +78,19 @@ def extract_text_from_image(image_bytes: bytes) -> List[Tuple[int, str]]:
     return [(1, clean)]
 
 
-def process_document_for_text(file_bytes: bytes, file_type: str) -> List[Tuple[int, str]]:
+def normalize_file_type(mime_type: str) -> str:
+    if mime_type.startswith("image/"):
+        return "image"
+    
+    ext = mimetypes.guess_extension(mime_type)
+    if not ext:
+        raise ValueError(f"Unknown MIME type: {mime_type}")
+    
+    ext = ext.lstrip(".").lower()
+    return ext
+
+
+def process_document_for_text(file_bytes: bytes, mime_type: str) -> List[Tuple[int, str]]:
 
     handlers = {
         "pdf": extract_text_from_pdf,
@@ -86,13 +99,14 @@ def process_document_for_text(file_bytes: bytes, file_type: str) -> List[Tuple[i
         # Add more handlers here as you support new file types
     }
 
-    handler = handlers.get(file_type.lower())
+    file_type = normalize_file_type(mime_type)
+    handler = handlers.get(file_type)
     
     if not handler:
         raise ValueError(f"Unsupported document type: '{file_type}'. Supported types are: {', '.join(handlers.keys())}")
     
     return handler(file_bytes)
 
-def base64_to_text(base64_text: str, file_type: str) -> List[Tuple[int, str]]:
+def base64_to_text(base64_text: str, mime_type: str) -> List[Tuple[int, str]]:
     file_bytes = base64.b64decode(base64_text)
-    return process_document_for_text(file_bytes, file_type)
+    return process_document_for_text(file_bytes, mime_type)

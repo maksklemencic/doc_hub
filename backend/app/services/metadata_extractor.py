@@ -31,7 +31,7 @@ def create_metadata(
     page_numbers: list[int], 
     doc_id: uuid,
     filename: str,
-    file_type: str
+    mime_type: str
 ) -> list[dict]:
     
     metadata_list = []
@@ -48,7 +48,7 @@ def create_metadata(
             "page_number": page_number,
             "document_id": doc_id,
             "filename": filename,
-            "file_type": file_type
+            "mime_type": mime_type
         })
 
     return metadata_list

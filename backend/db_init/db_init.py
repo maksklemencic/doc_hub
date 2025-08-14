@@ -31,7 +31,7 @@ class Document(Base):
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     filename = Column(String, nullable=False)
     file_path = Column(String, nullable=False)
-    file_type = Column(String, nullable=False)
+    mime_type = Column(String, nullable=False)
     uploaded_by = Column(UUID(as_uuid=True), ForeignKey("users.id"))
     upload_date = Column(TIMESTAMP, server_default="NOW()")
 

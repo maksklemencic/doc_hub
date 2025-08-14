@@ -22,7 +22,7 @@ def chunk_pages_with_recursive_chunker(
     chunk_overlap: int = 50
 ) -> List[Tuple[int, str]]:
     
-    chunker = RecursiveChunker(chunk_size=chunk_size, overlap=chunk_overlap)
+    chunker = RecursiveChunker(chunk_size=chunk_size)
     chunks = []
     page_numbers = []
 
