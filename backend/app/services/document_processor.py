@@ -1,5 +1,4 @@
 import io
-import base64
 import fitz
 import re
 from typing import List, Tuple
@@ -7,7 +6,7 @@ from PIL import Image
 import pytesseract
 from docx import Document
 import unicodedata
-
+import base64
 
 def clean_text(text: str) -> str:
     text = re.sub(r"-\n", "", text)
@@ -97,4 +96,3 @@ def process_document_for_text(file_bytes: bytes, file_type: str) -> List[Tuple[i
 def base64_to_text(base64_text: str, file_type: str) -> List[Tuple[int, str]]:
     file_bytes = base64.b64decode(base64_text)
     return process_document_for_text(file_bytes, file_type)
-

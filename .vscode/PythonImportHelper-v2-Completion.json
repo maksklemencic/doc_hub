@@ -114,6 +114,14 @@
         "documentation": {}
     },
     {
+        "label": "UploadFile",
+        "importPath": "fastapi",
+        "description": "fastapi",
+        "isExtraImport": true,
+        "detail": "fastapi",
+        "documentation": {}
+    },
+    {
         "label": "FastAPI",
         "importPath": "fastapi",
         "description": "fastapi",
@@ -155,21 +163,100 @@
         "documentation": {}
     },
     {
+        "label": "create_engine",
+        "importPath": "sqlalchemy",
+        "description": "sqlalchemy",
+        "isExtraImport": true,
+        "detail": "sqlalchemy",
+        "documentation": {}
+    },
+    {
+        "label": "exc",
+        "importPath": "sqlalchemy",
+        "description": "sqlalchemy",
+        "isExtraImport": true,
+        "detail": "sqlalchemy",
+        "documentation": {}
+    },
+    {
+        "label": "create_engine",
+        "importPath": "sqlalchemy",
+        "description": "sqlalchemy",
+        "isExtraImport": true,
+        "detail": "sqlalchemy",
+        "documentation": {}
+    },
+    {
+        "label": "Column",
+        "importPath": "sqlalchemy",
+        "description": "sqlalchemy",
+        "isExtraImport": true,
+        "detail": "sqlalchemy",
+        "documentation": {}
+    },
+    {
+        "label": "String",
+        "importPath": "sqlalchemy",
+        "description": "sqlalchemy",
+        "isExtraImport": true,
+        "detail": "sqlalchemy",
+        "documentation": {}
+    },
+    {
+        "label": "TIMESTAMP",
+        "importPath": "sqlalchemy",
+        "description": "sqlalchemy",
+        "isExtraImport": true,
+        "detail": "sqlalchemy",
+        "documentation": {}
+    },
+    {
+        "label": "ForeignKey",
+        "importPath": "sqlalchemy",
+        "description": "sqlalchemy",
+        "isExtraImport": true,
+        "detail": "sqlalchemy",
+        "documentation": {}
+    },
+    {
+        "label": "inspect",
+        "importPath": "sqlalchemy",
+        "description": "sqlalchemy",
+        "isExtraImport": true,
+        "detail": "sqlalchemy",
+        "documentation": {}
+    },
+    {
+        "label": "text",
+        "importPath": "sqlalchemy",
+        "description": "sqlalchemy",
+        "isExtraImport": true,
+        "detail": "sqlalchemy",
+        "documentation": {}
+    },
+    {
+        "label": "sessionmaker",
+        "importPath": "sqlalchemy.orm",
+        "description": "sqlalchemy.orm",
+        "isExtraImport": true,
+        "detail": "sqlalchemy.orm",
+        "documentation": {}
+    },
+    {
+        "label": "sessionmaker",
+        "importPath": "sqlalchemy.orm",
+        "description": "sqlalchemy.orm",
+        "isExtraImport": true,
+        "detail": "sqlalchemy.orm",
+        "documentation": {}
+    },
+    {
         "label": "io",
         "kind": 6,
         "isExtraImport": true,
         "importPath": "io",
         "description": "io",
         "detail": "io",
-        "documentation": {}
-    },
-    {
-        "label": "base64",
-        "kind": 6,
-        "isExtraImport": true,
-        "importPath": "base64",
-        "description": "base64",
-        "detail": "base64",
         "documentation": {}
     },
     {
@@ -257,11 +344,28 @@
         "documentation": {}
     },
     {
+        "label": "base64",
+        "kind": 6,
+        "isExtraImport": true,
+        "importPath": "base64",
+        "description": "base64",
+        "detail": "base64",
+        "documentation": {}
+    },
+    {
         "label": "RecursiveChunker",
         "importPath": "chonkie",
         "description": "chonkie",
         "isExtraImport": true,
         "detail": "chonkie",
+        "documentation": {}
+    },
+    {
+        "label": "Path",
+        "importPath": "pathlib",
+        "description": "pathlib",
+        "isExtraImport": true,
+        "detail": "pathlib",
         "documentation": {}
     },
     {
@@ -331,62 +435,6 @@
         "documentation": {}
     },
     {
-        "label": "create_engine",
-        "importPath": "sqlalchemy",
-        "description": "sqlalchemy",
-        "isExtraImport": true,
-        "detail": "sqlalchemy",
-        "documentation": {}
-    },
-    {
-        "label": "Column",
-        "importPath": "sqlalchemy",
-        "description": "sqlalchemy",
-        "isExtraImport": true,
-        "detail": "sqlalchemy",
-        "documentation": {}
-    },
-    {
-        "label": "String",
-        "importPath": "sqlalchemy",
-        "description": "sqlalchemy",
-        "isExtraImport": true,
-        "detail": "sqlalchemy",
-        "documentation": {}
-    },
-    {
-        "label": "TIMESTAMP",
-        "importPath": "sqlalchemy",
-        "description": "sqlalchemy",
-        "isExtraImport": true,
-        "detail": "sqlalchemy",
-        "documentation": {}
-    },
-    {
-        "label": "ForeignKey",
-        "importPath": "sqlalchemy",
-        "description": "sqlalchemy",
-        "isExtraImport": true,
-        "detail": "sqlalchemy",
-        "documentation": {}
-    },
-    {
-        "label": "inspect",
-        "importPath": "sqlalchemy",
-        "description": "sqlalchemy",
-        "isExtraImport": true,
-        "detail": "sqlalchemy",
-        "documentation": {}
-    },
-    {
-        "label": "text",
-        "importPath": "sqlalchemy",
-        "description": "sqlalchemy",
-        "isExtraImport": true,
-        "detail": "sqlalchemy",
-        "documentation": {}
-    },
-    {
         "label": "UUID",
         "importPath": "sqlalchemy.dialects.postgresql",
         "description": "sqlalchemy.dialects.postgresql",
@@ -400,14 +448,6 @@
         "description": "sqlalchemy.ext.declarative",
         "isExtraImport": true,
         "detail": "sqlalchemy.ext.declarative",
-        "documentation": {}
-    },
-    {
-        "label": "sessionmaker",
-        "importPath": "sqlalchemy.orm",
-        "description": "sqlalchemy.orm",
-        "isExtraImport": true,
-        "detail": "sqlalchemy.orm",
         "documentation": {}
     },
     {
@@ -514,7 +554,7 @@
         "kind": 6,
         "importPath": "backend.app.routes.upload",
         "description": "backend.app.routes.upload",
-        "peekOfCode": "class Base64UploadRequest(BaseModel):\n    filename: str\n    file_type: str\n    content_base64: str\n@router.post(\"/base64\")\ndef upload_base64(request: Base64UploadRequest):\n    try:\n        pages = base64_to_text(base64_text=request.content_base64, file_type=request.file_type)\n        chunks, document_id = save_to_db(pages, request.filename, request.file_type)\n        return {",
+        "peekOfCode": "class Base64UploadRequest(BaseModel):\n    filename: str\n    file_type: str\n    content_base64: str\n    user_id: uuid.UUID\n@router.post(\"/base64\")\ndef upload_base64(request: Base64UploadRequest):\n    try:\n        pages = document_processor.base64_to_text(base64_text=request.content_base64, file_type=request.file_type)\n        chunks, document_id = save_to_vector_db(pages, request.filename, request.file_type)",
         "detail": "backend.app.routes.upload",
         "documentation": {}
     },
@@ -523,16 +563,16 @@
         "kind": 2,
         "importPath": "backend.app.routes.upload",
         "description": "backend.app.routes.upload",
-        "peekOfCode": "def upload_base64(request: Base64UploadRequest):\n    try:\n        pages = base64_to_text(base64_text=request.content_base64, file_type=request.file_type)\n        chunks, document_id = save_to_db(pages, request.filename, request.file_type)\n        return {\n            \"status\": \"Success\",\n            \"document_id\": document_id,\n            \"document_name\": request.filename,\n            \"chunk_count\": len(chunks) \n        }",
+        "peekOfCode": "def upload_base64(request: Base64UploadRequest):\n    try:\n        pages = document_processor.base64_to_text(base64_text=request.content_base64, file_type=request.file_type)\n        chunks, document_id = save_to_vector_db(pages, request.filename, request.file_type)\n        saved_file_path = file_service.save_base64_file(request.content_base64, request.filename, user_id)\n        _ = db_handler.add_document(\n            filename=request.filename,\n            file_path=saved_file_path,\n            file_type=request.file_type,\n            uploaded_by=request.user_id",
         "detail": "backend.app.routes.upload",
         "documentation": {}
     },
     {
-        "label": "save_to_db",
+        "label": "save_to_vector_db",
         "kind": 2,
         "importPath": "backend.app.routes.upload",
         "description": "backend.app.routes.upload",
-        "peekOfCode": "def save_to_db(pages: list[(int, str)], filename: str, file_type: str):\n    # chunks, page_numbers = structure_aware_chunk(pages=pages)\n    chunks, page_numbers = chunk_pages_with_recursive_chunker(pages=pages)\n    embeddings = get_embeddings(chunks=chunks)\n    document_id = str(uuid.uuid4())\n    metadata = create_metadata(\n        chunks=chunks, \n        page_numbers=page_numbers, \n        doc_id=document_id,\n        filename=filename,",
+        "peekOfCode": "def save_to_vector_db(pages: list[(int, str)], filename: str, file_type: str):\n    # chunks, page_numbers = structure_aware_chunk(pages=pages)\n    chunks, page_numbers = embedding.chunk_pages_with_recursive_chunker(pages=pages)\n    embeddings = embedding.get_embeddings(chunks=chunks)\n    document_id = str(uuid.uuid4())\n    metadata = metadata_extractor.create_metadata(\n        chunks=chunks, \n        page_numbers=page_numbers, \n        doc_id=document_id,\n        filename=filename,",
         "detail": "backend.app.routes.upload",
         "documentation": {}
     },
@@ -541,8 +581,62 @@
         "kind": 5,
         "importPath": "backend.app.routes.upload",
         "description": "backend.app.routes.upload",
-        "peekOfCode": "router = APIRouter()\nclass Base64UploadRequest(BaseModel):\n    filename: str\n    file_type: str\n    content_base64: str\n@router.post(\"/base64\")\ndef upload_base64(request: Base64UploadRequest):\n    try:\n        pages = base64_to_text(base64_text=request.content_base64, file_type=request.file_type)\n        chunks, document_id = save_to_db(pages, request.filename, request.file_type)",
+        "peekOfCode": "router = APIRouter()\nclass Base64UploadRequest(BaseModel):\n    filename: str\n    file_type: str\n    content_base64: str\n    user_id: uuid.UUID\n@router.post(\"/base64\")\ndef upload_base64(request: Base64UploadRequest):\n    try:\n        pages = document_processor.base64_to_text(base64_text=request.content_base64, file_type=request.file_type)",
         "detail": "backend.app.routes.upload",
+        "documentation": {}
+    },
+    {
+        "label": "add_document",
+        "kind": 2,
+        "importPath": "backend.app.services.db_handler",
+        "description": "backend.app.services.db_handler",
+        "peekOfCode": "def add_document(filename: str, file_path: str, file_type: str, uploaded_by: uuid.UUID) -> Document:\n    session = SessionLocal()\n    try:\n        doc = Document(\n            filename=filename,\n            file_path=file_path,\n            file_type=file_type,\n            uploaded_by=uploaded_by\n        )\n        session.add(doc)",
+        "detail": "backend.app.services.db_handler",
+        "documentation": {}
+    },
+    {
+        "label": "update_document",
+        "kind": 2,
+        "importPath": "backend.app.services.db_handler",
+        "description": "backend.app.services.db_handler",
+        "peekOfCode": "def update_document(doc_id: uuid.UUID, **kwargs) -> Document:\n    session = SessionLocal()\n    try:\n        doc = session.get(Document, doc_id)\n        if not doc:\n            raise ValueError(f\"Document with id {doc_id} not found\")\n        for key, value in kwargs.items():\n            if hasattr(doc, key):\n                setattr(doc, key, value)\n        session.commit()",
+        "detail": "backend.app.services.db_handler",
+        "documentation": {}
+    },
+    {
+        "label": "delete_document",
+        "kind": 2,
+        "importPath": "backend.app.services.db_handler",
+        "description": "backend.app.services.db_handler",
+        "peekOfCode": "def delete_document(doc_id: uuid.UUID) -> bool:\n    session = SessionLocal()\n    try:\n        doc = session.get(Document, doc_id)\n        if not doc:\n            raise ValueError(f\"Document with id {doc_id} not found\")\n        session.delete(doc)\n        session.commit()\n        return True\n    except exc.SQLAlchemyError as e:",
+        "detail": "backend.app.services.db_handler",
+        "documentation": {}
+    },
+    {
+        "label": "DATABASE_URL",
+        "kind": 5,
+        "importPath": "backend.app.services.db_handler",
+        "description": "backend.app.services.db_handler",
+        "peekOfCode": "DATABASE_URL = os.environ.get(\"DATABASE_URL\")\nif not DATABASE_URL:\n    raise ValueError(\"DATABASE_URL is not set in environment\")\nengine = create_engine(DATABASE_URL)\nSessionLocal = sessionmaker(bind=engine)\ndef add_document(filename: str, file_path: str, file_type: str, uploaded_by: uuid.UUID) -> Document:\n    session = SessionLocal()\n    try:\n        doc = Document(\n            filename=filename,",
+        "detail": "backend.app.services.db_handler",
+        "documentation": {}
+    },
+    {
+        "label": "engine",
+        "kind": 5,
+        "importPath": "backend.app.services.db_handler",
+        "description": "backend.app.services.db_handler",
+        "peekOfCode": "engine = create_engine(DATABASE_URL)\nSessionLocal = sessionmaker(bind=engine)\ndef add_document(filename: str, file_path: str, file_type: str, uploaded_by: uuid.UUID) -> Document:\n    session = SessionLocal()\n    try:\n        doc = Document(\n            filename=filename,\n            file_path=file_path,\n            file_type=file_type,\n            uploaded_by=uploaded_by",
+        "detail": "backend.app.services.db_handler",
+        "documentation": {}
+    },
+    {
+        "label": "SessionLocal",
+        "kind": 5,
+        "importPath": "backend.app.services.db_handler",
+        "description": "backend.app.services.db_handler",
+        "peekOfCode": "SessionLocal = sessionmaker(bind=engine)\ndef add_document(filename: str, file_path: str, file_type: str, uploaded_by: uuid.UUID) -> Document:\n    session = SessionLocal()\n    try:\n        doc = Document(\n            filename=filename,\n            file_path=file_path,\n            file_type=file_type,\n            uploaded_by=uploaded_by\n        )",
+        "detail": "backend.app.services.db_handler",
         "documentation": {}
     },
     {
@@ -633,6 +727,33 @@
         "description": "backend.app.services.embedding",
         "peekOfCode": "model = SentenceTransformer(EMBEDDING_MODEL_NAME)\n# def chunk_text_recursive(text: str, chunk_size=500, chunk_overlap=50) -> list[str]:\n#     chunker = RecursiveChunker(chunk_size=chunk_size, overlap=chunk_overlap)\n#     chunks = chunker(text)\n#     return [chunk.text for chunk in chunks]\ndef chunk_pages_with_recursive_chunker(\n    pages: List[Tuple[int, str]],\n    chunk_size: int = 500,\n    chunk_overlap: int = 50\n) -> List[Tuple[int, str]]:",
         "detail": "backend.app.services.embedding",
+        "documentation": {}
+    },
+    {
+        "label": "save_file",
+        "kind": 2,
+        "importPath": "backend.app.services.file_service",
+        "description": "backend.app.services.file_service",
+        "peekOfCode": "def save_file(upload_file: UploadFile, user_id: uuid.UUID) -> str:\n    extension = Path(upload_file.filename).suffix\n    unique_filename = f\"{uuid.uuid4()}_{extension}\"\n    user_dir = Path(UPLOAD_DIR) / str(user_id)\n    user_dir.mkdir(parents=True, exist_ok=True)\n    file_path = user_dir / unique_filename\n    with file_path.open(\"wb\") as f:\n        f.write(upload_file.file.read())\n    return str(file_path)\ndef save_base64_file(content_base64: str, filename: str, user_id: uuid.UUID) -> str:",
+        "detail": "backend.app.services.file_service",
+        "documentation": {}
+    },
+    {
+        "label": "save_base64_file",
+        "kind": 2,
+        "importPath": "backend.app.services.file_service",
+        "description": "backend.app.services.file_service",
+        "peekOfCode": "def save_base64_file(content_base64: str, filename: str, user_id: uuid.UUID) -> str:\n    user_folder = UPLOAD_DIR / str(user_id)\n    user_folder.mkdir(parents=True, exist_ok=True)\n    extension = Path(filename).suffix\n    unique_filename = f\"{uuid.uuid4()}{extension}\"\n    file_path = user_folder / unique_filename\n    file_bytes = base64.b64decode(content_base64)\n    with file_path.open(\"wb\") as f:\n        f.write(file_bytes)\n    return str(file_path)",
+        "detail": "backend.app.services.file_service",
+        "documentation": {}
+    },
+    {
+        "label": "UPLOAD_DIR",
+        "kind": 5,
+        "importPath": "backend.app.services.file_service",
+        "description": "backend.app.services.file_service",
+        "peekOfCode": "UPLOAD_DIR = os.getenv(\"UPLOAD_DIR\", \"/app/uploads\")\nPath(UPLOAD_DIR).mkdir(parents=True, exist_ok=True)\ndef save_file(upload_file: UploadFile, user_id: uuid.UUID) -> str:\n    extension = Path(upload_file.filename).suffix\n    unique_filename = f\"{uuid.uuid4()}_{extension}\"\n    user_dir = Path(UPLOAD_DIR) / str(user_id)\n    user_dir.mkdir(parents=True, exist_ok=True)\n    file_path = user_dir / unique_filename\n    with file_path.open(\"wb\") as f:\n        f.write(upload_file.file.read())",
+        "detail": "backend.app.services.file_service",
         "documentation": {}
     },
     {
