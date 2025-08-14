@@ -223,14 +223,6 @@
         "documentation": {}
     },
     {
-        "label": "Optional",
-        "importPath": "typing",
-        "description": "typing",
-        "isExtraImport": true,
-        "detail": "typing",
-        "documentation": {}
-    },
-    {
         "label": "Image",
         "importPath": "PIL",
         "description": "PIL",
@@ -256,27 +248,12 @@
         "documentation": {}
     },
     {
-        "label": "Path",
-        "importPath": "pathlib",
-        "description": "pathlib",
+        "label": "unicodedata",
+        "kind": 6,
         "isExtraImport": true,
-        "detail": "pathlib",
-        "documentation": {}
-    },
-    {
-        "label": "distill",
-        "importPath": "model2vec",
-        "description": "model2vec",
-        "isExtraImport": true,
-        "detail": "model2vec",
-        "documentation": {}
-    },
-    {
-        "label": "StaticModel",
-        "importPath": "model2vec",
-        "description": "model2vec",
-        "isExtraImport": true,
-        "detail": "model2vec",
+        "importPath": "unicodedata",
+        "description": "unicodedata",
+        "detail": "unicodedata",
         "documentation": {}
     },
     {
@@ -475,7 +452,7 @@
         "kind": 2,
         "importPath": "backend.app.routes.upload",
         "description": "backend.app.routes.upload",
-        "peekOfCode": "def save_to_db(pages: list[(int, str)], filename: str, file_type: str):\n    chunks, page_numbers = structure_aware_chunk(pages=pages)\n    embeddings = get_embeddings(chunks=chunks)\n    document_id = str(uuid.uuid4())\n    metadata = create_metadata(\n        chunks=chunks, \n        page_numbers=page_numbers, \n        doc_id=document_id,\n        filename=filename,\n        file_type=file_type",
+        "peekOfCode": "def save_to_db(pages: list[(int, str)], filename: str, file_type: str):\n    # chunks, page_numbers = structure_aware_chunk(pages=pages)\n    chunks, page_numbers = chunk_pages_with_recursive_chunker(pages=pages)\n    embeddings = get_embeddings(chunks=chunks)\n    document_id = str(uuid.uuid4())\n    metadata = create_metadata(\n        chunks=chunks, \n        page_numbers=page_numbers, \n        doc_id=document_id,\n        filename=filename,",
         "detail": "backend.app.routes.upload",
         "documentation": {}
     },
@@ -493,7 +470,7 @@
         "kind": 2,
         "importPath": "backend.app.services.document_processor",
         "description": "backend.app.services.document_processor",
-        "peekOfCode": "def clean_text(text: str) -> str:\n    text = re.sub(r\"-\\n\", \"\", text)\n    text = re.sub(r\"\\n{2,}\", \"\\n\", text)\n    text = re.sub(r\"[ \\t]+\", \" \", text)\n    return text.strip()\ndef extract_text_from_pdf(file_bytes: bytes) -> List[Tuple[int, str]]:\n    try:\n        doc = fitz.open(stream=file_bytes, filetype=\"pdf\")\n    except Exception as e:\n        raise ValueError(f\"Failed to open PDF file: {e}\")",
+        "peekOfCode": "def clean_text(text: str) -> str:\n    text = re.sub(r\"-\\n\", \"\", text)\n    text = re.sub(r\"\\n{2,}\", \"\\n\", text)\n    text = re.sub(r\"[ \\t]+\", \" \", text)\n    text = re.sub(r\"[\\x00-\\x1F\\x7F]+\", \"\", text)\n    text = unicodedata.normalize(\"NFKC\", text)\n    return text.strip()\ndef extract_text_from_pdf(file_bytes: bytes) -> List[Tuple[int, str]]:\n    try:\n        doc = fitz.open(stream=file_bytes, filetype=\"pdf\")",
         "detail": "backend.app.services.document_processor",
         "documentation": {}
     },
@@ -502,7 +479,7 @@
         "kind": 2,
         "importPath": "backend.app.services.document_processor",
         "description": "backend.app.services.document_processor",
-        "peekOfCode": "def extract_text_from_pdf(file_bytes: bytes) -> List[Tuple[int, str]]:\n    try:\n        doc = fitz.open(stream=file_bytes, filetype=\"pdf\")\n    except Exception as e:\n        raise ValueError(f\"Failed to open PDF file: {e}\")\n    page_texts = []\n    for i, page in enumerate(doc):\n        text = page.get_text()\n        if not text.strip():\n            pix = page.get_pixmap(dpi=300)",
+        "peekOfCode": "def extract_text_from_pdf(file_bytes: bytes) -> List[Tuple[int, str]]:\n    try:\n        doc = fitz.open(stream=file_bytes, filetype=\"pdf\")\n    except Exception as e:\n        raise ValueError(f\"Failed to open PDF file: {e}\")\n    page_texts = []\n    for i, page in enumerate(doc):\n        text = page.get_text()\n        if not len(text.strip()) < 5:\n            pix = page.get_pixmap(dpi=300, alpha=False)",
         "detail": "backend.app.services.document_processor",
         "documentation": {}
     },
@@ -511,7 +488,16 @@
         "kind": 2,
         "importPath": "backend.app.services.document_processor",
         "description": "backend.app.services.document_processor",
-        "peekOfCode": "def extract_text_from_docx(file_bytes: bytes) -> List[Tuple[int, str]]:\n    try:\n        doc = Document(io.BytesIO(file_bytes))\n    except Exception as e:\n        raise ValueError(f\"Failed to open DOCX file: {e}\")\n    full_text = []\n    for paragraph in doc.paragraphs:\n        full_text.append(paragraph.text)\n    text_content = \"\\n\".join(full_text)\n    return [(1, clean_text(text_content))]",
+        "peekOfCode": "def extract_text_from_docx(file_bytes: bytes) -> List[Tuple[int, str]]:\n    try:\n        doc = Document(io.BytesIO(file_bytes))\n    except Exception as e:\n        raise ValueError(f\"Failed to open DOCX file: {e}\")\n    text_chunks = []\n    for paragraph in doc.paragraphs:\n        try:\n            text = clean_text(paragraph.text)\n            if text:",
+        "detail": "backend.app.services.document_processor",
+        "documentation": {}
+    },
+    {
+        "label": "extract_text_from_image",
+        "kind": 2,
+        "importPath": "backend.app.services.document_processor",
+        "description": "backend.app.services.document_processor",
+        "peekOfCode": "def extract_text_from_image(image_bytes: bytes) -> List[Tuple[int, str]]:\n    image = Image.open(io.BytesIO(image_bytes))\n    text = pytesseract.image_to_string(image).strip()\n    clean = clean_text(text)\n    return [(1, clean)]\ndef process_document_for_text(file_bytes: bytes, file_type: str) -> List[Tuple[int, str]]:\n    handlers = {\n        \"pdf\": extract_text_from_pdf,\n        \"docx\": extract_text_from_docx,\n        \"img\": extract_text_from_image",
         "detail": "backend.app.services.document_processor",
         "documentation": {}
     },
@@ -520,7 +506,7 @@
         "kind": 2,
         "importPath": "backend.app.services.document_processor",
         "description": "backend.app.services.document_processor",
-        "peekOfCode": "def process_document_for_text(file_bytes: bytes, file_type: str) -> List[Tuple[int, str]]:\n    handlers = {\n        \"pdf\": extract_text_from_pdf,\n        \"docx\": extract_text_from_docx\n        # Add more handlers here as you support new file types\n    }\n    handler = handlers.get(file_type.lower())\n    if not handler:\n        raise ValueError(f\"Unsupported document type: '{file_type}'. Supported types are: {', '.join(handlers.keys())}\")\n    return handler(file_bytes)",
+        "peekOfCode": "def process_document_for_text(file_bytes: bytes, file_type: str) -> List[Tuple[int, str]]:\n    handlers = {\n        \"pdf\": extract_text_from_pdf,\n        \"docx\": extract_text_from_docx,\n        \"img\": extract_text_from_image\n        # Add more handlers here as you support new file types\n    }\n    handler = handlers.get(file_type.lower())\n    if not handler:\n        raise ValueError(f\"Unsupported document type: '{file_type}'. Supported types are: {', '.join(handlers.keys())}\")",
         "detail": "backend.app.services.document_processor",
         "documentation": {}
     },
@@ -534,38 +520,11 @@
         "documentation": {}
     },
     {
-        "label": "get_static_model",
+        "label": "chunk_pages_with_recursive_chunker",
         "kind": 2,
         "importPath": "backend.app.services.embedding",
         "description": "backend.app.services.embedding",
-        "peekOfCode": "def get_static_model() -> StaticModel:\n    global _static_model\n    if _static_model is None:\n        _static_model = load_or_distill_model(\n            model_path=STATIC_MODEL_PATH,\n            source_model=EMBEDDING_MODEL_NAME,\n            pca_dims=PCA_DIMS\n        )\n    return _static_model\ndef load_or_distill_model(model_path: str, source_model: str, pca_dims: int) -> StaticModel:",
-        "detail": "backend.app.services.embedding",
-        "documentation": {}
-    },
-    {
-        "label": "load_or_distill_model",
-        "kind": 2,
-        "importPath": "backend.app.services.embedding",
-        "description": "backend.app.services.embedding",
-        "peekOfCode": "def load_or_distill_model(model_path: str, source_model: str, pca_dims: int) -> StaticModel:\n    try:\n        model_path_obj = Path(model_path)\n        if model_path_obj.exists() and any(model_path_obj.iterdir()):\n            print(f\"Loading StaticModel from {model_path}\")\n            return StaticModel.from_pretrained(model_path)\n        else:\n            print(f\"No model found at {model_path}. Distilling new model from {source_model}\")\n            # Ensure directory exists\n            model_path_obj.mkdir(parents=True, exist_ok=True)",
-        "detail": "backend.app.services.embedding",
-        "documentation": {}
-    },
-    {
-        "label": "chunk_text_recursive",
-        "kind": 2,
-        "importPath": "backend.app.services.embedding",
-        "description": "backend.app.services.embedding",
-        "peekOfCode": "def chunk_text_recursive(text: str, chunk_size=500, chunk_overlap=50) -> list[str]:\n    chunker = RecursiveChunker(chunk_size=chunk_size, overlap=chunk_overlap)\n    chunks = chunker(text)\n    return [chunk.text for chunk in chunks]\ndef structure_aware_chunk(pages: List[Tuple[int, str]], max_length=500, overlap=50) -> Tuple[List[str], List[int]]:\n    chunks = []\n    page_numbers = []\n    for page_number, page_text in pages:\n        paragraphs = page_text.split(\"\\n\")\n        current_chunk = \"\"",
-        "detail": "backend.app.services.embedding",
-        "documentation": {}
-    },
-    {
-        "label": "structure_aware_chunk",
-        "kind": 2,
-        "importPath": "backend.app.services.embedding",
-        "description": "backend.app.services.embedding",
-        "peekOfCode": "def structure_aware_chunk(pages: List[Tuple[int, str]], max_length=500, overlap=50) -> Tuple[List[str], List[int]]:\n    chunks = []\n    page_numbers = []\n    for page_number, page_text in pages:\n        paragraphs = page_text.split(\"\\n\")\n        current_chunk = \"\"\n        for para in paragraphs:\n            if not para.strip():\n                continue\n            if len(current_chunk.split()) + len(para.split()) <= max_length:",
+        "peekOfCode": "def chunk_pages_with_recursive_chunker(\n    pages: List[Tuple[int, str]],\n    chunk_size: int = 500,\n    chunk_overlap: int = 50\n) -> List[Tuple[int, str]]:\n    chunker = RecursiveChunker(chunk_size=chunk_size, overlap=chunk_overlap)\n    chunks = []\n    page_numbers = []\n    for page_number, page_text in pages:\n        if not page_text.strip():",
         "detail": "backend.app.services.embedding",
         "documentation": {}
     },
@@ -574,7 +533,7 @@
         "kind": 2,
         "importPath": "backend.app.services.embedding",
         "description": "backend.app.services.embedding",
-        "peekOfCode": "def get_embeddings(chunks: list) -> list:\n    model = get_static_model()\n    embeddings = model.encode(chunks)\n    return embeddings.tolist()",
+        "peekOfCode": "def get_embeddings(chunks: list[str]) -> list[list[float]]:\n    embeddings = model.encode(chunks, normalize_embeddings=True)\n    return embeddings.tolist()",
         "detail": "backend.app.services.embedding",
         "documentation": {}
     },
@@ -583,34 +542,16 @@
         "kind": 5,
         "importPath": "backend.app.services.embedding",
         "description": "backend.app.services.embedding",
-        "peekOfCode": "EMBEDDING_MODEL_NAME = os.getenv(\"EMBEDDING_MODEL\", \"all-MiniLM-L6-v2\")\nMODEL_BASE_DIR = os.getenv(\"MODEL_BASE_DIR\", \"/app/models\")\nSTATIC_MODEL_PATH = os.path.join(MODEL_BASE_DIR, f\"static_embedding_model_{EMBEDDING_MODEL_NAME}\")\nPCA_DIMS = 256\n_static_model: Optional[StaticModel] = None\ndef get_static_model() -> StaticModel:\n    global _static_model\n    if _static_model is None:\n        _static_model = load_or_distill_model(\n            model_path=STATIC_MODEL_PATH,",
+        "peekOfCode": "EMBEDDING_MODEL_NAME = os.getenv(\"EMBEDDING_MODEL\", \"all-MiniLM-L6-v2\")\nmodel = SentenceTransformer(EMBEDDING_MODEL_NAME)\n# def chunk_text_recursive(text: str, chunk_size=500, chunk_overlap=50) -> list[str]:\n#     chunker = RecursiveChunker(chunk_size=chunk_size, overlap=chunk_overlap)\n#     chunks = chunker(text)\n#     return [chunk.text for chunk in chunks]\ndef chunk_pages_with_recursive_chunker(\n    pages: List[Tuple[int, str]],\n    chunk_size: int = 500,\n    chunk_overlap: int = 50",
         "detail": "backend.app.services.embedding",
         "documentation": {}
     },
     {
-        "label": "MODEL_BASE_DIR",
+        "label": "model",
         "kind": 5,
         "importPath": "backend.app.services.embedding",
         "description": "backend.app.services.embedding",
-        "peekOfCode": "MODEL_BASE_DIR = os.getenv(\"MODEL_BASE_DIR\", \"/app/models\")\nSTATIC_MODEL_PATH = os.path.join(MODEL_BASE_DIR, f\"static_embedding_model_{EMBEDDING_MODEL_NAME}\")\nPCA_DIMS = 256\n_static_model: Optional[StaticModel] = None\ndef get_static_model() -> StaticModel:\n    global _static_model\n    if _static_model is None:\n        _static_model = load_or_distill_model(\n            model_path=STATIC_MODEL_PATH,\n            source_model=EMBEDDING_MODEL_NAME,",
-        "detail": "backend.app.services.embedding",
-        "documentation": {}
-    },
-    {
-        "label": "STATIC_MODEL_PATH",
-        "kind": 5,
-        "importPath": "backend.app.services.embedding",
-        "description": "backend.app.services.embedding",
-        "peekOfCode": "STATIC_MODEL_PATH = os.path.join(MODEL_BASE_DIR, f\"static_embedding_model_{EMBEDDING_MODEL_NAME}\")\nPCA_DIMS = 256\n_static_model: Optional[StaticModel] = None\ndef get_static_model() -> StaticModel:\n    global _static_model\n    if _static_model is None:\n        _static_model = load_or_distill_model(\n            model_path=STATIC_MODEL_PATH,\n            source_model=EMBEDDING_MODEL_NAME,\n            pca_dims=PCA_DIMS",
-        "detail": "backend.app.services.embedding",
-        "documentation": {}
-    },
-    {
-        "label": "PCA_DIMS",
-        "kind": 5,
-        "importPath": "backend.app.services.embedding",
-        "description": "backend.app.services.embedding",
-        "peekOfCode": "PCA_DIMS = 256\n_static_model: Optional[StaticModel] = None\ndef get_static_model() -> StaticModel:\n    global _static_model\n    if _static_model is None:\n        _static_model = load_or_distill_model(\n            model_path=STATIC_MODEL_PATH,\n            source_model=EMBEDDING_MODEL_NAME,\n            pca_dims=PCA_DIMS\n        )",
+        "peekOfCode": "model = SentenceTransformer(EMBEDDING_MODEL_NAME)\n# def chunk_text_recursive(text: str, chunk_size=500, chunk_overlap=50) -> list[str]:\n#     chunker = RecursiveChunker(chunk_size=chunk_size, overlap=chunk_overlap)\n#     chunks = chunker(text)\n#     return [chunk.text for chunk in chunks]\ndef chunk_pages_with_recursive_chunker(\n    pages: List[Tuple[int, str]],\n    chunk_size: int = 500,\n    chunk_overlap: int = 50\n) -> List[Tuple[int, str]]:",
         "detail": "backend.app.services.embedding",
         "documentation": {}
     },

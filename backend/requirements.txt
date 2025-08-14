@@ -13,5 +13,4 @@ langdetect
 python-docx
 python-multipart
 debugpy
-model2vec
 chonkie

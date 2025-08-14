@@ -2,7 +2,7 @@ from fastapi import APIRouter, File, UploadFile, Form, HTTPException
 from pydantic import BaseModel
 import uuid
 
-from ..services.embedding import get_embeddings, structure_aware_chunk
+from ..services.embedding import get_embeddings, chunk_pages_with_recursive_chunker
 from ..services.qdrant_client import store_document
 from ..services.metadata_extractor import create_metadata
 from ..services.document_processor import base64_to_text, process_document_for_text
@@ -54,7 +54,8 @@ async def upload_file_multipart(
 
 def save_to_db(pages: list[(int, str)], filename: str, file_type: str):
     
-    chunks, page_numbers = structure_aware_chunk(pages=pages)
+    # chunks, page_numbers = structure_aware_chunk(pages=pages)
+    chunks, page_numbers = chunk_pages_with_recursive_chunker(pages=pages)
     embeddings = get_embeddings(chunks=chunks)
     
     document_id = str(uuid.uuid4())

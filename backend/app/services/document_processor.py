@@ -6,12 +6,15 @@ from typing import List, Tuple
 from PIL import Image
 import pytesseract
 from docx import Document
+import unicodedata
 
 
 def clean_text(text: str) -> str:
     text = re.sub(r"-\n", "", text)
     text = re.sub(r"\n{2,}", "\n", text)
     text = re.sub(r"[ \t]+", " ", text)
+    text = re.sub(r"[\x00-\x1F\x7F]+", "", text)
+    text = unicodedata.normalize("NFKC", text)
     return text.strip()
 
 
@@ -25,8 +28,8 @@ def extract_text_from_pdf(file_bytes: bytes) -> List[Tuple[int, str]]:
     for i, page in enumerate(doc):
         text = page.get_text()
 
-        if not text.strip():
-            pix = page.get_pixmap(dpi=300)
+        if not len(text.strip()) < 5:
+            pix = page.get_pixmap(dpi=300, alpha=False)
             img_bytes = pix.tobytes("png")
             image = Image.open(io.BytesIO(img_bytes))
             text = pytesseract.image_to_string(image)
@@ -43,20 +46,44 @@ def extract_text_from_docx(file_bytes: bytes) -> List[Tuple[int, str]]:
     except Exception as e:
         raise ValueError(f"Failed to open DOCX file: {e}")
     
-    full_text = []
+    text_chunks = []
     for paragraph in doc.paragraphs:
-        full_text.append(paragraph.text)
-        
-    text_content = "\n".join(full_text)
+        try:
+            text = clean_text(paragraph.text)
+            if text:
+                text_chunks.append(text)
+        except Exception as e:
+            print(f"Warning: failed to read paragraph: {e}")
+
+    for table in doc.tables:
+        for row in table.rows:
+            row_text = " | ".join(clean_text(cell.text) for cell in row.cells if cell.text.strip())
+            if row_text:
+                text_chunks.append(row_text)
+
+    combined_text = "\n".join(text_chunks)
+
+    if not combined_text.strip():
+        raise ValueError("No readable text found in DOCX file.")
+
+    return [(1, combined_text)]
+
+
+def extract_text_from_image(image_bytes: bytes) -> List[Tuple[int, str]]:
     
-    return [(1, clean_text(text_content))]
+    image = Image.open(io.BytesIO(image_bytes))
+    text = pytesseract.image_to_string(image).strip()
+    clean = clean_text(text)
+
+    return [(1, clean)]
 
 
 def process_document_for_text(file_bytes: bytes, file_type: str) -> List[Tuple[int, str]]:
 
     handlers = {
         "pdf": extract_text_from_pdf,
-        "docx": extract_text_from_docx
+        "docx": extract_text_from_docx,
+        "img": extract_text_from_image
         # Add more handlers here as you support new file types
     }
 
