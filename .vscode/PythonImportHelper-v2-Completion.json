@@ -793,7 +793,7 @@
         "kind": 2,
         "importPath": "backend.db_init.db_init",
         "description": "backend.db_init.db_init",
-        "peekOfCode": "def database_is_empty(engine):\n    inspector = inspect(engine)\n    tables = inspector.get_table_names()\n    return not any(t in tables for t in [\"users\", \"documents\"])\ndef create_tables():\n    with engine.connect() as conn:\n        conn.execute(text(\"CREATE EXTENSION IF NOT EXISTS pgcrypto;\"))\n    Base.metadata.create_all(engine)\n    print(\"Tables created successfully!\")\nif __name__ == \"__main__\":",
+        "peekOfCode": "def database_is_empty(engine):\n    inspector = inspect(engine)\n    tables = inspector.get_table_names()\n    return not any(t in tables for t in [\"users\", \"documents\"])\ndef create_tables():\n    with engine.connect() as conn:\n        conn.execute(text(\"CREATE EXTENSION IF NOT EXISTS pgcrypto;\"))\n    Base.metadata.create_all(engine)\n    print(\"Tables created successfully!\")\ndef insert_test_user():",
         "detail": "backend.db_init.db_init",
         "documentation": {}
     },
@@ -802,7 +802,16 @@
         "kind": 2,
         "importPath": "backend.db_init.db_init",
         "description": "backend.db_init.db_init",
-        "peekOfCode": "def create_tables():\n    with engine.connect() as conn:\n        conn.execute(text(\"CREATE EXTENSION IF NOT EXISTS pgcrypto;\"))\n    Base.metadata.create_all(engine)\n    print(\"Tables created successfully!\")\nif __name__ == \"__main__\":\n    if database_is_empty(engine):\n        print(\"Database is empty. Creating tables...\")\n        create_tables()\n    else:",
+        "peekOfCode": "def create_tables():\n    with engine.connect() as conn:\n        conn.execute(text(\"CREATE EXTENSION IF NOT EXISTS pgcrypto;\"))\n    Base.metadata.create_all(engine)\n    print(\"Tables created successfully!\")\ndef insert_test_user():\n    session = SessionLocal()\n    try:\n        user_count = session.query(User).count()\n        if user_count == 0 and TEST_USER_EMAIL:",
+        "detail": "backend.db_init.db_init",
+        "documentation": {}
+    },
+    {
+        "label": "insert_test_user",
+        "kind": 2,
+        "importPath": "backend.db_init.db_init",
+        "description": "backend.db_init.db_init",
+        "peekOfCode": "def insert_test_user():\n    session = SessionLocal()\n    try:\n        user_count = session.query(User).count()\n        if user_count == 0 and TEST_USER_EMAIL:\n            test_user = User(\n                email=TEST_USER_EMAIL,\n                first_name=TEST_USER_FIRST,\n                last_name=TEST_USER_LAST\n            )",
         "detail": "backend.db_init.db_init",
         "documentation": {}
     },
@@ -811,7 +820,34 @@
         "kind": 5,
         "importPath": "backend.db_init.db_init",
         "description": "backend.db_init.db_init",
-        "peekOfCode": "DATABASE_URL = os.environ.get(\"DATABASE_URL\")\nif not DATABASE_URL:\n    raise ValueError(\"DATABASE_URL is not set in environment\")\nengine = create_engine(DATABASE_URL)\nSessionLocal = sessionmaker(bind=engine)\nBase = declarative_base()\nclass User(Base):\n    __tablename__ = \"users\"\n    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)\n    email = Column(String, unique=True, nullable=False)",
+        "peekOfCode": "DATABASE_URL = os.environ.get(\"DATABASE_URL\")\nif not DATABASE_URL:\n    raise ValueError(\"DATABASE_URL is not set in environment\")\nTEST_USER_EMAIL = os.environ.get(\"TEST_USER_EMAIL\")\nTEST_USER_FIRST = os.environ.get(\"TEST_USER_FIRST\", \"Test\")\nTEST_USER_LAST = os.environ.get(\"TEST_USER_LAST\", \"User\")\nengine = create_engine(DATABASE_URL)\nSessionLocal = sessionmaker(bind=engine)\nBase = declarative_base()\nclass User(Base):",
+        "detail": "backend.db_init.db_init",
+        "documentation": {}
+    },
+    {
+        "label": "TEST_USER_EMAIL",
+        "kind": 5,
+        "importPath": "backend.db_init.db_init",
+        "description": "backend.db_init.db_init",
+        "peekOfCode": "TEST_USER_EMAIL = os.environ.get(\"TEST_USER_EMAIL\")\nTEST_USER_FIRST = os.environ.get(\"TEST_USER_FIRST\", \"Test\")\nTEST_USER_LAST = os.environ.get(\"TEST_USER_LAST\", \"User\")\nengine = create_engine(DATABASE_URL)\nSessionLocal = sessionmaker(bind=engine)\nBase = declarative_base()\nclass User(Base):\n    __tablename__ = \"users\"\n    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)\n    email = Column(String, unique=True, nullable=False)",
+        "detail": "backend.db_init.db_init",
+        "documentation": {}
+    },
+    {
+        "label": "TEST_USER_FIRST",
+        "kind": 5,
+        "importPath": "backend.db_init.db_init",
+        "description": "backend.db_init.db_init",
+        "peekOfCode": "TEST_USER_FIRST = os.environ.get(\"TEST_USER_FIRST\", \"Test\")\nTEST_USER_LAST = os.environ.get(\"TEST_USER_LAST\", \"User\")\nengine = create_engine(DATABASE_URL)\nSessionLocal = sessionmaker(bind=engine)\nBase = declarative_base()\nclass User(Base):\n    __tablename__ = \"users\"\n    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)\n    email = Column(String, unique=True, nullable=False)\n    first_name = Column(String)",
+        "detail": "backend.db_init.db_init",
+        "documentation": {}
+    },
+    {
+        "label": "TEST_USER_LAST",
+        "kind": 5,
+        "importPath": "backend.db_init.db_init",
+        "description": "backend.db_init.db_init",
+        "peekOfCode": "TEST_USER_LAST = os.environ.get(\"TEST_USER_LAST\", \"User\")\nengine = create_engine(DATABASE_URL)\nSessionLocal = sessionmaker(bind=engine)\nBase = declarative_base()\nclass User(Base):\n    __tablename__ = \"users\"\n    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)\n    email = Column(String, unique=True, nullable=False)\n    first_name = Column(String)\n    last_name = Column(String)",
         "detail": "backend.db_init.db_init",
         "documentation": {}
     },

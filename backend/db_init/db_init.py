@@ -9,6 +9,11 @@ DATABASE_URL = os.environ.get("DATABASE_URL")
 if not DATABASE_URL:
     raise ValueError("DATABASE_URL is not set in environment")
 
+
+TEST_USER_EMAIL = os.environ.get("TEST_USER_EMAIL")
+TEST_USER_FIRST = os.environ.get("TEST_USER_FIRST", "Test")
+TEST_USER_LAST = os.environ.get("TEST_USER_LAST", "User")
+
 engine = create_engine(DATABASE_URL)
 SessionLocal = sessionmaker(bind=engine)
 Base = declarative_base()
@@ -40,6 +45,24 @@ def create_tables():
         conn.execute(text("CREATE EXTENSION IF NOT EXISTS pgcrypto;"))
     Base.metadata.create_all(engine)
     print("Tables created successfully!")
+    
+def insert_test_user():
+    session = SessionLocal()
+    try:
+        user_count = session.query(User).count()
+        if user_count == 0 and TEST_USER_EMAIL:
+            test_user = User(
+                email=TEST_USER_EMAIL,
+                first_name=TEST_USER_FIRST,
+                last_name=TEST_USER_LAST
+            )
+            session.add(test_user)
+            session.commit()
+            print(f"Inserted test user {TEST_USER_EMAIL}")
+        else:
+            print("Users table not empty or TEST_USER_EMAIL not set. Skipping test user creation.")
+    finally:
+        session.close()
 
 if __name__ == "__main__":
     if database_is_empty(engine):
@@ -47,3 +70,5 @@ if __name__ == "__main__":
         create_tables()
     else:
         print("Database already has tables. Skipping creation.")
+
+    insert_test_user()
