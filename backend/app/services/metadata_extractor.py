@@ -29,7 +29,7 @@ def infer_heading_from_context(chunk: str, previous_lines: list[str]) -> str:
 def create_metadata(
     chunks: list[str], 
     page_numbers: list[int], 
-    doc_id: uuid,
+    document_id: str,
     filename: str,
     mime_type: str
 ) -> list[dict]:
@@ -46,7 +46,7 @@ def create_metadata(
             "heading": heading,
             "topics": topics,
             "page_number": page_number,
-            "document_id": doc_id,
+            "document_id": document_id,
             "filename": filename,
             "mime_type": mime_type
         })

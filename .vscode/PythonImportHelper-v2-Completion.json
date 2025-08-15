@@ -180,6 +180,22 @@
         "documentation": {}
     },
     {
+        "label": "Path",
+        "importPath": "pathlib",
+        "description": "pathlib",
+        "isExtraImport": true,
+        "detail": "pathlib",
+        "documentation": {}
+    },
+    {
+        "label": "Path",
+        "importPath": "pathlib",
+        "description": "pathlib",
+        "isExtraImport": true,
+        "detail": "pathlib",
+        "documentation": {}
+    },
+    {
         "label": "create_engine",
         "importPath": "sqlalchemy",
         "description": "sqlalchemy",
@@ -378,14 +394,6 @@
         "documentation": {}
     },
     {
-        "label": "Path",
-        "importPath": "pathlib",
-        "description": "pathlib",
-        "isExtraImport": true,
-        "detail": "pathlib",
-        "documentation": {}
-    },
-    {
         "label": "detect",
         "importPath": "langdetect",
         "description": "langdetect",
@@ -440,6 +448,14 @@
         "description": "qdrant_client.http.models",
         "isExtraImport": true,
         "detail": "qdrant_client.http.models",
+        "documentation": {}
+    },
+    {
+        "label": "models",
+        "importPath": "qdrant_client.http",
+        "description": "qdrant_client.http",
+        "isExtraImport": true,
+        "detail": "qdrant_client.http",
         "documentation": {}
     },
     {
@@ -567,6 +583,15 @@
         "documentation": {}
     },
     {
+        "label": "delete_document_endpoint",
+        "kind": 2,
+        "importPath": "backend.app.routes.documents",
+        "description": "backend.app.routes.documents",
+        "peekOfCode": "def delete_document_endpoint(doc_id: str):\n    try:\n        doc_uuid = uuid.UUID(doc_id)\n    except ValueError:\n        raise HTTPException(status_code=400, detail=\"Invalid document ID format\")\n    document = db_handler.get_document_by_id(doc_uuid)\n    if not document:\n        raise HTTPException(status_code=404, detail=\"Document not found\")\n    # 1. Delete from filesystem\n    file_path = Path(document.file_path)",
+        "detail": "backend.app.routes.documents",
+        "documentation": {}
+    },
+    {
         "label": "router",
         "kind": 5,
         "importPath": "backend.app.routes.documents",
@@ -580,7 +605,7 @@
         "kind": 6,
         "importPath": "backend.app.routes.upload",
         "description": "backend.app.routes.upload",
-        "peekOfCode": "class Base64UploadRequest(BaseModel):\n    filename: str\n    mime_type: str\n    content_base64: str\n    user_id: uuid.UUID\n@router.post(\"/base64\")\ndef upload_base64(request: Base64UploadRequest):\n    try:\n        pages = document_processor.base64_to_text(base64_text=request.content_base64, mime_type=request.mime_type)\n        chunks, document_id = save_to_vector_db(pages, request.filename, request.mime_type)",
+        "peekOfCode": "class Base64UploadRequest(BaseModel):\n    filename: str\n    mime_type: str\n    content_base64: str\n    user_id: uuid.UUID\n@router.post(\"/base64\")\ndef upload_base64(request: Base64UploadRequest):\n    try:\n        pages = document_processor.base64_to_text(base64_text=request.content_base64, mime_type=request.mime_type)\n        saved_file_path = file_service.save_base64_file(request.content_base64, request.filename, request.user_id)",
         "detail": "backend.app.routes.upload",
         "documentation": {}
     },
@@ -589,7 +614,7 @@
         "kind": 2,
         "importPath": "backend.app.routes.upload",
         "description": "backend.app.routes.upload",
-        "peekOfCode": "def upload_base64(request: Base64UploadRequest):\n    try:\n        pages = document_processor.base64_to_text(base64_text=request.content_base64, mime_type=request.mime_type)\n        chunks, document_id = save_to_vector_db(pages, request.filename, request.mime_type)\n        saved_file_path = file_service.save_base64_file(request.content_base64, request.filename, request.user_id)\n        doc_id = db_handler.add_document(\n            filename=request.filename,\n            file_path=saved_file_path,\n            mime_type=request.mime_type,\n            uploaded_by=request.user_id",
+        "peekOfCode": "def upload_base64(request: Base64UploadRequest):\n    try:\n        pages = document_processor.base64_to_text(base64_text=request.content_base64, mime_type=request.mime_type)\n        saved_file_path = file_service.save_base64_file(request.content_base64, request.filename, request.user_id)\n        doc_id = db_handler.add_document(\n            filename=request.filename,\n            file_path=saved_file_path,\n            mime_type=request.mime_type,\n            uploaded_by=request.user_id\n        )",
         "detail": "backend.app.routes.upload",
         "documentation": {}
     },
@@ -598,7 +623,7 @@
         "kind": 2,
         "importPath": "backend.app.routes.upload",
         "description": "backend.app.routes.upload",
-        "peekOfCode": "def save_to_vector_db(pages: list[(int, str)], filename: str, mime_type: str):\n    # chunks, page_numbers = structure_aware_chunk(pages=pages)\n    chunks, page_numbers = embedding.chunk_pages_with_recursive_chunker(pages=pages)\n    embeddings = embedding.get_embeddings(chunks=chunks)\n    document_id = str(uuid.uuid4())\n    metadata = metadata_extractor.create_metadata(\n        chunks=chunks, \n        page_numbers=page_numbers, \n        doc_id=document_id,\n        filename=filename,",
+        "peekOfCode": "def save_to_vector_db(pages: list[(int, str)], filename: str, mime_type: str, document_id: uuid.UUID):\n    # chunks, page_numbers = structure_aware_chunk(pages=pages)\n    chunks, page_numbers = embedding.chunk_pages_with_recursive_chunker(pages=pages)\n    embeddings = embedding.get_embeddings(chunks=chunks)\n    document_id = str(document_id)\n    metadata = metadata_extractor.create_metadata(\n        chunks=chunks, \n        page_numbers=page_numbers, \n        document_id=document_id,\n        filename=filename,",
         "detail": "backend.app.routes.upload",
         "documentation": {}
     },
@@ -823,7 +848,7 @@
         "kind": 2,
         "importPath": "backend.app.services.metadata_extractor",
         "description": "backend.app.services.metadata_extractor",
-        "peekOfCode": "def infer_heading_from_context(chunk: str, previous_lines: list[str]) -> str:\n    for line in reversed(previous_lines[-5:]):\n        if len(line.strip()) < 100:\n            if line.isupper() or re.match(r'^[A-Z][A-Za-z0-9\\s\\-:]{2,}$', line):\n                return line.strip()\n    return \"\"\ndef create_metadata(\n    chunks: list[str], \n    page_numbers: list[int], \n    doc_id: uuid,",
+        "peekOfCode": "def infer_heading_from_context(chunk: str, previous_lines: list[str]) -> str:\n    for line in reversed(previous_lines[-5:]):\n        if len(line.strip()) < 100:\n            if line.isupper() or re.match(r'^[A-Z][A-Za-z0-9\\s\\-:]{2,}$', line):\n                return line.strip()\n    return \"\"\ndef create_metadata(\n    chunks: list[str], \n    page_numbers: list[int], \n    document_id: str,",
         "detail": "backend.app.services.metadata_extractor",
         "documentation": {}
     },
@@ -832,7 +857,7 @@
         "kind": 2,
         "importPath": "backend.app.services.metadata_extractor",
         "description": "backend.app.services.metadata_extractor",
-        "peekOfCode": "def create_metadata(\n    chunks: list[str], \n    page_numbers: list[int], \n    doc_id: uuid,\n    filename: str,\n    mime_type: str\n) -> list[dict]:\n    metadata_list = []\n    for i, (chunk, page_number) in enumerate(zip(chunks, page_numbers)):\n        heading = infer_heading_from_context(chunk, chunks[:i])",
+        "peekOfCode": "def create_metadata(\n    chunks: list[str], \n    page_numbers: list[int], \n    document_id: str,\n    filename: str,\n    mime_type: str\n) -> list[dict]:\n    metadata_list = []\n    for i, (chunk, page_number) in enumerate(zip(chunks, page_numbers)):\n        heading = infer_heading_from_context(chunk, chunks[:i])",
         "detail": "backend.app.services.metadata_extractor",
         "documentation": {}
     },
@@ -887,6 +912,15 @@
         "importPath": "backend.app.services.qdrant_client",
         "description": "backend.app.services.qdrant_client",
         "peekOfCode": "def store_document(\n        chunks: list, \n        embeddings: list, \n        metadata: list[dict],\n    ):\n    ensure_collection()\n    client.upsert(\n        collection_name=COLLECTION_NAME,\n        points=[\n            PointStruct(",
+        "detail": "backend.app.services.qdrant_client",
+        "documentation": {}
+    },
+    {
+        "label": "delete_document",
+        "kind": 2,
+        "importPath": "backend.app.services.qdrant_client",
+        "description": "backend.app.services.qdrant_client",
+        "peekOfCode": "def delete_document(doc_id: uuid.UUID):\n    ensure_collection()\n    client.delete(\n        collection_name=COLLECTION_NAME,\n        points_selector=qmodels.FilterSelector(\n            filter=qmodels.Filter(\n                must=[\n                    qmodels.FieldCondition(\n                        key=\"document_id\",\n                        match=qmodels.MatchValue(value=str(doc_id))",
         "detail": "backend.app.services.qdrant_client",
         "documentation": {}
     },

@@ -1,5 +1,6 @@
 from qdrant_client import QdrantClient
 from qdrant_client.http.models import VectorParams, Distance, PointStruct
+from qdrant_client.http import models as qmodels
 import uuid
 
 client = QdrantClient(host="qdrant", port=6333)
@@ -34,7 +35,25 @@ def store_document(
             for i, (embedding, chunk, item_metadata) in enumerate(zip(embeddings, chunks, metadata))
         ]
     )
-    
+
+def delete_document(doc_id: uuid.UUID):
+    ensure_collection()
+
+    client.delete(
+        collection_name=COLLECTION_NAME,
+        points_selector=qmodels.FilterSelector(
+            filter=qmodels.Filter(
+                must=[
+                    qmodels.FieldCondition(
+                        key="document_id",
+                        match=qmodels.MatchValue(value=str(doc_id))
+                    )
+                ]
+            )
+        )
+        
+    )
+
 def query_top_k(query_vector, user_id, k=5):
     ensure_collection()
     
