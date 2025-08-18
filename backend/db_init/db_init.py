@@ -24,7 +24,7 @@ class User(Base):
     email = Column(String, unique=True, nullable=False)
     first_name = Column(String)
     last_name = Column(String)
-    created_at = Column(TIMESTAMP, server_default="NOW()")
+    created_at = Column(TIMESTAMP, server_default=text("NOW()"))
 
 class Document(Base):
     __tablename__ = "documents"
@@ -33,20 +33,37 @@ class Document(Base):
     file_path = Column(String, nullable=False)
     mime_type = Column(String, nullable=False)
     uploaded_by = Column(UUID(as_uuid=True), ForeignKey("users.id"))
-    upload_date = Column(TIMESTAMP, server_default="NOW()")
+    upload_date = Column(TIMESTAMP, server_default=text("NOW()"))
+
+class Space(Base):
+    __tablename__ = "spaces"
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    name = Column(String, nullable=False)
+    user_id = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=False)
+    created_at = Column(TIMESTAMP, server_default=text("NOW()"))
+    updated_at = Column(TIMESTAMP, server_default=text("NOW()"), onupdate=text("NOW()"))
+
+class Message(Base):
+    __tablename__ = "messages"
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    space_id = Column(UUID(as_uuid=True), ForeignKey("spaces.id"), nullable=False)
+    user_id = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=False)
+    content = Column(String, nullable=False)
+    created_at = Column(TIMESTAMP, server_default=text("NOW()"))
+
 
 def database_is_empty(engine):
     inspector = inspect(engine)
     tables = inspector.get_table_names()
-    return not any(t in tables for t in ["users", "documents"])
+    return not any(t in tables for t in ["users", "documents", "spaces", "messages"])
 
 def create_tables():
     with engine.connect() as conn:
         conn.execute(text("CREATE EXTENSION IF NOT EXISTS pgcrypto;"))
     Base.metadata.create_all(engine)
     print("Tables created successfully!")
-    
-def insert_test_user():
+
+def insert_test_data():
     session = SessionLocal()
     try:
         user_count = session.query(User).count()
@@ -59,8 +76,17 @@ def insert_test_user():
             session.add(test_user)
             session.commit()
             print(f"Inserted test user {TEST_USER_EMAIL}")
+
+            personal_space = Space(
+                name="Personal space",
+                user_id=test_user.id
+            )
+            session.add(personal_space)
+            session.commit()
+            print(f"Created 'Personal space' for user {TEST_USER_EMAIL}")
+
         else:
-            print("Users table not empty or TEST_USER_EMAIL not set. Skipping test user creation.")
+            print("Users table not empty or TEST_USER_EMAIL not set. Skipping test data creation.")
     finally:
         session.close()
 
@@ -71,4 +97,4 @@ if __name__ == "__main__":
     else:
         print("Database already has tables. Skipping creation.")
 
-    insert_test_user()
+    insert_test_data()

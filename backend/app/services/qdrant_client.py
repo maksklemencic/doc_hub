@@ -2,6 +2,7 @@ from qdrant_client import QdrantClient
 from qdrant_client.http.models import VectorParams, Distance, PointStruct
 from qdrant_client.http import models as qmodels
 import uuid
+from typing import Optional, List
 
 client = QdrantClient(host="qdrant", port=6333)
 
@@ -54,19 +55,39 @@ def delete_document(doc_id: uuid.UUID):
         
     )
 
-def query_top_k(query_vector, user_id, k=5):
+def query_top_k(query_vector, user_id: uuid.UUID, space_id: Optional[uuid.UUID] = None, document_ids: Optional[List[uuid.UUID]] = None, k=5):
     ensure_collection()
     
-    # TODO Use metadata to better search
+    must_filters = [
+        qmodels.FieldCondition(
+            key="user_id",
+            match=qmodels.MatchValue(value=str(user_id))
+        )
+    ]
+
+    if space_id:
+        must_filters.append(
+            qmodels.FieldCondition(
+                key="space_id",
+                match=qmodels.MatchValue(value=str(space_id))
+            )
+        )
+
+    if document_ids:
+        must_filters.append(
+            qmodels.FieldCondition(
+                key="document_id",
+                match=qmodels.MatchAny(any=[str(doc_id) for doc_id in document_ids])
+            )
+        )
+
     results = client.search(
         collection_name=COLLECTION_NAME,
         query_vector=query_vector,
         limit=k,
         with_payload=True,
-        # query_filter={
-        #     "must": [
-        #         {"key": "user_id", "match": {"value": user_id}}
-        #     ]
-        # }
+        query_filter=qmodels.Filter(
+            must=must_filters
+        )
     )
     return results  # Each result has `.payload` and `.score`
