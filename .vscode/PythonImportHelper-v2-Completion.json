@@ -82,6 +82,38 @@
         "documentation": {}
     },
     {
+        "label": "Depends",
+        "importPath": "fastapi",
+        "description": "fastapi",
+        "isExtraImport": true,
+        "detail": "fastapi",
+        "documentation": {}
+    },
+    {
+        "label": "HTTPException",
+        "importPath": "fastapi",
+        "description": "fastapi",
+        "isExtraImport": true,
+        "detail": "fastapi",
+        "documentation": {}
+    },
+    {
+        "label": "status",
+        "importPath": "fastapi",
+        "description": "fastapi",
+        "isExtraImport": true,
+        "detail": "fastapi",
+        "documentation": {}
+    },
+    {
+        "label": "APIRouter",
+        "importPath": "fastapi",
+        "description": "fastapi",
+        "isExtraImport": true,
+        "detail": "fastapi",
+        "documentation": {}
+    },
+    {
         "label": "File",
         "importPath": "fastapi",
         "description": "fastapi",
@@ -196,6 +228,94 @@
         "documentation": {}
     },
     {
+        "label": "List",
+        "importPath": "typing",
+        "description": "typing",
+        "isExtraImport": true,
+        "detail": "typing",
+        "documentation": {}
+    },
+    {
+        "label": "Optional",
+        "importPath": "typing",
+        "description": "typing",
+        "isExtraImport": true,
+        "detail": "typing",
+        "documentation": {}
+    },
+    {
+        "label": "List",
+        "importPath": "typing",
+        "description": "typing",
+        "isExtraImport": true,
+        "detail": "typing",
+        "documentation": {}
+    },
+    {
+        "label": "Optional",
+        "importPath": "typing",
+        "description": "typing",
+        "isExtraImport": true,
+        "detail": "typing",
+        "documentation": {}
+    },
+    {
+        "label": "List",
+        "importPath": "typing",
+        "description": "typing",
+        "isExtraImport": true,
+        "detail": "typing",
+        "documentation": {}
+    },
+    {
+        "label": "Tuple",
+        "importPath": "typing",
+        "description": "typing",
+        "isExtraImport": true,
+        "detail": "typing",
+        "documentation": {}
+    },
+    {
+        "label": "List",
+        "importPath": "typing",
+        "description": "typing",
+        "isExtraImport": true,
+        "detail": "typing",
+        "documentation": {}
+    },
+    {
+        "label": "Tuple",
+        "importPath": "typing",
+        "description": "typing",
+        "isExtraImport": true,
+        "detail": "typing",
+        "documentation": {}
+    },
+    {
+        "label": "Optional",
+        "importPath": "typing",
+        "description": "typing",
+        "isExtraImport": true,
+        "detail": "typing",
+        "documentation": {}
+    },
+    {
+        "label": "List",
+        "importPath": "typing",
+        "description": "typing",
+        "isExtraImport": true,
+        "detail": "typing",
+        "documentation": {}
+    },
+    {
+        "label": "db_handler",
+        "importPath": "backend.app.services",
+        "description": "backend.app.services",
+        "isExtraImport": true,
+        "detail": "backend.app.services",
+        "documentation": {}
+    },
+    {
         "label": "create_engine",
         "importPath": "sqlalchemy",
         "description": "sqlalchemy",
@@ -268,6 +388,14 @@
         "documentation": {}
     },
     {
+        "label": "Session",
+        "importPath": "sqlalchemy.orm",
+        "description": "sqlalchemy.orm",
+        "isExtraImport": true,
+        "detail": "sqlalchemy.orm",
+        "documentation": {}
+    },
+    {
         "label": "sessionmaker",
         "importPath": "sqlalchemy.orm",
         "description": "sqlalchemy.orm",
@@ -308,38 +436,6 @@
         "importPath": "re",
         "description": "re",
         "detail": "re",
-        "documentation": {}
-    },
-    {
-        "label": "List",
-        "importPath": "typing",
-        "description": "typing",
-        "isExtraImport": true,
-        "detail": "typing",
-        "documentation": {}
-    },
-    {
-        "label": "Tuple",
-        "importPath": "typing",
-        "description": "typing",
-        "isExtraImport": true,
-        "detail": "typing",
-        "documentation": {}
-    },
-    {
-        "label": "List",
-        "importPath": "typing",
-        "description": "typing",
-        "isExtraImport": true,
-        "detail": "typing",
-        "documentation": {}
-    },
-    {
-        "label": "Tuple",
-        "importPath": "typing",
-        "description": "typing",
-        "isExtraImport": true,
-        "detail": "typing",
         "documentation": {}
     },
     {
@@ -601,6 +697,51 @@
         "documentation": {}
     },
     {
+        "label": "create_space",
+        "kind": 2,
+        "importPath": "backend.app.routes.spaces",
+        "description": "backend.app.routes.spaces",
+        "peekOfCode": "def create_space(\n    name: str,\n    user_id: uuid.UUID\n):\n    try:\n        db_space = db_handler.create_space(name, user_id)\n        return db_space\n    except RuntimeError as e:\n        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(e))\n@router.get(\"/\", response_model=List[dict])  # Using dict for now, can create a Pydantic model later",
+        "detail": "backend.app.routes.spaces",
+        "documentation": {}
+    },
+    {
+        "label": "get_spaces",
+        "kind": 2,
+        "importPath": "backend.app.routes.spaces",
+        "description": "backend.app.routes.spaces",
+        "peekOfCode": "def get_spaces(\n    space_id: Optional[uuid.UUID] = None\n):\n    if space_id:\n        space = db_handler.get_space_by_id(space_id)\n        if not space:\n            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=\"Space not found\")\n        return [space]\n    spaces = db_handler.get_all_spaces()\n    return spaces",
+        "detail": "backend.app.routes.spaces",
+        "documentation": {}
+    },
+    {
+        "label": "update_space",
+        "kind": 2,
+        "importPath": "backend.app.routes.spaces",
+        "description": "backend.app.routes.spaces",
+        "peekOfCode": "def update_space(\n    space_id: uuid.UUID,\n    name: str\n):\n    try:\n        space = db_handler.update_space(space_id, name)\n        if not space:\n            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=\"Space not found\")\n        return space\n    except RuntimeError as e:",
+        "detail": "backend.app.routes.spaces",
+        "documentation": {}
+    },
+    {
+        "label": "delete_space",
+        "kind": 2,
+        "importPath": "backend.app.routes.spaces",
+        "description": "backend.app.routes.spaces",
+        "peekOfCode": "def delete_space(\n    space_id: uuid.UUID\n):\n    try:\n        deleted = db_handler.delete_space(space_id)\n        if not deleted:\n            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=\"Space not found\")\n        return None  # Return None for 204 No Content\n    except RuntimeError as e:\n        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(e))",
+        "detail": "backend.app.routes.spaces",
+        "documentation": {}
+    },
+    {
+        "label": "router",
+        "kind": 5,
+        "importPath": "backend.app.routes.spaces",
+        "description": "backend.app.routes.spaces",
+        "peekOfCode": "router = APIRouter()\n@router.post(\"/\")\ndef create_space(\n    name: str,\n    user_id: uuid.UUID\n):\n    try:\n        db_space = db_handler.create_space(name, user_id)\n        return db_space\n    except RuntimeError as e:",
+        "detail": "backend.app.routes.spaces",
+        "documentation": {}
+    },
+    {
         "label": "Base64UploadRequest",
         "kind": 6,
         "importPath": "backend.app.routes.upload",
@@ -673,11 +814,56 @@
         "documentation": {}
     },
     {
+        "label": "create_space",
+        "kind": 2,
+        "importPath": "backend.app.services.db_handler",
+        "description": "backend.app.services.db_handler",
+        "peekOfCode": "def create_space(name: str, user_id: uuid.UUID) -> Space:\n    session = SessionLocal()\n    try:\n        space = Space(name=name, user_id=user_id)\n        session.add(space)\n        session.commit()\n        session.refresh(space)\n        return space\n    except exc.SQLAlchemyError as e:\n        session.rollback()",
+        "detail": "backend.app.services.db_handler",
+        "documentation": {}
+    },
+    {
+        "label": "get_space_by_id",
+        "kind": 2,
+        "importPath": "backend.app.services.db_handler",
+        "description": "backend.app.services.db_handler",
+        "peekOfCode": "def get_space_by_id(space_id: uuid.UUID, user_id: uuid.UUID) -> Optional[Space]:\n    session = SessionLocal()\n    try:\n        return session.query(Space).filter(Space.id == space_id, Space.user_id == user_id).first()\n    finally:\n        session.close()\ndef get_all_spaces(user_id: uuid.UUID) -> List[Space]:\n    session = SessionLocal()\n    try:\n        return session.query(Space).filter(Space.user_id == user_id).all()",
+        "detail": "backend.app.services.db_handler",
+        "documentation": {}
+    },
+    {
+        "label": "get_all_spaces",
+        "kind": 2,
+        "importPath": "backend.app.services.db_handler",
+        "description": "backend.app.services.db_handler",
+        "peekOfCode": "def get_all_spaces(user_id: uuid.UUID) -> List[Space]:\n    session = SessionLocal()\n    try:\n        return session.query(Space).filter(Space.user_id == user_id).all()\n    finally:\n        session.close()\ndef update_space(space_id: uuid.UUID, new_name: str) -> Optional[Space]:\n    session = SessionLocal()\n    try:\n        space = session.query(Space).filter(Space.id == space_id).first()",
+        "detail": "backend.app.services.db_handler",
+        "documentation": {}
+    },
+    {
+        "label": "update_space",
+        "kind": 2,
+        "importPath": "backend.app.services.db_handler",
+        "description": "backend.app.services.db_handler",
+        "peekOfCode": "def update_space(space_id: uuid.UUID, new_name: str) -> Optional[Space]:\n    session = SessionLocal()\n    try:\n        space = session.query(Space).filter(Space.id == space_id).first()\n        if space:\n            space.name = new_name\n            session.commit()\n            session.refresh(space)\n        return space\n    except exc.SQLAlchemyError as e:",
+        "detail": "backend.app.services.db_handler",
+        "documentation": {}
+    },
+    {
+        "label": "delete_space",
+        "kind": 2,
+        "importPath": "backend.app.services.db_handler",
+        "description": "backend.app.services.db_handler",
+        "peekOfCode": "def delete_space(space_id: uuid.UUID) -> bool:\n    session = SessionLocal()\n    try:\n        space = session.query(Space).filter(Space.id == space_id).first()\n        if space:\n            session.delete(space)\n            session.commit()\n            return True\n        return False\n    except exc.SQLAlchemyError as e:",
+        "detail": "backend.app.services.db_handler",
+        "documentation": {}
+    },
+    {
         "label": "DATABASE_URL",
         "kind": 5,
         "importPath": "backend.app.services.db_handler",
         "description": "backend.app.services.db_handler",
-        "peekOfCode": "DATABASE_URL = os.environ.get(\"DATABASE_URL\")\nif not DATABASE_URL:\n    raise ValueError(\"DATABASE_URL is not set in environment\")\nengine = create_engine(DATABASE_URL)\nSessionLocal = sessionmaker(bind=engine)\ndef get_document_by_id(doc_id: uuid.UUID) -> Document | None:\n    session = SessionLocal()\n    try:\n        doc = session.query(Document).filter(Document.id == doc_id).first()\n        return doc",
+        "peekOfCode": "DATABASE_URL = os.environ.get(\"DATABASE_URL\")\nif not DATABASE_URL:\n    raise ValueError(\"DATABASE_URL is not set in environment\")\nengine = create_engine(DATABASE_URL)\nSessionLocal = sessionmaker(bind=engine)\n# Documents CRUD operations\ndef get_document_by_id(doc_id: uuid.UUID) -> Document | None:\n    session = SessionLocal()\n    try:\n        doc = session.query(Document).filter(Document.id == doc_id).first()",
         "detail": "backend.app.services.db_handler",
         "documentation": {}
     },
@@ -686,7 +872,7 @@
         "kind": 5,
         "importPath": "backend.app.services.db_handler",
         "description": "backend.app.services.db_handler",
-        "peekOfCode": "engine = create_engine(DATABASE_URL)\nSessionLocal = sessionmaker(bind=engine)\ndef get_document_by_id(doc_id: uuid.UUID) -> Document | None:\n    session = SessionLocal()\n    try:\n        doc = session.query(Document).filter(Document.id == doc_id).first()\n        return doc\n    finally:\n        session.close()\ndef add_document(filename: str, file_path: str, mime_type: str, uploaded_by: uuid.UUID) -> uuid.UUID:",
+        "peekOfCode": "engine = create_engine(DATABASE_URL)\nSessionLocal = sessionmaker(bind=engine)\n# Documents CRUD operations\ndef get_document_by_id(doc_id: uuid.UUID) -> Document | None:\n    session = SessionLocal()\n    try:\n        doc = session.query(Document).filter(Document.id == doc_id).first()\n        return doc\n    finally:\n        session.close()",
         "detail": "backend.app.services.db_handler",
         "documentation": {}
     },
@@ -695,7 +881,7 @@
         "kind": 5,
         "importPath": "backend.app.services.db_handler",
         "description": "backend.app.services.db_handler",
-        "peekOfCode": "SessionLocal = sessionmaker(bind=engine)\ndef get_document_by_id(doc_id: uuid.UUID) -> Document | None:\n    session = SessionLocal()\n    try:\n        doc = session.query(Document).filter(Document.id == doc_id).first()\n        return doc\n    finally:\n        session.close()\ndef add_document(filename: str, file_path: str, mime_type: str, uploaded_by: uuid.UUID) -> uuid.UUID:\n    session = SessionLocal()",
+        "peekOfCode": "SessionLocal = sessionmaker(bind=engine)\n# Documents CRUD operations\ndef get_document_by_id(doc_id: uuid.UUID) -> Document | None:\n    session = SessionLocal()\n    try:\n        doc = session.query(Document).filter(Document.id == doc_id).first()\n        return doc\n    finally:\n        session.close()\ndef add_document(filename: str, file_path: str, mime_type: str, uploaded_by: uuid.UUID) -> uuid.UUID:",
         "detail": "backend.app.services.db_handler",
         "documentation": {}
     },
@@ -929,7 +1115,7 @@
         "kind": 2,
         "importPath": "backend.app.services.qdrant_client",
         "description": "backend.app.services.qdrant_client",
-        "peekOfCode": "def query_top_k(query_vector, user_id, k=5):\n    ensure_collection()\n    # TODO Use metadata to better search\n    results = client.search(\n        collection_name=COLLECTION_NAME,\n        query_vector=query_vector,\n        limit=k,\n        with_payload=True,\n        # query_filter={\n        #     \"must\": [",
+        "peekOfCode": "def query_top_k(query_vector, user_id: uuid.UUID, space_id: Optional[uuid.UUID] = None, document_ids: Optional[List[uuid.UUID]] = None, k=5):\n    ensure_collection()\n    must_filters = [\n        qmodels.FieldCondition(\n            key=\"user_id\",\n            match=qmodels.MatchValue(value=str(user_id))\n        )\n    ]\n    if space_id:\n        must_filters.append(",
         "detail": "backend.app.services.qdrant_client",
         "documentation": {}
     },
@@ -965,7 +1151,7 @@
         "kind": 5,
         "importPath": "backend.app.main",
         "description": "backend.app.main",
-        "peekOfCode": "app = FastAPI()\napp.include_router(upload.router, prefix=\"/upload\")\napp.include_router(chat.router, prefix=\"/chat\")\napp.include_router(documents.router, prefix=\"/documents\")\n@app.get(\"/\")\ndef read_root():\n    return {\"message\": \"FastAPI is running!\"}\n# @app.get(\"/items/{item_id}\")\n# def read_item(item_id: int, q: str = None):\n#     return {\"item_id\": item_id, \"q\": q}",
+        "peekOfCode": "app = FastAPI()\napp.include_router(upload.router, prefix=\"/upload\")\napp.include_router(chat.router, prefix=\"/chat\")\napp.include_router(documents.router, prefix=\"/documents\")\napp.include_router(spaces.router, prefix=\"/spaces\")\n@app.get(\"/\")\ndef read_root():\n    return {\"message\": \"FastAPI is running!\"}\n# @app.get(\"/items/{item_id}\")\n# def read_item(item_id: int, q: str = None):",
         "detail": "backend.app.main",
         "documentation": {}
     },
@@ -974,7 +1160,7 @@
         "kind": 6,
         "importPath": "backend.db_init.db_init",
         "description": "backend.db_init.db_init",
-        "peekOfCode": "class User(Base):\n    __tablename__ = \"users\"\n    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)\n    email = Column(String, unique=True, nullable=False)\n    first_name = Column(String)\n    last_name = Column(String)\n    created_at = Column(TIMESTAMP, server_default=\"NOW()\")\nclass Document(Base):\n    __tablename__ = \"documents\"\n    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)",
+        "peekOfCode": "class User(Base):\n    __tablename__ = \"users\"\n    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)\n    email = Column(String, unique=True, nullable=False)\n    first_name = Column(String)\n    last_name = Column(String)\n    created_at = Column(TIMESTAMP, server_default=text(\"NOW()\"))\nclass Document(Base):\n    __tablename__ = \"documents\"\n    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)",
         "detail": "backend.db_init.db_init",
         "documentation": {}
     },
@@ -983,7 +1169,25 @@
         "kind": 6,
         "importPath": "backend.db_init.db_init",
         "description": "backend.db_init.db_init",
-        "peekOfCode": "class Document(Base):\n    __tablename__ = \"documents\"\n    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)\n    filename = Column(String, nullable=False)\n    file_path = Column(String, nullable=False)\n    mime_type = Column(String, nullable=False)\n    uploaded_by = Column(UUID(as_uuid=True), ForeignKey(\"users.id\"))\n    upload_date = Column(TIMESTAMP, server_default=\"NOW()\")\ndef database_is_empty(engine):\n    inspector = inspect(engine)",
+        "peekOfCode": "class Document(Base):\n    __tablename__ = \"documents\"\n    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)\n    filename = Column(String, nullable=False)\n    file_path = Column(String, nullable=False)\n    mime_type = Column(String, nullable=False)\n    uploaded_by = Column(UUID(as_uuid=True), ForeignKey(\"users.id\"))\n    upload_date = Column(TIMESTAMP, server_default=text(\"NOW()\"))\nclass Space(Base):\n    __tablename__ = \"spaces\"",
+        "detail": "backend.db_init.db_init",
+        "documentation": {}
+    },
+    {
+        "label": "Space",
+        "kind": 6,
+        "importPath": "backend.db_init.db_init",
+        "description": "backend.db_init.db_init",
+        "peekOfCode": "class Space(Base):\n    __tablename__ = \"spaces\"\n    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)\n    name = Column(String, nullable=False)\n    user_id = Column(UUID(as_uuid=True), ForeignKey(\"users.id\"), nullable=False)\n    created_at = Column(TIMESTAMP, server_default=text(\"NOW()\"))\n    updated_at = Column(TIMESTAMP, server_default=text(\"NOW()\"), onupdate=text(\"NOW()\"))\nclass Message(Base):\n    __tablename__ = \"messages\"\n    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)",
+        "detail": "backend.db_init.db_init",
+        "documentation": {}
+    },
+    {
+        "label": "Message",
+        "kind": 6,
+        "importPath": "backend.db_init.db_init",
+        "description": "backend.db_init.db_init",
+        "peekOfCode": "class Message(Base):\n    __tablename__ = \"messages\"\n    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)\n    space_id = Column(UUID(as_uuid=True), ForeignKey(\"spaces.id\"), nullable=False)\n    user_id = Column(UUID(as_uuid=True), ForeignKey(\"users.id\"), nullable=False)\n    content = Column(String, nullable=False)\n    created_at = Column(TIMESTAMP, server_default=text(\"NOW()\"))\ndef database_is_empty(engine):\n    inspector = inspect(engine)\n    tables = inspector.get_table_names()",
         "detail": "backend.db_init.db_init",
         "documentation": {}
     },
@@ -992,7 +1196,7 @@
         "kind": 2,
         "importPath": "backend.db_init.db_init",
         "description": "backend.db_init.db_init",
-        "peekOfCode": "def database_is_empty(engine):\n    inspector = inspect(engine)\n    tables = inspector.get_table_names()\n    return not any(t in tables for t in [\"users\", \"documents\"])\ndef create_tables():\n    with engine.connect() as conn:\n        conn.execute(text(\"CREATE EXTENSION IF NOT EXISTS pgcrypto;\"))\n    Base.metadata.create_all(engine)\n    print(\"Tables created successfully!\")\ndef insert_test_user():",
+        "peekOfCode": "def database_is_empty(engine):\n    inspector = inspect(engine)\n    tables = inspector.get_table_names()\n    return not any(t in tables for t in [\"users\", \"documents\", \"spaces\", \"messages\"])\ndef create_tables():\n    with engine.connect() as conn:\n        conn.execute(text(\"CREATE EXTENSION IF NOT EXISTS pgcrypto;\"))\n    Base.metadata.create_all(engine)\n    print(\"Tables created successfully!\")\ndef insert_test_data():",
         "detail": "backend.db_init.db_init",
         "documentation": {}
     },
@@ -1001,16 +1205,16 @@
         "kind": 2,
         "importPath": "backend.db_init.db_init",
         "description": "backend.db_init.db_init",
-        "peekOfCode": "def create_tables():\n    with engine.connect() as conn:\n        conn.execute(text(\"CREATE EXTENSION IF NOT EXISTS pgcrypto;\"))\n    Base.metadata.create_all(engine)\n    print(\"Tables created successfully!\")\ndef insert_test_user():\n    session = SessionLocal()\n    try:\n        user_count = session.query(User).count()\n        if user_count == 0 and TEST_USER_EMAIL:",
+        "peekOfCode": "def create_tables():\n    with engine.connect() as conn:\n        conn.execute(text(\"CREATE EXTENSION IF NOT EXISTS pgcrypto;\"))\n    Base.metadata.create_all(engine)\n    print(\"Tables created successfully!\")\ndef insert_test_data():\n    session = SessionLocal()\n    try:\n        user_count = session.query(User).count()\n        if user_count == 0 and TEST_USER_EMAIL:",
         "detail": "backend.db_init.db_init",
         "documentation": {}
     },
     {
-        "label": "insert_test_user",
+        "label": "insert_test_data",
         "kind": 2,
         "importPath": "backend.db_init.db_init",
         "description": "backend.db_init.db_init",
-        "peekOfCode": "def insert_test_user():\n    session = SessionLocal()\n    try:\n        user_count = session.query(User).count()\n        if user_count == 0 and TEST_USER_EMAIL:\n            test_user = User(\n                email=TEST_USER_EMAIL,\n                first_name=TEST_USER_FIRST,\n                last_name=TEST_USER_LAST\n            )",
+        "peekOfCode": "def insert_test_data():\n    session = SessionLocal()\n    try:\n        user_count = session.query(User).count()\n        if user_count == 0 and TEST_USER_EMAIL:\n            test_user = User(\n                email=TEST_USER_EMAIL,\n                first_name=TEST_USER_FIRST,\n                last_name=TEST_USER_LAST\n            )",
         "detail": "backend.db_init.db_init",
         "documentation": {}
     },
@@ -1055,7 +1259,7 @@
         "kind": 5,
         "importPath": "backend.db_init.db_init",
         "description": "backend.db_init.db_init",
-        "peekOfCode": "engine = create_engine(DATABASE_URL)\nSessionLocal = sessionmaker(bind=engine)\nBase = declarative_base()\nclass User(Base):\n    __tablename__ = \"users\"\n    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)\n    email = Column(String, unique=True, nullable=False)\n    first_name = Column(String)\n    last_name = Column(String)\n    created_at = Column(TIMESTAMP, server_default=\"NOW()\")",
+        "peekOfCode": "engine = create_engine(DATABASE_URL)\nSessionLocal = sessionmaker(bind=engine)\nBase = declarative_base()\nclass User(Base):\n    __tablename__ = \"users\"\n    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)\n    email = Column(String, unique=True, nullable=False)\n    first_name = Column(String)\n    last_name = Column(String)\n    created_at = Column(TIMESTAMP, server_default=text(\"NOW()\"))",
         "detail": "backend.db_init.db_init",
         "documentation": {}
     },
@@ -1064,7 +1268,7 @@
         "kind": 5,
         "importPath": "backend.db_init.db_init",
         "description": "backend.db_init.db_init",
-        "peekOfCode": "SessionLocal = sessionmaker(bind=engine)\nBase = declarative_base()\nclass User(Base):\n    __tablename__ = \"users\"\n    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)\n    email = Column(String, unique=True, nullable=False)\n    first_name = Column(String)\n    last_name = Column(String)\n    created_at = Column(TIMESTAMP, server_default=\"NOW()\")\nclass Document(Base):",
+        "peekOfCode": "SessionLocal = sessionmaker(bind=engine)\nBase = declarative_base()\nclass User(Base):\n    __tablename__ = \"users\"\n    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)\n    email = Column(String, unique=True, nullable=False)\n    first_name = Column(String)\n    last_name = Column(String)\n    created_at = Column(TIMESTAMP, server_default=text(\"NOW()\"))\nclass Document(Base):",
         "detail": "backend.db_init.db_init",
         "documentation": {}
     },
@@ -1073,7 +1277,7 @@
         "kind": 5,
         "importPath": "backend.db_init.db_init",
         "description": "backend.db_init.db_init",
-        "peekOfCode": "Base = declarative_base()\nclass User(Base):\n    __tablename__ = \"users\"\n    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)\n    email = Column(String, unique=True, nullable=False)\n    first_name = Column(String)\n    last_name = Column(String)\n    created_at = Column(TIMESTAMP, server_default=\"NOW()\")\nclass Document(Base):\n    __tablename__ = \"documents\"",
+        "peekOfCode": "Base = declarative_base()\nclass User(Base):\n    __tablename__ = \"users\"\n    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)\n    email = Column(String, unique=True, nullable=False)\n    first_name = Column(String)\n    last_name = Column(String)\n    created_at = Column(TIMESTAMP, server_default=text(\"NOW()\"))\nclass Document(Base):\n    __tablename__ = \"documents\"",
         "detail": "backend.db_init.db_init",
         "documentation": {}
     }
