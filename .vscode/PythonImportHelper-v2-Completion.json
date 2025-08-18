@@ -533,7 +533,7 @@
         "kind": 6,
         "importPath": "backend.app.routes.chat",
         "description": "backend.app.routes.chat",
-        "peekOfCode": "class PostQueryRequest(BaseModel):\n    query: str\n    stream: bool = False\n    top_k: int = 5\n@router.post(\"/query/{user_id}\")\ndef create_query(data: PostQueryRequest, user_id: str):\n    try:\n        if user_id is None:\n            raise HTTPException(status_code=404, detail=\"No user_id provided!\")\n        query_embedding = get_embeddings([data.query])[0]",
+        "peekOfCode": "class PostQueryRequest(BaseModel):\n    query: str\n    stream: bool = False\n    top_k: int = 5\n    use_context: bool = True\n@router.post(\"/messages/{user_id}\")\ndef create_query(data: PostQueryRequest, user_id: str):\n    try:\n        if user_id is None:\n            raise HTTPException(status_code=404, detail=\"No user_id provided!\")",
         "detail": "backend.app.routes.chat",
         "documentation": {}
     },
@@ -542,7 +542,7 @@
         "kind": 2,
         "importPath": "backend.app.routes.chat",
         "description": "backend.app.routes.chat",
-        "peekOfCode": "def create_query(data: PostQueryRequest, user_id: str):\n    try:\n        if user_id is None:\n            raise HTTPException(status_code=404, detail=\"No user_id provided!\")\n        query_embedding = get_embeddings([data.query])[0]\n        top_k_chunks = query_top_k(query_embedding, user_id=user_id, k=data.top_k)\n        context = \"\\n\".join([res.payload[\"text\"] for res in top_k_chunks])\n        response = generate_response(query=data.query, context=context, stream=data.stream)\n        return {\"response\": response}\n    except Exception as e:",
+        "peekOfCode": "def create_query(data: PostQueryRequest, user_id: str):\n    try:\n        if user_id is None:\n            raise HTTPException(status_code=404, detail=\"No user_id provided!\")\n        if data.use_context is True:\n            query_embedding = get_embeddings([data.query])[0]\n            top_k_chunks = query_top_k(query_embedding, user_id=user_id, k=data.top_k)\n            context = \"\\n\".join([res.payload[\"text\"] for res in top_k_chunks])\n        else:\n            context = \"/\"",
         "detail": "backend.app.routes.chat",
         "documentation": {}
     },
@@ -551,7 +551,7 @@
         "kind": 5,
         "importPath": "backend.app.routes.chat",
         "description": "backend.app.routes.chat",
-        "peekOfCode": "router = APIRouter()\nclass PostQueryRequest(BaseModel):\n    query: str\n    stream: bool = False\n    top_k: int = 5\n@router.post(\"/query/{user_id}\")\ndef create_query(data: PostQueryRequest, user_id: str):\n    try:\n        if user_id is None:\n            raise HTTPException(status_code=404, detail=\"No user_id provided!\")",
+        "peekOfCode": "router = APIRouter()\nclass PostQueryRequest(BaseModel):\n    query: str\n    stream: bool = False\n    top_k: int = 5\n    use_context: bool = True\n@router.post(\"/messages/{user_id}\")\ndef create_query(data: PostQueryRequest, user_id: str):\n    try:\n        if user_id is None:",
         "detail": "backend.app.routes.chat",
         "documentation": {}
     },
@@ -875,7 +875,7 @@
         "kind": 2,
         "importPath": "backend.app.services.ollama_client",
         "description": "backend.app.services.ollama_client",
-        "peekOfCode": "def generate_response(query: str, context: str, stream: bool) -> str:\n    promt = f\"\"\"Instruction: Use the context to answer the question. If there is no sufficient information in context, use your knowledge.\n    Question: {query}\n    Context: {context}\"\"\"\n    response = requests.post(f\"{OLLAMA_URL}/api/generate\", json={\n        \"model\": MODEL,\n        \"prompt\": promt,\n        \"stream\": stream\n    })\n    response.raise_for_status()",
+        "peekOfCode": "def generate_response(query: str, context: str, stream: bool) -> str:\n    # promt = f\"\"\"Instruction: Use the context to answer the question. If there is no sufficient information in context, use your knowledge.\n    # Question: {query}\n    # Context: {context}\"\"\"\n    prompt_template = \"\"\"<|im_start|>system\nYou are a highly knowledgeable and accurate RAG system. Your primary goal is to provide concise and comprehensive answers to user questions based on the provided context. Follow these rules precisely:\n1.  **Prioritize the Context:** Your answer must be based *exclusively* on the information found in the `<context>` section. Do not use any external knowledge.\n2.  **No Sufficient Information:** If the `<context>` does not contain the answer, you must respond with a specific phrase indicating this, such as \"I'm sorry, I cannot answer this question with the provided context.\" or \"The provided context does not contain sufficient information to answer the question.\"\n3.  **Synthesize and Summarize:** If the answer is present, synthesize the relevant information from the context into a clear, direct, and well-structured response.\n4.  **Stay on Topic:** Your answer should directly address the user's question and avoid adding any unrelated details.",
         "detail": "backend.app.services.ollama_client",
         "documentation": {}
     },
@@ -884,7 +884,7 @@
         "kind": 5,
         "importPath": "backend.app.services.ollama_client",
         "description": "backend.app.services.ollama_client",
-        "peekOfCode": "OLLAMA_URL = os.getenv(\"OLLAMA_URL\", \"http://localhost:11434\")\nMODEL = os.getenv(\"LLM_MODEL_NAME\", \"qwen3:0.6b\")\ndef generate_response(query: str, context: str, stream: bool) -> str:\n    promt = f\"\"\"Instruction: Use the context to answer the question. If there is no sufficient information in context, use your knowledge.\n    Question: {query}\n    Context: {context}\"\"\"\n    response = requests.post(f\"{OLLAMA_URL}/api/generate\", json={\n        \"model\": MODEL,\n        \"prompt\": promt,\n        \"stream\": stream",
+        "peekOfCode": "OLLAMA_URL = os.getenv(\"OLLAMA_URL\", \"http://localhost:11434\")\nMODEL = os.getenv(\"LLM_MODEL_NAME\", \"qwen3:0.6b\")\ndef generate_response(query: str, context: str, stream: bool) -> str:\n    # promt = f\"\"\"Instruction: Use the context to answer the question. If there is no sufficient information in context, use your knowledge.\n    # Question: {query}\n    # Context: {context}\"\"\"\n    prompt_template = \"\"\"<|im_start|>system\nYou are a highly knowledgeable and accurate RAG system. Your primary goal is to provide concise and comprehensive answers to user questions based on the provided context. Follow these rules precisely:\n1.  **Prioritize the Context:** Your answer must be based *exclusively* on the information found in the `<context>` section. Do not use any external knowledge.\n2.  **No Sufficient Information:** If the `<context>` does not contain the answer, you must respond with a specific phrase indicating this, such as \"I'm sorry, I cannot answer this question with the provided context.\" or \"The provided context does not contain sufficient information to answer the question.\"",
         "detail": "backend.app.services.ollama_client",
         "documentation": {}
     },
@@ -893,7 +893,7 @@
         "kind": 5,
         "importPath": "backend.app.services.ollama_client",
         "description": "backend.app.services.ollama_client",
-        "peekOfCode": "MODEL = os.getenv(\"LLM_MODEL_NAME\", \"qwen3:0.6b\")\ndef generate_response(query: str, context: str, stream: bool) -> str:\n    promt = f\"\"\"Instruction: Use the context to answer the question. If there is no sufficient information in context, use your knowledge.\n    Question: {query}\n    Context: {context}\"\"\"\n    response = requests.post(f\"{OLLAMA_URL}/api/generate\", json={\n        \"model\": MODEL,\n        \"prompt\": promt,\n        \"stream\": stream\n    })",
+        "peekOfCode": "MODEL = os.getenv(\"LLM_MODEL_NAME\", \"qwen3:0.6b\")\ndef generate_response(query: str, context: str, stream: bool) -> str:\n    # promt = f\"\"\"Instruction: Use the context to answer the question. If there is no sufficient information in context, use your knowledge.\n    # Question: {query}\n    # Context: {context}\"\"\"\n    prompt_template = \"\"\"<|im_start|>system\nYou are a highly knowledgeable and accurate RAG system. Your primary goal is to provide concise and comprehensive answers to user questions based on the provided context. Follow these rules precisely:\n1.  **Prioritize the Context:** Your answer must be based *exclusively* on the information found in the `<context>` section. Do not use any external knowledge.\n2.  **No Sufficient Information:** If the `<context>` does not contain the answer, you must respond with a specific phrase indicating this, such as \"I'm sorry, I cannot answer this question with the provided context.\" or \"The provided context does not contain sufficient information to answer the question.\"\n3.  **Synthesize and Summarize:** If the answer is present, synthesize the relevant information from the context into a clear, direct, and well-structured response.",
         "detail": "backend.app.services.ollama_client",
         "documentation": {}
     },
