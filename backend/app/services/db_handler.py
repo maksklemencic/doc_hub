@@ -3,7 +3,7 @@ import uuid
 from sqlalchemy import create_engine, exc
 from sqlalchemy.orm import Session, sessionmaker
 from typing import List, Optional
-from ...db_init.db_init import Base, Document, Space, User
+from ...db_init.db_init import Base, Document, Space, Message
 
 DATABASE_URL = os.environ.get("DATABASE_URL")
 if not DATABASE_URL:
@@ -94,7 +94,7 @@ def create_space(name: str, user_id: uuid.UUID) -> Space:
 def get_space_by_id(space_id: uuid.UUID) -> Optional[Space]:
     session = SessionLocal()
     try:
-        return session.query(Space).filter(Space.id == space_id, Space.user_id == user_id).first()
+        return session.query(Space).filter(Space.id == space_id).first()
     finally:
         session.close()
 
@@ -132,5 +132,90 @@ def delete_space(space_id: uuid.UUID) -> bool:
     except exc.SQLAlchemyError as e:
         session.rollback()
         raise RuntimeError(f"Error deleting space: {e}")
+    finally:
+        session.close()
+
+
+# Messages CRUD Operaions
+def create_message(content: str, space_id: uuid.UUID, user_id: uuid.UUID) -> 'Message':
+    session = SessionLocal()
+    try:
+        # Check if space exists and belongs to user
+        space = session.query(Space).filter(Space.id == space_id, Space.user_id == user_id).first()
+        if not space:
+            return "space_not_found_or_unauthorized"
+        message = Message(content=content, space_id=space_id, user_id=user_id)
+        session.add(message)
+        session.commit()
+        session.refresh(message)
+        return message
+    except exc.SQLAlchemyError as e:
+        session.rollback()
+        raise RuntimeError(f"Error creating message: {e}")
+    finally:
+        session.close()
+
+def get_messages(user_id: uuid.UUID, space_id: uuid.UUID, message_id: Optional[uuid.UUID] = None) -> List['Message']:
+    session = SessionLocal()
+    try:
+        if message_id:
+            message = session.query(Message).filter(
+                Message.id == message_id,
+                Message.space_id == space_id,
+                Message.user_id == user_id
+            ).first()
+            return [message] if message else []
+        messages = session.query(Message).filter(
+            Message.space_id == space_id,
+            Message.user_id == user_id
+        ).all()
+        return messages
+    finally:
+        session.close()
+
+def update_message(message_id: uuid.UUID, space_id: uuid.UUID, user_id: uuid.UUID, content: str) -> Optional['Message']:
+    session = SessionLocal()
+    try:
+        message = session.query(Message).filter(
+            Message.id == message_id,
+            Message.space_id == space_id,
+            Message.user_id == user_id
+        ).first()
+        if not message:
+            # Check if message exists but belongs to another user
+            exists = session.query(Message).filter(Message.id == message_id, Message.space_id == space_id).first()
+            if exists:
+                return "unauthorized"
+            return None
+        message.content = content
+        session.commit()
+        session.refresh(message)
+        return message
+    except exc.SQLAlchemyError as e:
+        session.rollback()
+        raise RuntimeError(f"Error updating message: {e}")
+    finally:
+        session.close()
+
+def delete_message(message_id: uuid.UUID, space_id: uuid.UUID, user_id: uuid.UUID) -> str:
+    session = SessionLocal()
+    try:
+        message = session.query(Message).filter(
+            Message.id == message_id,
+            Message.space_id == space_id,
+            Message.user_id == user_id
+        ).first()
+        if not message:
+            # Check if message exists but belongs to another user
+            exists = session.query(Message).filter(Message.id == message_id, Message.space_id == space_id).first()
+            if exists:
+                return "unauthorized"
+            return "not_found"
+        session.delete(message)
+        session.commit()
+        return "success"
+    except exc.SQLAlchemyError as e:
+        session.rollback()
+        raise RuntimeError(f"Error deleting message: {e}")
     finally:
         session.close()

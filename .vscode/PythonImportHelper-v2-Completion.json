@@ -114,6 +114,38 @@
         "documentation": {}
     },
     {
+        "label": "Depends",
+        "importPath": "fastapi",
+        "description": "fastapi",
+        "isExtraImport": true,
+        "detail": "fastapi",
+        "documentation": {}
+    },
+    {
+        "label": "HTTPException",
+        "importPath": "fastapi",
+        "description": "fastapi",
+        "isExtraImport": true,
+        "detail": "fastapi",
+        "documentation": {}
+    },
+    {
+        "label": "status",
+        "importPath": "fastapi",
+        "description": "fastapi",
+        "isExtraImport": true,
+        "detail": "fastapi",
+        "documentation": {}
+    },
+    {
+        "label": "APIRouter",
+        "importPath": "fastapi",
+        "description": "fastapi",
+        "isExtraImport": true,
+        "detail": "fastapi",
+        "documentation": {}
+    },
+    {
         "label": "File",
         "importPath": "fastapi",
         "description": "fastapi",
@@ -268,6 +300,22 @@
         "documentation": {}
     },
     {
+        "label": "Optional",
+        "importPath": "typing",
+        "description": "typing",
+        "isExtraImport": true,
+        "detail": "typing",
+        "documentation": {}
+    },
+    {
+        "label": "List",
+        "importPath": "typing",
+        "description": "typing",
+        "isExtraImport": true,
+        "detail": "typing",
+        "documentation": {}
+    },
+    {
         "label": "Tuple",
         "importPath": "typing",
         "description": "typing",
@@ -305,6 +353,14 @@
         "description": "typing",
         "isExtraImport": true,
         "detail": "typing",
+        "documentation": {}
+    },
+    {
+        "label": "db_handler",
+        "importPath": "backend.app.services",
+        "description": "backend.app.services",
+        "isExtraImport": true,
+        "detail": "backend.app.services",
         "documentation": {}
     },
     {
@@ -564,6 +620,14 @@
         "documentation": {}
     },
     {
+        "label": "Message",
+        "importPath": "backend.db_init.db_init",
+        "description": "backend.db_init.db_init",
+        "isExtraImport": true,
+        "detail": "backend.db_init.db_init",
+        "documentation": {}
+    },
+    {
         "label": "UUID",
         "importPath": "sqlalchemy.dialects.postgresql",
         "description": "sqlalchemy.dialects.postgresql",
@@ -697,6 +761,51 @@
         "documentation": {}
     },
     {
+        "label": "create_message",
+        "kind": 2,
+        "importPath": "backend.app.routes.messages",
+        "description": "backend.app.routes.messages",
+        "peekOfCode": "def create_message(\n    space_id: uuid.UUID,\n    content: str,\n    user_id: uuid.UUID\n):\n    try:\n        result = db_handler.create_message(content, space_id, user_id)\n        if result == \"space_not_found_or_unauthorized\":\n            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=\"Space not found or not authorized\")\n        return result",
+        "detail": "backend.app.routes.messages",
+        "documentation": {}
+    },
+    {
+        "label": "get_space_messages",
+        "kind": 2,
+        "importPath": "backend.app.routes.messages",
+        "description": "backend.app.routes.messages",
+        "peekOfCode": "def get_space_messages(\n    space_id: uuid.UUID,\n    user_id: uuid.UUID,\n    message_id: Optional[uuid.UUID] = None\n):\n    try:\n        messages = db_handler.get_messages(user_id, space_id, message_id)\n        if not messages and message_id:\n            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=\"Message not found\")\n        # Check if space exists and is authorized",
+        "detail": "backend.app.routes.messages",
+        "documentation": {}
+    },
+    {
+        "label": "update_message",
+        "kind": 2,
+        "importPath": "backend.app.routes.messages",
+        "description": "backend.app.routes.messages",
+        "peekOfCode": "def update_message(\n    space_id: uuid.UUID,\n    message_id: uuid.UUID,\n    content: str,\n    user_id: uuid.UUID\n):\n    try:\n        result = db_handler.update_message(message_id, space_id, user_id, content)\n        if result == \"unauthorized\":\n            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=\"Not authorized to update this message\")",
+        "detail": "backend.app.routes.messages",
+        "documentation": {}
+    },
+    {
+        "label": "delete_message",
+        "kind": 2,
+        "importPath": "backend.app.routes.messages",
+        "description": "backend.app.routes.messages",
+        "peekOfCode": "def delete_message(\n    space_id: uuid.UUID,\n    message_id: uuid.UUID,\n    user_id: uuid.UUID\n):\n    try:\n        result = db_handler.delete_message(message_id, space_id, user_id)\n        if result == \"not_found\":\n            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=\"Message not found\")\n        if result == \"unauthorized\":",
+        "detail": "backend.app.routes.messages",
+        "documentation": {}
+    },
+    {
+        "label": "router",
+        "kind": 5,
+        "importPath": "backend.app.routes.messages",
+        "description": "backend.app.routes.messages",
+        "peekOfCode": "router = APIRouter()\n@router.post(\"/{space_id}/messages\")\ndef create_message(\n    space_id: uuid.UUID,\n    content: str,\n    user_id: uuid.UUID\n):\n    try:\n        result = db_handler.create_message(content, space_id, user_id)\n        if result == \"space_not_found_or_unauthorized\":",
+        "detail": "backend.app.routes.messages",
+        "documentation": {}
+    },
+    {
         "label": "create_space",
         "kind": 2,
         "importPath": "backend.app.routes.spaces",
@@ -827,7 +936,7 @@
         "kind": 2,
         "importPath": "backend.app.services.db_handler",
         "description": "backend.app.services.db_handler",
-        "peekOfCode": "def get_space_by_id(space_id: uuid.UUID, user_id: uuid.UUID) -> Optional[Space]:\n    session = SessionLocal()\n    try:\n        return session.query(Space).filter(Space.id == space_id, Space.user_id == user_id).first()\n    finally:\n        session.close()\ndef get_all_spaces(user_id: uuid.UUID) -> List[Space]:\n    session = SessionLocal()\n    try:\n        return session.query(Space).filter(Space.user_id == user_id).all()",
+        "peekOfCode": "def get_space_by_id(space_id: uuid.UUID) -> Optional[Space]:\n    session = SessionLocal()\n    try:\n        return session.query(Space).filter(Space.id == space_id).first()\n    finally:\n        session.close()\ndef get_all_spaces() -> List[Space]:\n    session = SessionLocal()\n    try:\n        return session.query(Space).all()",
         "detail": "backend.app.services.db_handler",
         "documentation": {}
     },
@@ -836,7 +945,7 @@
         "kind": 2,
         "importPath": "backend.app.services.db_handler",
         "description": "backend.app.services.db_handler",
-        "peekOfCode": "def get_all_spaces(user_id: uuid.UUID) -> List[Space]:\n    session = SessionLocal()\n    try:\n        return session.query(Space).filter(Space.user_id == user_id).all()\n    finally:\n        session.close()\ndef update_space(space_id: uuid.UUID, new_name: str) -> Optional[Space]:\n    session = SessionLocal()\n    try:\n        space = session.query(Space).filter(Space.id == space_id).first()",
+        "peekOfCode": "def get_all_spaces() -> List[Space]:\n    session = SessionLocal()\n    try:\n        return session.query(Space).all()\n    finally:\n        session.close()\ndef update_space(space_id: uuid.UUID, new_name: str) -> Optional[Space]:\n    session = SessionLocal()\n    try:\n        space = session.query(Space).filter(Space.id == space_id).first()",
         "detail": "backend.app.services.db_handler",
         "documentation": {}
     },
@@ -855,6 +964,42 @@
         "importPath": "backend.app.services.db_handler",
         "description": "backend.app.services.db_handler",
         "peekOfCode": "def delete_space(space_id: uuid.UUID) -> bool:\n    session = SessionLocal()\n    try:\n        space = session.query(Space).filter(Space.id == space_id).first()\n        if space:\n            session.delete(space)\n            session.commit()\n            return True\n        return False\n    except exc.SQLAlchemyError as e:",
+        "detail": "backend.app.services.db_handler",
+        "documentation": {}
+    },
+    {
+        "label": "create_message",
+        "kind": 2,
+        "importPath": "backend.app.services.db_handler",
+        "description": "backend.app.services.db_handler",
+        "peekOfCode": "def create_message(content: str, space_id: uuid.UUID, user_id: uuid.UUID) -> 'Message':\n    session = SessionLocal()\n    try:\n        # Check if space exists and belongs to user\n        space = session.query(Space).filter(Space.id == space_id, Space.user_id == user_id).first()\n        if not space:\n            return \"space_not_found_or_unauthorized\"\n        message = Message(content=content, space_id=space_id, user_id=user_id)\n        session.add(message)\n        session.commit()",
+        "detail": "backend.app.services.db_handler",
+        "documentation": {}
+    },
+    {
+        "label": "get_messages",
+        "kind": 2,
+        "importPath": "backend.app.services.db_handler",
+        "description": "backend.app.services.db_handler",
+        "peekOfCode": "def get_messages(user_id: uuid.UUID, space_id: uuid.UUID, message_id: Optional[uuid.UUID] = None) -> List['Message']:\n    session = SessionLocal()\n    try:\n        if message_id:\n            message = session.query(Message).filter(\n                Message.id == message_id,\n                Message.space_id == space_id,\n                Message.user_id == user_id\n            ).first()\n            return [message] if message else []",
+        "detail": "backend.app.services.db_handler",
+        "documentation": {}
+    },
+    {
+        "label": "update_message",
+        "kind": 2,
+        "importPath": "backend.app.services.db_handler",
+        "description": "backend.app.services.db_handler",
+        "peekOfCode": "def update_message(message_id: uuid.UUID, space_id: uuid.UUID, user_id: uuid.UUID, content: str) -> Optional['Message']:\n    session = SessionLocal()\n    try:\n        message = session.query(Message).filter(\n            Message.id == message_id,\n            Message.space_id == space_id,\n            Message.user_id == user_id\n        ).first()\n        if not message:\n            # Check if message exists but belongs to another user",
+        "detail": "backend.app.services.db_handler",
+        "documentation": {}
+    },
+    {
+        "label": "delete_message",
+        "kind": 2,
+        "importPath": "backend.app.services.db_handler",
+        "description": "backend.app.services.db_handler",
+        "peekOfCode": "def delete_message(message_id: uuid.UUID, space_id: uuid.UUID, user_id: uuid.UUID) -> str:\n    session = SessionLocal()\n    try:\n        message = session.query(Message).filter(\n            Message.id == message_id,\n            Message.space_id == space_id,\n            Message.user_id == user_id\n        ).first()\n        if not message:\n            # Check if message exists but belongs to another user",
         "detail": "backend.app.services.db_handler",
         "documentation": {}
     },
@@ -1151,7 +1296,7 @@
         "kind": 5,
         "importPath": "backend.app.main",
         "description": "backend.app.main",
-        "peekOfCode": "app = FastAPI()\napp.include_router(upload.router, prefix=\"/upload\")\napp.include_router(chat.router, prefix=\"/chat\")\napp.include_router(documents.router, prefix=\"/documents\")\napp.include_router(spaces.router, prefix=\"/spaces\")\n@app.get(\"/\")\ndef read_root():\n    return {\"message\": \"FastAPI is running!\"}\n# @app.get(\"/items/{item_id}\")\n# def read_item(item_id: int, q: str = None):",
+        "peekOfCode": "app = FastAPI()\napp.include_router(upload.router, prefix=\"/upload\")\napp.include_router(chat.router, prefix=\"/chat\")\napp.include_router(documents.router, prefix=\"/documents\")\napp.include_router(spaces.router, prefix=\"/spaces\")\napp.include_router(messages.router, prefix=\"/spaces\")\n@app.get(\"/\")\ndef read_root():\n    return {\"message\": \"FastAPI is running!\"}\n# @app.get(\"/items/{item_id}\")",
         "detail": "backend.app.main",
         "documentation": {}
     },
