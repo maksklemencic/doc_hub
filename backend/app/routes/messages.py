@@ -39,22 +39,6 @@ def get_space_messages(
     except RuntimeError as e:
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(e))
 
-@router.patch("/{space_id}/messages/{message_id}", response_model=dict)
-def update_message(
-    space_id: uuid.UUID,
-    message_id: uuid.UUID,
-    content: str,
-    user_id: uuid.UUID
-):
-    try:
-        result = db_handler.update_message(message_id, space_id, user_id, content)
-        if result == "unauthorized":
-            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Not authorized to update this message")
-        if not result:
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Message not found")
-        return result
-    except RuntimeError as e:
-        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(e))
 
 @router.delete("/{space_id}/messages/{message_id}", status_code=status.HTTP_204_NO_CONTENT)
 def delete_message(
