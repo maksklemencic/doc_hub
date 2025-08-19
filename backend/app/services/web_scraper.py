@@ -5,7 +5,7 @@ from requests.adapters import HTTPAdapter
 from urllib3.util.retry import Retry
 from bs4 import BeautifulSoup
 import trafilatura
-from playwright.sync_api import sync_playwright
+# from playwright.sync_api import sync_playwright
 
 def setup_session() -> requests.Session:
     session = requests.Session()
@@ -25,18 +25,18 @@ def fetch_static_content(url: str, session: requests.Session) -> Optional[str]:
     except requests.exceptions.RequestException:
         return None
 
-def fetch_dynamic_content(url: str) -> Optional[str]:
-    try:
-        with sync_playwright() as p:
-            browser = p.chromium.launch()
-            page = browser.new_page()
-            page.goto(url, timeout=10000)
-            page.wait_for_timeout(2000)  # Wait for dynamic content
-            content = page.content()
-            browser.close()
-            return content
-    except Exception as e:
-        return None
+# def fetch_dynamic_content(url: str) -> Optional[str]:
+#     try:
+#         with sync_playwright() as p:
+#             browser = p.chromium.launch()
+#             page = browser.new_page()
+#             page.goto(url, timeout=10000)
+#             page.wait_for_timeout(2000)  # Wait for dynamic content
+#             content = page.content()
+#             browser.close()
+#             return content
+#     except Exception as e:
+#         return None
 
 def extract_with_trafilatura(content: str, min_content_length: int) -> Tuple[Optional[str], dict]:
     metadata = {
@@ -159,12 +159,14 @@ def scrape_webpage(url: str, use_dynamic: bool=True) -> Tuple[Optional[str], dic
     MIN_CONTENT_LENGTH = 50
     MIN_LINE_LENGTH = 10
     
+    # TODO Dynamic fetching with Playwright currently disabled
+    
     # Fetch content
-    if use_dynamic:
-        content = fetch_dynamic_content(url)
-    else:
-        session = setup_session()
-        content = fetch_static_content(url, session)
+    # if use_dynamic:
+    #     content = fetch_dynamic_content(url)
+    # else:
+    session = setup_session()
+    content = fetch_static_content(url, session)
     
     if not content:
         return None
@@ -172,11 +174,11 @@ def scrape_webpage(url: str, use_dynamic: bool=True) -> Tuple[Optional[str], dic
     # Try trafilatura first
     final_content, metadata = extract_with_trafilatura(content, MIN_CONTENT_LENGTH)
     if final_content:
-        return [(1, final_content)], metadata
+        return final_content, metadata
     
     # Fallback to BeautifulSoup
     final_content, metadata = extract_with_beautifulsoup(content, MIN_CONTENT_LENGTH, MIN_LINE_LENGTH)
-    return [(1, final_content)], metadata
+    return final_content, metadata
 
 if __name__ == "__main__":
     url = "https://github.com/adbar/trafilatura"

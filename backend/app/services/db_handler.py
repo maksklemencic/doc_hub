@@ -12,6 +12,21 @@ if not DATABASE_URL:
 engine = create_engine(DATABASE_URL)
 SessionLocal = sessionmaker(bind=engine)
 
+
+class NotFoundError(Exception):
+    pass
+
+class ForbiddenError(Exception):
+    pass
+
+class IntegrityViolationError(Exception):
+    pass
+
+class DatabaseUnavailableError(Exception):
+    pass
+
+
+
 # Documents CRUD operations
 def get_document_by_id(doc_id: uuid.UUID) -> Document | None:
     session = SessionLocal()
@@ -22,14 +37,21 @@ def get_document_by_id(doc_id: uuid.UUID) -> Document | None:
         session.close()
         
 
-def add_document(filename: str, file_path: str, mime_type: str, uploaded_by: uuid.UUID) -> uuid.UUID:
+def add_document(
+    filename: str, 
+    file_path: str, 
+    mime_type: str, 
+    uploaded_by: uuid.UUID, 
+    space_id: uuid.UUID) -> uuid.UUID:
+    
     session = SessionLocal()
     try:
         doc = Document(
             filename=filename,
             file_path=file_path,
             mime_type=mime_type,
-            uploaded_by=uploaded_by
+            uploaded_by=uploaded_by,
+            space_id=space_id
         )
         session.add(doc)
         session.commit()
@@ -77,63 +99,74 @@ def delete_document(doc_id: uuid.UUID) -> bool:
         session.close()
 
 # Spaces CRUD operations
-def create_space(name: str, user_id: uuid.UUID) -> Space:
-    session = SessionLocal()
-    try:
-        space = Space(name=name, user_id=user_id)
-        session.add(space)
-        session.commit()
-        session.refresh(space)
-        return space
-    except exc.SQLAlchemyError as e:
-        session.rollback()
-        raise RuntimeError(f"Error creating space: {e}")
-    finally:
-        session.close()
-
-def get_space_by_id(space_id: uuid.UUID) -> Optional[Space]:
-    session = SessionLocal()
-    try:
-        return session.query(Space).filter(Space.id == space_id).first()
-    finally:
-        session.close()
-
-def get_all_spaces() -> List[Space]:
-    session = SessionLocal()
-    try:
-        return session.query(Space).all()
-    finally:
-        session.close()
-
-def update_space(space_id: uuid.UUID, new_name: str) -> Optional[Space]:
-    session = SessionLocal()
-    try:
-        space = session.query(Space).filter(Space.id == space_id).first()
-        if space:
-            space.name = new_name
+def create_space(user_id: uuid.UUID, name: str) -> Space:
+    with SessionLocal() as session:
+        try:
+            space = Space(name=name, user_id=user_id)            
+            session.add(space)
             session.commit()
             session.refresh(space)
-        return space
-    except exc.SQLAlchemyError as e:
-        session.rollback()
-        raise RuntimeError(f"Error updating space: {e}")
-    finally:
-        session.close()
+            return space
+        except exc.SQLAlchemyError as e:
+            session.rollback()
+            raise RuntimeError(f"Error creating space: {e}")
+        finally:
+            session.close()
 
-def delete_space(space_id: uuid.UUID) -> bool:
-    session = SessionLocal()
-    try:
-        space = session.query(Space).filter(Space.id == space_id).first()
-        if space:
+def get_paginated_spaces(user_id: uuid.UUID, limit: int, offset: int) -> List[Space]:
+    with SessionLocal() as session:
+        query = session.query(Space).filter(Space.user_id == user_id)
+        
+        total_count = query.count()
+        spaces = query.offset(offset).limit(limit).all()
+        return spaces, total_count
+    
+
+def update_space(user_id: uuid.UUID, space_id: uuid.UUID, new_name: str) -> Optional[Space]:
+    with SessionLocal() as session:  
+        try:
+            space = session.query(Space).filter(Space.user_id == user_id, Space.id == space_id).first()
+            if not space:
+                raise NotFoundError("Space not found")
+            if space.user_id != user_id:
+                raise ForbiddenError("Not authorized to update this space")
+            
+            if space:
+                space.name = new_name
+                session.commit()
+                session.refresh(space)
+            return space
+        except exc.IntegrityError:
+            session.rollback()
+            raise IntegrityViolationError("Cannot update space; it is referenced elsewhere")
+        except exc.OperationalError:
+            session.rollback()
+            raise DatabaseUnavailableError("Database unavailable")
+        except exc.SQLAlchemyError as e:
+            session.rollback()
+            raise Exception(f"Error updating space: {str(e)}")
+
+
+def delete_space(user_id: uuid.UUID, space_id: uuid.UUID):
+    with SessionLocal() as session:
+        try:
+            space = session.query(Space).filter(Space.user_id == user_id, Space.id == space_id).first()
+            if not space:
+                raise NotFoundError("Space not found")
+            if space.user_id != user_id:
+                raise ForbiddenError("Not authorized to delete this space")
             session.delete(space)
             session.commit()
-            return True
-        return False
-    except exc.SQLAlchemyError as e:
-        session.rollback()
-        raise RuntimeError(f"Error deleting space: {e}")
-    finally:
-        session.close()
+            
+        except exc.IntegrityError:
+            session.rollback()
+            raise IntegrityViolationError("Cannot delete space; it is referenced elsewhere")
+        except exc.OperationalError:
+            session.rollback()
+            raise DatabaseUnavailableError("Database unavailable")
+        except exc.SQLAlchemyError as e:
+            session.rollback()
+            raise Exception(f"Error deleting space: {str(e)}")
 
 
 # Messages CRUD Operaions

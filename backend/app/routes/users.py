@@ -2,7 +2,6 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel
 import uuid
 
-from backend.app.routes.users import create_user
 from ..services import db_handler
 
 router = APIRouter()

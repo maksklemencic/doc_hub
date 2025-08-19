@@ -7,7 +7,7 @@ debugpy.listen(("0.0.0.0", 5678))
 
 app = FastAPI()
 app.include_router(upload.router, prefix="/upload")
-app.include_router(chat.router, prefix="/chat")
+app.include_router(chat.router, prefix="/spaces")
 app.include_router(documents.router, prefix="/documents")
 app.include_router(spaces.router, prefix="/spaces")
 app.include_router(messages.router, prefix="/spaces")

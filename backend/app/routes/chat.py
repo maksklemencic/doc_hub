@@ -12,8 +12,8 @@ class PostQueryRequest(BaseModel):
     top_k: int = 5
     use_context: bool = True
 
-@router.post("/messages/{user_id}")
-def create_query(data: PostQueryRequest, user_id: str):
+@router.post("/{spaceId}/messages/{user_id}")
+def create_query(data: PostQueryRequest, spaceId: str, user_id: str):
     try:
         if user_id is None:
             raise HTTPException(status_code=404, detail="No user_id provided!")

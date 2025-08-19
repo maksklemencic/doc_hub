@@ -16,3 +16,7 @@ debugpy
 chonkie
 SQLAlchemy
 psycopg2-binary
+trafilatura
+# playwright
+beautifulsoup4
+lxml_html_clean

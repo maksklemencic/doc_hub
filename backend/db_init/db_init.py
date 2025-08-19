@@ -29,6 +29,7 @@ class User(Base):
 class Document(Base):
     __tablename__ = "documents"
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    space_id = Column(UUID(as_uuid=True), ForeignKey("spaces.id"), nullable=False)
     filename = Column(String, nullable=False)
     file_path = Column(String, nullable=False)
     mime_type = Column(String, nullable=False)

@@ -11,11 +11,13 @@ class Base64UploadRequest(BaseModel):
     mime_type: str
     content_base64: str
     user_id: uuid.UUID
+    space_id: uuid.UUID
     
 
 class WebDocumentUploadRequest(BaseModel):
     url: str
     user_id: uuid.UUID
+    space_id: uuid.UUID
 
 
 @router.post("/base64")
@@ -29,7 +31,8 @@ def upload_base64(request: Base64UploadRequest):
             filename=request.filename,
             file_path=saved_file_path,
             mime_type=request.mime_type,
-            uploaded_by=request.user_id
+            uploaded_by=request.user_id,
+            space_id=request.space_id
         )
         
         metadata = {
@@ -57,7 +60,8 @@ def upload_base64(request: Base64UploadRequest):
 @router.post("/file")
 async def upload_file_multipart(   
             file: UploadFile = File(...),
-            user_id: uuid.UUID = Form(...)
+            user_id: uuid.UUID = Form(...),
+            space_id: uuid.UUID = Form(...)
         ):
     try:
         contents = await file.read()        
@@ -69,7 +73,8 @@ async def upload_file_multipart(
             filename=file.filename,
             file_path=saved_file_path,
             mime_type=file.content_type,
-            uploaded_by=user_id
+            uploaded_by=user_id,
+            space_id=space_id
         )
         
         metadata = {
@@ -110,18 +115,19 @@ def upload_web_document(request: WebDocumentUploadRequest):
             filename=request.url.split("/")[-1],
             file_path=saved_file_path,
             mime_type="text/html",
-            uploaded_by=request.user_id
+            uploaded_by=request.user_id,
+            space_id=request.space_id
         )
 
         metadata['document_id'] = str(doc_id)
-        metadata['url'] = request.url.split("/")[-1]
+        metadata['url'] = request.url
         metadata['mime_type'] = "text/html"
-        chunks = save_to_vector_db(pages, request.url.split("/")[-1], "text/html", doc_id)
+        chunks = save_to_vector_db(pages, metadata)
         
         return {
             "status": "Success",
             "doc_id": doc_id,
-            "url": request.url.split("/")[-1],
+            "url": request.url,
             "chunk_count": len(chunks),
             "save_path": saved_file_path
         }
