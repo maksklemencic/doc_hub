@@ -3,7 +3,7 @@ import uuid
 from sqlalchemy import create_engine, exc
 from sqlalchemy.orm import Session, sessionmaker
 from typing import List, Optional
-from ...db_init.db_init import Base, Document, Space, Message
+from ...db_init.db_init import Base, Document, Space, Message, User
 
 DATABASE_URL = os.environ.get("DATABASE_URL")
 if not DATABASE_URL:
@@ -217,5 +217,69 @@ def delete_message(message_id: uuid.UUID, space_id: uuid.UUID, user_id: uuid.UUI
     except exc.SQLAlchemyError as e:
         session.rollback()
         raise RuntimeError(f"Error deleting message: {e}")
+    finally:
+        session.close()
+        
+        
+
+# Users CRUD Operaions
+def create_user(email: str, first_name: str, last_name: str) -> User:
+    session = SessionLocal()
+    try:
+        # Check if user exists
+        found_user = session.query(User).filter(User.email == email).first()
+        if found_user:
+            return "User with this email already exists"
+        
+        user = User(email=email, first_name=first_name, last_name=last_name)
+        session.add(user)
+        session.commit()
+        session.refresh(user)
+        return user
+    except exc.SQLAlchemyError as e:
+        session.rollback()
+        raise RuntimeError(f"Error creating user: {e}")
+    finally:
+        session.close()
+        
+        
+def get_user_by_id(user_id: uuid.UUID) -> Optional[User]:
+    session = SessionLocal()
+    try:
+        return session.query(User).filter(User.id == user_id).first()
+    finally:
+        session.close()
+        
+def update_user(user_id: uuid.UUID, **kwargs) -> Optional[User]:
+    session = SessionLocal()
+    try:
+        user = session.get(User, user_id)
+        if not user:
+            raise ValueError(f"User with id {user_id} not found")
+        for key, value in kwargs.items():
+            if hasattr(user, key):
+                setattr(user, key, value)
+        session.commit()
+        session.refresh(user)
+        return user
+    except exc.SQLAlchemyError as e:
+        session.rollback()
+        raise RuntimeError(f"Error updating user: {e}")
+    finally:
+        session.close()
+        
+
+def delete_user(user_id: uuid.UUID) -> bool:
+    session = SessionLocal()
+    try:
+        user = session.get(User, user_id)
+        if not user:
+            raise ValueError(f"User with id {user_id} not found")
+        session.delete(user)
+        session.commit()
+        return True
+    except exc.SQLAlchemyError as e:
+        session.rollback()
+        raise RuntimeError(f"Error deleting user: {e}")
     finally:
         session.close()
