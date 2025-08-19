@@ -1,24 +1,12 @@
 from fastapi import APIRouter, Depends, HTTPException, Query, status
-import pathlib
-from typing import List, Optional, datetime
 import uuid
-from pydantic import BaseModel, Field
-# import datetime
 
 from backend.app.services import db_handler
+from ..models.spaces import *
 
 
 router = APIRouter()
 
-class SpaceResponse(BaseModel):
-    id: uuid.UUID
-    name: str = Field(..., min_length=1, max_length=100)
-    # user_id: uuid.UUID
-    created_at: Optional[datetime] = None
-    updated_at: Optional[datetime] = None
-    class Config:
-        orm_mode = True
-        
 
 # TODO Placeholder for user_id dependency
 def get_current_user_id_from_query(user_id: uuid.UUID = Query(...)) -> uuid.UUID:
@@ -32,10 +20,6 @@ def get_current_user_id_from_query(user_id: uuid.UUID = Query(...)) -> uuid.UUID
     return user_id
 
 
-# TODO POST Space
-class CreateSpaceRequest(BaseModel):
-    name: str = Field(..., min_length=1, max_length=100)
-    
 @router.post("/", response_model=SpaceResponse)
 def create_space(
     request: CreateSpaceRequest,
@@ -44,24 +28,14 @@ def create_space(
     try:
         db_space = db_handler.create_space(current_user_id, request.name)
         return db_space
-    except RuntimeError as e:
-        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(e))
+    except db_handler.ConflictError as e:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=e.message)
+    except db_handler.DatabaseError as e:
+        raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail=e.message)
+    except db_handler.ServiceError as e:
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=e.message)
 
 
-# TODO GET Spaces
-class GetSpacesQuery(BaseModel):
-    limit: int = Field(10, ge=1, le=100)
-    offset: int = Field(0, ge=0)
-
-class PaginationMetadata(BaseModel):
-    limit: int = Field(..., ge=1, le=100)
-    offset: int = Field(..., ge=0)
-    total_count: int = Field(..., ge=0)
-        
-class GetSpacesResponseWrapper(BaseModel):
-    spaces: List[SpaceResponse] = Field(..., max_items=100)
-    pagination: PaginationMetadata
-    
 @router.get("/", response_model=GetSpacesResponseWrapper)
 def get_spaces(
     request: GetSpacesQuery = Depends(),
@@ -77,13 +51,11 @@ def get_spaces(
                 "total_count": total_count
             }
         }
-    except Exception as e:
-        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Internal server error")
+    except db_handler.DatabaseError as e:
+        raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail=e.message)
+    except db_handler.ServiceError as e:
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=e.message)
 
-
-# TODO PATCH Space
-class UpdateSpaceRequest(BaseModel):
-    name: str = Field(..., min_length=1, max_length=100)
 
 @router.patch("/{space_id}", response_model=SpaceResponse)
 def update_space(
@@ -93,13 +65,18 @@ def update_space(
 ):
     try:
         space = db_handler.update_space(current_user_id, space_id, request.name)
-        if not space:
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Space not found")
         return space
-    except RuntimeError as e:
-        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(e))
+    except db_handler.NotFoundError as e:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=e.message)
+    except db_handler.PermissionError as e:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=e.message)
+    except db_handler.ConflictError as e:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=e.message)
+    except db_handler.DatabaseError as e:
+        raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail=e.message)
+    except db_handler.ServiceError as e:
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=e.message)
 
-# TODO DELETE Space
 @router.delete("/{space_id}", status_code=status.HTTP_204_NO_CONTENT)
 def delete_space(
     space_id: uuid.UUID,
@@ -107,11 +84,13 @@ def delete_space(
 ):
     try:
         db_handler.delete_space(current_user_id, space_id)
-    except db_handler.SpaceNotFoundError:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Space not found")
-    except db_handler.IntegrityViolationError:
-        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Cannot delete space; it is referenced elsewhere")
-    except db_handler.DatabaseUnavailableError:
-        raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail="Database unavailable")
-    except Exception as e:
-        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=f"Error deleting space: {str(e)}")   
+    except db_handler.NotFoundError as e:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=e.message)
+    except db_handler.PermissionError as e:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=e.message)
+    except db_handler.ConflictError as e:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=e.message)
+    except db_handler.DatabaseError as e:
+        raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail=e.message)
+    except db_handler.ServiceError as e:
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=e.message)
