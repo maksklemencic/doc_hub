@@ -1,10 +1,12 @@
 import os
 import uuid
+import logging
 from sqlalchemy import create_engine, exc
 from sqlalchemy.orm import Session, sessionmaker
 from typing import List, Optional
+
 from ...db_init.db_init import Base, Document, Space, Message, User
-import logging
+from ..errors.errors import NotFoundError, PermissionError, DatabaseError, ConflictError
 
 DATABASE_URL = os.environ.get("DATABASE_URL")
 if not DATABASE_URL:
@@ -14,33 +16,6 @@ engine = create_engine(DATABASE_URL)
 SessionLocal = sessionmaker(bind=engine)
 
 logger = logging.getLogger(__name__)
-
-class ServiceError(Exception):
-    """Base exception for service errors"""
-    def __init__(self, message: str, code: str = "service_error"):
-        self.message = message
-        self.code = code
-        super().__init__(message)
-
-class NotFoundError(ServiceError):
-    """Raised when a resource is not found"""
-    def __init__(self, resource: str, id: str):
-        super().__init__(f"{resource} with id {id} not found", code=f"{resource.lower()}_not_found")
-
-class PermissionError(ServiceError):
-    """Raised when user lacks permission"""
-    def __init__(self, message: str = "Permission denied"):
-        super().__init__(message, code="permission_denied")
-
-class DatabaseError(ServiceError):
-    """Raised for database operation errors"""
-    def __init__(self, message: str):
-        super().__init__(message, code="database_error")
-
-class ConflictError(ServiceError):
-    """Raised for database conflicts (e.g., unique constraint violations)"""
-    def __init__(self, message: str):
-        super().__init__(message, code="conflict_error")
 
 
 # Documents CRUD operations
@@ -125,10 +100,6 @@ def create_space(user_id: uuid.UUID, name: str) -> Space:
             session.refresh(space)
             logger.info(f"Successfully created space with name '{name}' for user {user_id}")
             return space
-        except exc.IntegrityError as e:
-            session.rollback()
-            logger.warning(f"Conflict creating space '{name}' for user {user_id}: {str(e)}")
-            raise ConflictError(f"Space name '{name}' already exists")
         except exc.OperationalError as e:
             session.rollback()
             logger.error(f"Database unavailable for user {user_id}: {str(e)}")
@@ -166,10 +137,6 @@ def update_space(user_id: uuid.UUID, space_id: uuid.UUID, new_name: str) -> Opti
                 logger.info(f"Successfully updated space {space_id} for user {user_id}")
             return space
         
-        except exc.IntegrityError as e:
-            session.rollback()
-            logger.warning(f"Conflict updating space {space_id} for user {user_id}: {str(e)}")
-            raise ConflictError(f"Space name '{new_name}' already exists")
         except exc.OperationalError as e:
             session.rollback()
             logger.error(f"Database unavailable for user {user_id}: {str(e)}")

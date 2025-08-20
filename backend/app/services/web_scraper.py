@@ -179,14 +179,3 @@ def scrape_webpage(url: str, use_dynamic: bool=True) -> Tuple[Optional[str], dic
     # Fallback to BeautifulSoup
     final_content, metadata = extract_with_beautifulsoup(content, MIN_CONTENT_LENGTH, MIN_LINE_LENGTH)
     return final_content, metadata
-
-if __name__ == "__main__":
-    url = "https://github.com/adbar/trafilatura"
-    content, metadata = scrape_webpage(url, use_dynamic=False)
-    if content and metadata:
-        print("Scraped Content:")
-        print(content)
-        print("\nMetadata:")
-        print(metadata)
-    else:
-        print("Failed to scrape content.")
