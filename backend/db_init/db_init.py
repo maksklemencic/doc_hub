@@ -1,6 +1,6 @@
 import os
 import uuid
-from sqlalchemy import create_engine, Column, String, TIMESTAMP, ForeignKey, inspect, text
+from sqlalchemy import UniqueConstraint, create_engine, Column, String, TIMESTAMP, ForeignKey, inspect, text
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker
@@ -43,6 +43,10 @@ class Space(Base):
     user_id = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=False)
     created_at = Column(TIMESTAMP, server_default=text("NOW()"))
     updated_at = Column(TIMESTAMP, server_default=text("NOW()"), onupdate=text("NOW()"))
+    
+    __table_args__ = (
+        UniqueConstraint('user_id', 'name', name='unique_user_space_name'),
+    )
 
 class Message(Base):
     __tablename__ = "messages"

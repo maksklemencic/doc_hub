@@ -2,7 +2,7 @@ from fastapi import FastAPI, HTTPException, Request, status
 from fastapi.responses import JSONResponse
 from fastapi.exceptions import RequestValidationError
 import debugpy
-from .routes import upload, chat, documents, spaces, messages, users
+from .routes import upload, documents, spaces, messages, users
 from backend.app.errors.db_errors import ServiceError
 import os
 import logging
@@ -30,12 +30,13 @@ app = FastAPI(
     title="📄 Documents Hub API",
     description="API for managing documents and interacting with a RAG system.",
     version="1.0.0",
-    openapi_tags=spaces.tags_metadata + messages.tags_metadata,
+    openapi_tags=spaces.tags_metadata + 
+                messages.tags_metadata +
+                users.tags_metadata,
     docs_url="/docs",
     redoc_url="/redoc"
 )
 app.include_router(upload.router, prefix="/upload")
-app.include_router(chat.router, prefix="/spaces")
 app.include_router(documents.router, prefix="/documents")
 app.include_router(spaces.router, prefix="/spaces")
 app.include_router(messages.router, prefix="/spaces")

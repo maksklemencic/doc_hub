@@ -100,6 +100,10 @@ def create_space(user_id: uuid.UUID, name: str) -> Space:
             session.refresh(space)
             logger.info(f"Successfully created space with name '{name}' for user {user_id}")
             return space
+        except exc.IntegrityError as e:
+            session.rollback()
+            logger.error(f"Conflict error while creating space '{name}' for user {user_id}: {str(e)}")
+            raise ConflictError("Space with this name already exists")
         except exc.OperationalError as e:
             session.rollback()
             logger.error(f"Database unavailable for user {user_id}: {str(e)}")
@@ -233,37 +237,6 @@ def get_paginated_messages(user_id: uuid.UUID, space_id: uuid.UUID, limit: int, 
             raise DatabaseError(f"Error fetching messages: {str(e)}")
 
 
-# def update_message(message_id: uuid.UUID, space_id: uuid.UUID, user_id: uuid.UUID, content: str) -> Optional[Message]:
-#     logger.info(f"Updating message {message_id} in space {space_id} for user {user_id}")
-#     with SessionLocal() as session:
-#         try:
-#             message = session.query(Message).filter(
-#                 Message.id == message_id,
-#                 Message.space_id == space_id,
-#                 Message.user_id == user_id
-#             ).first()
-#             if not message:
-#                 logger.warning(f"Message {message_id} not found for user {user_id} in space {space_id}")
-#                 raise NotFoundError("Message", str(message_id))
-#             if message.user_id != user_id:
-#                 logger.warning(f"Permission denied for user {user_id} on message {message_id} in space {space_id}")
-#                 raise PermissionError("Not authorized to update this message")
-            
-#             message.content = content
-#             session.commit()
-#             session.refresh(message)
-#             logger.info(f"Successfully updated message {message_id} for user {user_id}")
-#             return message
-#         except exc.OperationalError as e:
-#             session.rollback()
-#             logger.error(f"Database unavailable for user {user_id}: {str(e)}")
-#             raise DatabaseError("Database unavailable")
-#         except exc.SQLAlchemyError as e:
-#             session.rollback()
-#             logger.error(f"Unexpected database error for user {user_id}: {str(e)}")
-#             raise DatabaseError(f"Error updating message: {str(e)}")
-
-
 def delete_message(message_id: uuid.UUID, space_id: uuid.UUID, user_id: uuid.UUID):
     logger.info(f"Deleting message {message_id} in space {space_id} for user {user_id}")
     with SessionLocal() as session:
@@ -296,62 +269,74 @@ def delete_message(message_id: uuid.UUID, space_id: uuid.UUID, user_id: uuid.UUI
 
 # Users CRUD Operaions
 def create_user(email: str, first_name: str, last_name: str) -> User:
-    session = SessionLocal()
-    try:
-        # Check if user exists
-        found_user = session.query(User).filter(User.email == email).first()
-        if found_user:
-            return "User with this email already exists"
+    logger.info(f"Creating user with email '{email}'")
+    with SessionLocal() as session:
+        try:
+            user = User(email=email, first_name=first_name, last_name=last_name)
+            session.add(user)
+            session.commit()
+            session.refresh(user)
+            logger.info(f"Successfully created user with email '{email}'")
+            return user
+        except exc.IntegrityError as e:
+            session.rollback()
+            logger.error(f"Conflict error while creating user with email '{email}': {str(e)}")
+            raise ConflictError("User with this email already exists")
+        except exc.OperationalError as e:
+            session.rollback()
+            logger.error(f"Database unavailable while creating user with email '{email}': {str(e)}")
+            raise DatabaseError("Database unavailable")
+        except exc.SQLAlchemyError as e:
+            session.rollback()
+            logger.error(f"Unexpected database error while creating user with email '{email}': {str(e)}")
+            raise DatabaseError(f"Error creating user: {str(e)}")
         
-        user = User(email=email, first_name=first_name, last_name=last_name)
-        session.add(user)
-        session.commit()
-        session.refresh(user)
-        return user
-    except exc.SQLAlchemyError as e:
-        session.rollback()
-        raise RuntimeError(f"Error creating user: {e}")
-    finally:
-        session.close()
         
-        
-def get_user_by_id(user_id: uuid.UUID) -> Optional[User]:
-    session = SessionLocal()
-    try:
-        return session.query(User).filter(User.id == user_id).first()
-    finally:
-        session.close()
-        
-def update_user(user_id: uuid.UUID, **kwargs) -> Optional[User]:
-    session = SessionLocal()
-    try:
-        user = session.get(User, user_id)
-        if not user:
-            raise ValueError(f"User with id {user_id} not found")
-        for key, value in kwargs.items():
-            if hasattr(user, key):
-                setattr(user, key, value)
-        session.commit()
-        session.refresh(user)
-        return user
-    except exc.SQLAlchemyError as e:
-        session.rollback()
-        raise RuntimeError(f"Error updating user: {e}")
-    finally:
-        session.close()
+def get_user_by_id(user_id: uuid.UUID, current_user_id: uuid.UUID) -> Optional[User]:
+    logger.info(f"Fetching user {user_id} for current user {current_user_id}")
+    with SessionLocal() as session:
+        try:
+            if user_id != current_user_id:
+                logger.warning(f"Permission denied for user {current_user_id} to view user {user_id}")
+                raise PermissionError("Not authorized to view this user")
+            
+            user = session.query(User).filter(User.id == user_id).first()
+            if not user:
+                logger.warning(f"User {user_id} not found")
+                raise NotFoundError("User", str(user_id))
+            logger.info(f"Successfully fetched user {user_id}")
+            return user
+        except exc.OperationalError as e:
+            logger.error(f"Database unavailable while fetching user {user_id}: {str(e)}")
+            raise DatabaseError("Database unavailable")
+        except exc.SQLAlchemyError as e:
+            logger.error(f"Unexpected database error while fetching user {user_id}: {str(e)}")
+            raise DatabaseError(f"Error fetching user: {str(e)}")
         
 
-def delete_user(user_id: uuid.UUID) -> bool:
-    session = SessionLocal()
-    try:
-        user = session.get(User, user_id)
-        if not user:
-            raise ValueError(f"User with id {user_id} not found")
-        session.delete(user)
-        session.commit()
-        return True
-    except exc.SQLAlchemyError as e:
-        session.rollback()
-        raise RuntimeError(f"Error deleting user: {e}")
-    finally:
-        session.close()
+
+def delete_user(user_id: uuid.UUID, current_user_id: uuid.UUID) -> Optional[User]:
+    logger.info(f"Deleting user {user_id} by current user {current_user_id}")
+    with SessionLocal() as session:
+        try:
+            if user_id != current_user_id:
+                logger.warning(f"Permission denied for user {current_user_id} to delete user {user_id}")
+                raise PermissionError("Not authorized to delete this user")
+            
+            user = session.get(User, user_id)
+            if not user:
+                logger.warning(f"User {user_id} not found")
+                raise NotFoundError("User", str(user_id))
+            
+            session.delete(user)
+            session.commit()
+            logger.info(f"Successfully deleted user {user_id}")
+            return user
+        except exc.SQLAlchemyError as e:
+            session.rollback()
+            logger.error(f"Unexpected database error while deleting user {user_id}: {str(e)}")
+            raise DatabaseError(f"Error deleting user: {str(e)}")
+        except exc.OperationalError as e:
+            session.rollback()
+            logger.error(f"Database unavailable while deleting user {user_id}: {str(e)}")
+            raise DatabaseError("Database unavailable")

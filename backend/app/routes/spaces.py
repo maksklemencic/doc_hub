@@ -1,5 +1,6 @@
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 import uuid
+import logging
 
 from backend.app.services import db_handler
 from ..models.spaces import *
@@ -7,6 +8,7 @@ from ..errors.db_errors import ServiceError, DatabaseError, NotFoundError, Permi
 
 
 router = APIRouter()
+logger = logging.getLogger(__name__)
 
 tags_metadata = [
     {
@@ -35,9 +37,11 @@ def get_current_user_id_from_query(user_id: uuid.UUID = Query(...)) -> uuid.UUID
     summary="Create a new space",
     description="Creates a new space with the provided name for the authenticated user.",
     response_description="The created space object with its ID, name, and timestamps.",
+    status_code=status.HTTP_201_CREATED,
     responses={
         201: {"description": "Space successfully created"},
         401: {"description": "Authentication required"},
+        409: {"description": "Conflict; Space with the same name already exists"},
         422: {"description": "Validation error"},
         500: {"description": "Internal server error"},
         503: {"description": "Database unavailable"}
@@ -50,10 +54,15 @@ def create_space(
     try:
         db_space = db_handler.create_space(current_user_id, request.name)
         return db_space
+    except ConflictError as e:
+        logger.error(f"Conflict creating space '{request.name}' for user {current_user_id}: {e.message}")
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=e.message)
     except DatabaseError as e:
-        raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail=f"Database error: {e.message} (code: {e.code})")
-    except ServiceError as e:
-        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=f"Internal error: {e.message} (code: {e.code})")
+        logger.error(f"Database error creating space '{request.name}' for user {current_user_id}: {e.message}")
+        raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail=e.message)
+    except Exception as e:
+        logger.error(f"Unexpected error creating space '{request.name}' for user {current_user_id}: {str(e)}")
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="An unexpected error occurred.")
 
 
 @router.get(
@@ -63,6 +72,7 @@ def create_space(
     summary="Retrieve paginated spaces",
     description="Fetches a paginated list of spaces for the authenticated user, with optional limit and offset parameters.",
     response_description="A list of spaces with pagination metadata (limit, offset, and total count).",
+    status_code=status.HTTP_200_OK,
     responses={
         200: {"description": "List of spaces successfully retrieved"},
         401: {"description": "Authentication required"},
@@ -85,9 +95,11 @@ def get_spaces(
             }
         }
     except DatabaseError as e:
+        logger.error(f"Database error fetching spaces for user {current_user_id}: {e.message}")
         raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail=e.message)
-    except ServiceError as e:
-        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=e.message)
+    except Exception as e:
+        logger.error(f"Unexpected error fetching spaces for user {current_user_id}: {str(e)}")
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="An unexpected error occurred.")
 
 
 @router.patch(
@@ -97,6 +109,7 @@ def get_spaces(
     summary="Update a space",
     description="Updates the name of an existing space identified by its UUID for the authenticated user.",
     response_description="The updated space object with its ID, name, and timestamps.",
+    status_code=status.HTTP_200_OK,
     responses={
         200: {"description": "Space successfully updated"},
         401: {"description": "Authentication required"},
@@ -114,14 +127,18 @@ def update_space(
     try:
         space = db_handler.update_space(current_user_id, space_id, request.name)
         return space
-    except NotFoundError as e:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=e.message)
     except PermissionError as e:
+        logger.warning(f"Permission denied for user {current_user_id} to update space {space_id}")
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=e.message)
+    except NotFoundError as e:
+        logger.warning(f"Space {space_id} not found for user {current_user_id}")
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=e.message)
     except DatabaseError as e:
+        logger.error(f"Database error updating space {space_id} for user {current_user_id}: {e.message}")
         raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail=e.message)
-    except ServiceError as e:
-        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=e.message)
+    except Exception as e:
+        logger.error(f"Unexpected error updating space {space_id} for user {current_user_id}: {str(e)}")
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="An unexpected error occurred.")
 
 @router.delete(
     "/{space_id}", 
@@ -146,13 +163,18 @@ def delete_space(
 ):
     try:
         db_handler.delete_space(current_user_id, space_id)
-    except NotFoundError as e:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=e.message)
     except PermissionError as e:
+        logger.warning(f"Permission denied for user {current_user_id} to delete space {space_id}")
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=e.message)
+    except NotFoundError as e:
+        logger.warning(f"Space {space_id} not found for user {current_user_id}")
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=e.message)
     except ConflictError as e:
+        logger.warning(f"Conflict deleting space {space_id} for user {current_user_id}: {e.message}")
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=e.message)
     except DatabaseError as e:
+        logger.error(f"Database error deleting space {space_id} for user {current_user_id}: {e.message}")
         raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail=e.message)
-    except ServiceError as e:
-        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=e.message)
+    except Exception as e:
+        logger.error(f"Unexpected error deleting space {space_id} for user {current_user_id}: {str(e)}")
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="An unexpected error occurred.")

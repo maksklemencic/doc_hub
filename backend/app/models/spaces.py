@@ -3,6 +3,8 @@ from datetime import datetime
 import uuid
 from pydantic import BaseModel, Field
 
+from .shared import PaginationMetadata
+
 class SpaceResponse(BaseModel):
     id: uuid.UUID = Field(..., description="Unique identifier (UUID) of the space.")
     name: str = Field(..., min_length=1, max_length=100, description="Name of the space, must be between 1 and 100 characters.")
@@ -25,12 +27,6 @@ class GetSpacesRequest(BaseModel):
     limit: int = Field(10, ge=1, le=100, description="Number of spaces to return per page, between 1 and 100.")
     offset: int = Field(0, ge=0, description="Number of spaces to skip before starting the page, non-negative.")
 
-
-class PaginationMetadata(BaseModel):
-    limit: int = Field(..., ge=1, le=100, description="Number of spaces returned in the current page, between 1 and 100.")
-    offset: int = Field(..., ge=0, description="Number of spaces skipped before the current page, non-negative.")
-    total_count: int = Field(..., ge=0, description="Total number of spaces available for the user.")
-        
 
 class GetSpacesResponseWrapper(BaseModel):
     spaces: List[SpaceResponse] = Field(..., max_items=100, description="List of spaces, up to 100 items per page.")

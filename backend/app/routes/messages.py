@@ -37,6 +37,7 @@ def get_current_user_id_from_query(user_id: uuid.UUID = Query(...)) -> uuid.UUID
     summary="Create a new message",
     description="Creates a new message in the specified space.",
     response_description="The created message object.",
+    status_code=status.HTTP_201_CREATED,
     responses={
         201: {"description": "Message successfully created"},
         401: {"description": "Authentication required"},
@@ -90,18 +91,25 @@ def create_message(
         }
     
     except NotFoundError as e:
+        logger.warning(f"Space {space_id} not found for user {current_user_id}")
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=e.message)
     except DatabaseError as e:
+        logger.error(f"Database error creating message in space {space_id} for user {current_user_id}: {e.message}")
         raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail=e.message)
     except InvalidInputError as e:
+        logger.warning(f"Invalid input creating message in space {space_id} for user {current_user_id}: {e.message}")
         raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=e.message)
     except EmbeddingError as e:
+        logger.error(f"Embedding error creating message in space {space_id} for user {current_user_id}: {e.message}")
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=f"Embedding error: {e.message}")
     except LLMError as e:
+        logger.error(f"LLM error creating message in space {space_id} for user {current_user_id}: {e.message}")
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=f"LLM error: {e.message}")
     except VectorStoreError as e:
+        logger.error(f"Vector store error creating message in space {space_id} for user {current_user_id}: {e.message}")
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=f"Vector error: {e.message}")
     except Exception as e:
+        logger.error(f"Unexpected error creating message in space {space_id} for user {current_user_id}: {str(e)}")
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="An unexpected error occurred.")
 
 
@@ -112,6 +120,7 @@ def create_message(
     summary="Retrieve paginated messages",
     description="Fetches a paginated list of recent messages for the specified space.",
     response_description="A list of messages with pagination metadata.",
+    status_code=status.HTTP_200_OK,
     responses={
         200: {"description": "List of messages successfully retrieved"},
         401: {"description": "Authentication required"},
@@ -136,10 +145,13 @@ def get_messages(
             }
         }
     except NotFoundError as e:
+        logger.warning(f"Space {space_id} not found for user {current_user_id}")
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=e.message)
     except DatabaseError as e:
+        logger.error(f"Database error fetching messages in space {space_id} for user {current_user_id}: {e.message}")
         raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail=e.message)
     except Exception as e:
+        logger.error(f"Unexpected error fetching messages in space {space_id} for user {current_user_id}: {str(e)}")
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="An unexpected error occurred.")
 
 
@@ -166,11 +178,15 @@ def delete_message(
 ):
     try:
         db_handler.delete_message(message_id, space_id, current_user_id)
-    except NotFoundError as e:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=e.message)
     except PermissionError as e:
+        logger.warning(f"Permission denied for user {current_user_id} to delete message {message_id} in space {space_id}")
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=e.message)
+    except NotFoundError as e:
+        logger.warning(f"Message {message_id} not found in space {space_id} for user {current_user_id}")
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=e.message)
     except DatabaseError as e:
+        logger.error(f"Database error deleting message {message_id} in space {space_id} for user {current_user_id}: {e.message}")
         raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail=e.message)
     except Exception as e:
+        logger.error(f"Unexpected error deleting message {message_id} in space {space_id} for user {current_user_id}: {str(e)}")
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="An unexpected error occurred.")
