@@ -3,6 +3,7 @@ import uuid
 
 from backend.app.services import db_handler
 from ..models.spaces import *
+from ..errors.db_errors import ServiceError, DatabaseError, NotFoundError, PermissionError, ConflictError
 
 
 router = APIRouter()
@@ -49,10 +50,10 @@ def create_space(
     try:
         db_space = db_handler.create_space(current_user_id, request.name)
         return db_space
-    except db_handler.DatabaseError as e:
-        raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail=e.message)
-    except db_handler.ServiceError as e:
-        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=e.message)
+    except DatabaseError as e:
+        raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail=f"Database error: {e.message} (code: {e.code})")
+    except ServiceError as e:
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=f"Internal error: {e.message} (code: {e.code})")
 
 
 @router.get(
@@ -70,7 +71,7 @@ def create_space(
     }
 )
 def get_spaces(
-    request: GetSpacesQuery = Depends(),
+    request: GetSpacesRequest = Depends(),
     current_user_id: uuid.UUID = Depends(get_current_user_id_from_query)  # Placeholder for user_id dependency
 ):
     try:
@@ -83,9 +84,9 @@ def get_spaces(
                 "total_count": total_count
             }
         }
-    except db_handler.DatabaseError as e:
+    except DatabaseError as e:
         raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail=e.message)
-    except db_handler.ServiceError as e:
+    except ServiceError as e:
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=e.message)
 
 
@@ -113,13 +114,13 @@ def update_space(
     try:
         space = db_handler.update_space(current_user_id, space_id, request.name)
         return space
-    except db_handler.NotFoundError as e:
+    except NotFoundError as e:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=e.message)
-    except db_handler.PermissionError as e:
+    except PermissionError as e:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=e.message)
-    except db_handler.DatabaseError as e:
+    except DatabaseError as e:
         raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail=e.message)
-    except db_handler.ServiceError as e:
+    except ServiceError as e:
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=e.message)
 
 @router.delete(
@@ -145,13 +146,13 @@ def delete_space(
 ):
     try:
         db_handler.delete_space(current_user_id, space_id)
-    except db_handler.NotFoundError as e:
+    except NotFoundError as e:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=e.message)
-    except db_handler.PermissionError as e:
+    except PermissionError as e:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=e.message)
-    except db_handler.ConflictError as e:
+    except ConflictError as e:
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=e.message)
-    except db_handler.DatabaseError as e:
+    except DatabaseError as e:
         raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail=e.message)
-    except db_handler.ServiceError as e:
+    except ServiceError as e:
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=e.message)

@@ -3,7 +3,7 @@ from fastapi.responses import JSONResponse
 from fastapi.exceptions import RequestValidationError
 import debugpy
 from .routes import upload, chat, documents, spaces, messages, users
-from backend.app.errors.errors import ServiceError
+from backend.app.errors.db_errors import ServiceError
 import os
 import logging
 from dotenv import load_dotenv
@@ -30,7 +30,7 @@ app = FastAPI(
     title="📄 Documents Hub API",
     description="API for managing documents and interacting with a RAG system.",
     version="1.0.0",
-    openapi_tags=spaces.tags_metadata,
+    openapi_tags=spaces.tags_metadata + messages.tags_metadata,
     docs_url="/docs",
     redoc_url="/redoc"
 )

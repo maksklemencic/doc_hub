@@ -6,7 +6,7 @@ from sqlalchemy.orm import Session, sessionmaker
 from typing import List, Optional
 
 from ...db_init.db_init import Base, Document, Space, Message, User
-from ..errors.errors import NotFoundError, PermissionError, DatabaseError, ConflictError
+from ..errors.db_errors import NotFoundError, PermissionError, DatabaseError, ConflictError
 
 DATABASE_URL = os.environ.get("DATABASE_URL")
 if not DATABASE_URL:
@@ -110,12 +110,24 @@ def create_space(user_id: uuid.UUID, name: str) -> Space:
             raise DatabaseError(f"Error creating space: {str(e)}")
 
 def get_paginated_spaces(user_id: uuid.UUID, limit: int, offset: int) -> List[Space]:
+    logger.info(f"Fetching spaces for user {user_id} with limit {limit} and offset {offset}")
     with SessionLocal() as session:
-        query = session.query(Space).filter(Space.user_id == user_id)
-        
-        total_count = query.count()
-        spaces = query.offset(offset).limit(limit).all()
-        return spaces, total_count
+        try:
+            query = session.query(Space).filter(Space.user_id == user_id)
+            if not query.count():
+                logger.warning(f"No spaces found for user {user_id}")
+                raise NotFoundError("Space", "No spaces found")
+
+            total_count = query.count()
+            spaces = query.offset(offset).limit(limit).all()
+            logger.info(f"Successfully fetched {len(spaces)} spaces for user {user_id}")
+            return spaces, total_count
+        except exc.OperationalError as e:
+            logger.error(f"Database unavailable for user {user_id}: {str(e)}")
+            raise DatabaseError("Database unavailable")
+        except exc.SQLAlchemyError as e:
+            logger.error(f"Unexpected database error for user {user_id}: {str(e)}")
+            raise DatabaseError(f"Error fetching messages: {str(e)}")
     
 
 def update_space(user_id: uuid.UUID, space_id: uuid.UUID, new_name: str) -> Optional[Space]:
@@ -172,88 +184,113 @@ def delete_space(user_id: uuid.UUID, space_id: uuid.UUID):
             raise DatabaseError(f"Error updating space: {str(e)}")
 
 # Messages CRUD Operaions
-def create_message(content: str, space_id: uuid.UUID, user_id: uuid.UUID) -> 'Message':
-    session = SessionLocal()
-    try:
-        # Check if space exists and belongs to user
-        space = session.query(Space).filter(Space.id == space_id, Space.user_id == user_id).first()
-        if not space:
-            return "space_not_found_or_unauthorized"
-        message = Message(content=content, space_id=space_id, user_id=user_id)
-        session.add(message)
-        session.commit()
-        session.refresh(message)
-        return message
-    except exc.SQLAlchemyError as e:
-        session.rollback()
-        raise RuntimeError(f"Error creating message: {e}")
-    finally:
-        session.close()
+def create_message(content: str, space_id: uuid.UUID, user_id: uuid.UUID) -> Message:
+    logger.info(f"Creating message in space {space_id} for user {user_id}")
+    with SessionLocal() as session:
+        try:
+            space = session.query(Space).filter(Space.id == space_id, Space.user_id == user_id).first()
+            if not space:
+                logger.warning(f"Space {space_id} not found or user {user_id} not authorized.")
+                raise NotFoundError("Space", str(space_id))
 
-def get_messages(user_id: uuid.UUID, space_id: uuid.UUID, message_id: Optional[uuid.UUID] = None) -> List['Message']:
-    session = SessionLocal()
-    try:
-        if message_id:
+            message = Message(content=content, space_id=space_id, user_id=user_id)
+            session.add(message)
+            session.commit()
+            session.refresh(message)
+            logger.info(f"Successfully created message in space {space_id} for user {user_id}")
+            return message
+        except exc.OperationalError as e:
+            session.rollback()
+            logger.error(f"Database unavailable for user {user_id}: {str(e)}")
+            raise DatabaseError("Database unavailable")
+        except exc.SQLAlchemyError as e:
+            session.rollback()
+            logger.error(f"Unexpected database error for user {user_id}: {str(e)}")
+            raise DatabaseError(f"Error creating message: {str(e)}")
+
+def get_paginated_messages(user_id: uuid.UUID, space_id: uuid.UUID, limit: int, offset: int) -> List[Message]:
+    logger.info(f"Fetching messages for user {user_id} in space {space_id} with limit {limit} and offset {offset}")
+    with SessionLocal() as session:
+        try:
+            space = session.query(Space) \
+                .filter(Space.id == space_id, Space.user_id == user_id) \
+                .order_by(Space.created_at.desc()) \
+                .first()
+            if not space:
+                logger.warning(f"Space {space_id} not found or user {user_id} not authorized.")
+                raise NotFoundError("Space", str(space_id))
+
+            query = session.query(Message).filter(Message.space_id == space_id, Message.user_id == user_id)
+            total_count = query.count()
+            messages = query.offset(offset).limit(limit).all()
+            logger.info(f"Successfully fetched {len(messages)} messages for user {user_id} in space {space_id}")
+            return messages, total_count
+        except exc.OperationalError as e:
+            logger.error(f"Database unavailable for user {user_id}: {str(e)}")
+            raise DatabaseError("Database unavailable")
+        except exc.SQLAlchemyError as e:
+            logger.error(f"Unexpected database error for user {user_id}: {str(e)}")
+            raise DatabaseError(f"Error fetching messages: {str(e)}")
+
+
+# def update_message(message_id: uuid.UUID, space_id: uuid.UUID, user_id: uuid.UUID, content: str) -> Optional[Message]:
+#     logger.info(f"Updating message {message_id} in space {space_id} for user {user_id}")
+#     with SessionLocal() as session:
+#         try:
+#             message = session.query(Message).filter(
+#                 Message.id == message_id,
+#                 Message.space_id == space_id,
+#                 Message.user_id == user_id
+#             ).first()
+#             if not message:
+#                 logger.warning(f"Message {message_id} not found for user {user_id} in space {space_id}")
+#                 raise NotFoundError("Message", str(message_id))
+#             if message.user_id != user_id:
+#                 logger.warning(f"Permission denied for user {user_id} on message {message_id} in space {space_id}")
+#                 raise PermissionError("Not authorized to update this message")
+            
+#             message.content = content
+#             session.commit()
+#             session.refresh(message)
+#             logger.info(f"Successfully updated message {message_id} for user {user_id}")
+#             return message
+#         except exc.OperationalError as e:
+#             session.rollback()
+#             logger.error(f"Database unavailable for user {user_id}: {str(e)}")
+#             raise DatabaseError("Database unavailable")
+#         except exc.SQLAlchemyError as e:
+#             session.rollback()
+#             logger.error(f"Unexpected database error for user {user_id}: {str(e)}")
+#             raise DatabaseError(f"Error updating message: {str(e)}")
+
+
+def delete_message(message_id: uuid.UUID, space_id: uuid.UUID, user_id: uuid.UUID):
+    logger.info(f"Deleting message {message_id} in space {space_id} for user {user_id}")
+    with SessionLocal() as session:
+        try:
             message = session.query(Message).filter(
                 Message.id == message_id,
                 Message.space_id == space_id,
                 Message.user_id == user_id
             ).first()
-            return [message] if message else []
-        messages = session.query(Message).filter(
-            Message.space_id == space_id,
-            Message.user_id == user_id
-        ).all()
-        return messages
-    finally:
-        session.close()
+            if not message:
+                logger.warning(f"Message {message_id} not found for user {user_id} in space {space_id}")
+                raise NotFoundError("Message", str(message_id))
+            if message.user_id != user_id:
+                logger.warning(f"Permission denied for user {user_id} on message {message_id} in space {space_id}")
+                raise PermissionError("Not authorized to delete this message")
 
-def update_message(message_id: uuid.UUID, space_id: uuid.UUID, user_id: uuid.UUID, content: str) -> Optional['Message']:
-    session = SessionLocal()
-    try:
-        message = session.query(Message).filter(
-            Message.id == message_id,
-            Message.space_id == space_id,
-            Message.user_id == user_id
-        ).first()
-        if not message:
-            # Check if message exists but belongs to another user
-            exists = session.query(Message).filter(Message.id == message_id, Message.space_id == space_id).first()
-            if exists:
-                return "unauthorized"
-            return None
-        message.content = content
-        session.commit()
-        session.refresh(message)
-        return message
-    except exc.SQLAlchemyError as e:
-        session.rollback()
-        raise RuntimeError(f"Error updating message: {e}")
-    finally:
-        session.close()
-
-def delete_message(message_id: uuid.UUID, space_id: uuid.UUID, user_id: uuid.UUID) -> str:
-    session = SessionLocal()
-    try:
-        message = session.query(Message).filter(
-            Message.id == message_id,
-            Message.space_id == space_id,
-            Message.user_id == user_id
-        ).first()
-        if not message:
-            # Check if message exists but belongs to another user
-            exists = session.query(Message).filter(Message.id == message_id, Message.space_id == space_id).first()
-            if exists:
-                return "unauthorized"
-            return "not_found"
-        session.delete(message)
-        session.commit()
-        return "success"
-    except exc.SQLAlchemyError as e:
-        session.rollback()
-        raise RuntimeError(f"Error deleting message: {e}")
-    finally:
-        session.close()
+            session.delete(message)
+            session.commit()
+            logger.info(f"Successfully deleted message {message_id} for user {user_id}")
+        except exc.OperationalError as e:
+            session.rollback()
+            logger.error(f"Database unavailable for user {user_id}: {str(e)}")
+            raise DatabaseError("Database unavailable")
+        except exc.SQLAlchemyError as e:
+            session.rollback()
+            logger.error(f"Unexpected database error for user {user_id}: {str(e)}")
+            raise DatabaseError(f"Error deleting message: {str(e)}")
         
         
 

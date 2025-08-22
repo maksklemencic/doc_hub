@@ -1,80 +1,65 @@
 from sentence_transformers import SentenceTransformer
 from typing import List, Tuple
 import os
-from chonkie import RecursiveChunker 
+import logging
+from chonkie import RecursiveChunker
+from ..errors.embedding_errors import ModelLoadingError, ChunkingError, InvalidInputError, EmbeddingError
 
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
 # Configuration
 EMBEDDING_MODEL_NAME = os.getenv("EMBEDDING_MODEL", "all-MiniLM-L6-v2")
 
-model = SentenceTransformer(EMBEDDING_MODEL_NAME)
-
-
-# def chunk_text_recursive(text: str, chunk_size=500, chunk_overlap=50) -> list[str]:
-#     chunker = RecursiveChunker(chunk_size=chunk_size, overlap=chunk_overlap)
-#     chunks = chunker(text)
-#     return [chunk.text for chunk in chunks]
+try:
+    model = SentenceTransformer(EMBEDDING_MODEL_NAME)
+    logger.info(f"Loaded SentenceTransformer model: {EMBEDDING_MODEL_NAME}")
+except Exception as e:
+    logger.error(f"Failed to load SentenceTransformer model {EMBEDDING_MODEL_NAME}: {str(e)}")
+    raise ModelLoadingError(EMBEDDING_MODEL_NAME, str(e))
 
 
 def chunk_pages_with_recursive_chunker(
     pages: List[Tuple[int, str]],
     chunk_size: int = 500,
-    chunk_overlap: int = 50
 ) -> List[Tuple[int, str]]:
     
-    chunker = RecursiveChunker(chunk_size=chunk_size)
+    try:
+        chunker = RecursiveChunker(chunk_size=chunk_size)
+    except Exception as e:
+        logger.error(f"Failed to initialize RecursiveChunker: {str(e)}")
+        raise ChunkingError(f"Failed to initialize chunker: {str(e)}")
+    
     chunks = []
     page_numbers = []
 
     for page_number, page_text in pages:
         if not page_text.strip():
+            logger.debug(f"Skipping empty page {page_number}")
             continue
 
-        page_chunks = chunker(page_text)
-        for chunk in page_chunks:
-            chunks.append(chunk.text)
-            page_numbers.append(page_number)
+        try:
+            page_chunks = chunker(page_text)
+            for chunk in page_chunks:
+                chunks.append(chunk.text)
+                page_numbers.append(page_number)
+        except Exception as e:
+            logger.error(f"Failed to chunk page {page_number}: {str(e)}")
+            raise ChunkingError(f"Failed to chunk page {page_number}: {str(e)}")
 
+    logger.info(f"Generated {len(chunks)} chunks from {len(pages)} pages")
     return chunks, page_numbers
 
 
-# def structure_aware_chunk(pages: List[Tuple[int, str]], max_length=500, overlap=50) -> Tuple[List[str], List[int]]:
-#     chunks = []
-#     page_numbers = []
-
-#     for page_number, page_text in pages:
-#         paragraphs = page_text.split("\n")
-#         current_chunk = ""
-
-#         for para in paragraphs:
-#             if not para.strip():
-#                 continue
-#             if len(current_chunk.split()) + len(para.split()) <= max_length:
-#                 current_chunk += " " + para.strip()
-#             else:
-#                 chunks.append(current_chunk.strip())
-#                 page_numbers.append(page_number)
-#                 current_chunk = para.strip()
-
-#         if current_chunk:
-#             chunks.append(current_chunk.strip())
-#             page_numbers.append(page_number)
-
-#     final_chunks = []
-#     final_pages = []
-
-#     for i in range(len(chunks)):
-#         chunk = chunks[i]
-#         if i > 0:
-#             prev_chunk = chunks[i - 1].split()
-#             overlap_text = " ".join(prev_chunk[-overlap:])
-#             chunk = overlap_text + " " + chunk
-
-#         final_chunks.append(chunk)
-#         final_pages.append(page_numbers[i])
-
-#     return final_chunks, final_pages
-
 def get_embeddings(chunks: list[str]) -> list[list[float]]:
-    embeddings = model.encode(chunks, normalize_embeddings=True)
-    return embeddings.tolist()
+    if not isinstance(chunks, list) or not chunks or not all(isinstance(c, str) for c in chunks):
+        logger.error("Invalid chunks input: must be a non-empty list of strings")
+        raise InvalidInputError("Chunks must be a non-empty list of strings")
+
+    try:
+        embeddings = model.encode(chunks, normalize_embeddings=True)
+        logger.info(f"Generated embeddings for {len(chunks)} chunks")
+        return embeddings.tolist()
+    except Exception as e:
+        logger.error(f"Failed to generate embeddings: {str(e)}")
+        raise EmbeddingError(f"Failed to generate embeddings: {str(e)}")

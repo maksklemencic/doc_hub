@@ -1,14 +1,16 @@
 import requests
 import os
+import logging
+
+from ..errors.ollama_errors import LLMConnectionError, LLMRequestError, LLMResponseError
+
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
 OLLAMA_URL = os.getenv("OLLAMA_URL", "http://localhost:11434")
 MODEL = os.getenv("LLM_MODEL_NAME", "qwen3:0.6b")
 
 def generate_response(query: str, context: str, stream: bool) -> str:
-    
-    # promt = f"""Instruction: Use the context to answer the question. If there is no sufficient information in context, use your knowledge.
-    # Question: {query}
-    # Context: {context}"""
     
     prompt_template = """<|im_start|>system
 You are a highly knowledgeable and accurate RAG system. Your primary goal is to provide concise and comprehensive answers to user questions based on the provided context. Follow these rules precisely:
@@ -29,10 +31,34 @@ You are a highly knowledgeable and accurate RAG system. Your primary goal is to 
 
     final_prompt = prompt_template.format(context=context, query=query)
     
-    response = requests.post(f"{OLLAMA_URL}/api/generate", json={
-        "model": MODEL,
-        "prompt": final_prompt,
-        "stream": stream
-    })
-    response.raise_for_status()
-    return response.json()["response"], context
+    try:
+        response = requests.post(
+            f"{OLLAMA_URL}/api/generate",
+            json={"model": MODEL, "prompt": final_prompt, "stream": stream},
+            # timeout=30
+        )
+        response.raise_for_status()
+    except requests.exceptions.ConnectionError as e:
+        logger.error(f"Connection error to Ollama at {OLLAMA_URL}: {str(e)}")
+        raise LLMConnectionError(OLLAMA_URL, str(e))
+    except requests.exceptions.HTTPError as e:
+        logger.error(f"HTTP error from Ollama at {OLLAMA_URL}: {str(e)}")
+        raise LLMRequestError(OLLAMA_URL, e.response.status_code if e.response else 0, str(e))
+    except requests.exceptions.Timeout as e:
+        logger.error(f"Timeout error from Ollama at {OLLAMA_URL}: {str(e)}")
+        raise LLMConnectionError(OLLAMA_URL, "Request timed out")
+    except requests.exceptions.RequestException as e:
+        logger.error(f"Request error to Ollama at {OLLAMA_URL}: {str(e)}")
+        raise LLMRequestError(OLLAMA_URL, 0, str(e))
+    
+    
+    try:
+        response_data = response.json()
+        if "response" not in response_data:
+            logger.error("Invalid Ollama response: missing 'response' key")
+            raise LLMResponseError("Missing 'response' key in JSON response")
+        logger.info(f"Generated response for query: {query[:50]}...")
+        return response_data["response"], context
+    except requests.exceptions.JSONDecodeError as e:
+        logger.error(f"Invalid JSON response from Ollama: {str(e)}")
+        raise LLMResponseError(f"Invalid JSON response: {str(e)}")

@@ -21,7 +21,7 @@ class CreateSpaceRequest(BaseModel):
             }
         }
 
-class GetSpacesQuery(BaseModel):
+class GetSpacesRequest(BaseModel):
     limit: int = Field(10, ge=1, le=100, description="Number of spaces to return per page, between 1 and 100.")
     offset: int = Field(0, ge=0, description="Number of spaces to skip before starting the page, non-negative.")
 
