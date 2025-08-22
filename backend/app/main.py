@@ -32,12 +32,13 @@ app = FastAPI(
     version="1.0.0",
     openapi_tags=spaces.tags_metadata + 
                 messages.tags_metadata +
-                users.tags_metadata,
+                users.tags_metadata +
+                documents.tags_metadata,
     docs_url="/docs",
     redoc_url="/redoc"
 )
 app.include_router(upload.router, prefix="/upload")
-app.include_router(documents.router, prefix="/documents")
+app.include_router(documents.router)
 app.include_router(spaces.router, prefix="/spaces")
 app.include_router(messages.router, prefix="/spaces")
 app.include_router(users.router, prefix="/users")

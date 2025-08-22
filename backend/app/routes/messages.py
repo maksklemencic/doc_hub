@@ -21,14 +21,14 @@ tags_metadata = [
 ]
 
 # Placeholder for user_id dependency
-def get_current_user_id_from_query(user_id: uuid.UUID = Query(...)) -> uuid.UUID:
+def get_current_user_id_from_query(current_user_id: uuid.UUID = Query(...)) -> uuid.UUID:
     """
-    Temporary dependency to get user_id from query parameters
+    Temporary dependency to get current_user_id from query parameters
     TODO: Replace with actual OAuth implementation
     """
-    if not user_id:
+    if not current_user_id:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Authentication required")
-    return user_id
+    return current_user_id
 
 @router.post(
     "/{space_id}/messages",
@@ -152,6 +152,47 @@ def get_messages(
         raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail=e.message)
     except Exception as e:
         logger.error(f"Unexpected error fetching messages in space {space_id} for user {current_user_id}: {str(e)}")
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="An unexpected error occurred.")
+
+
+@router.patch(
+    "/{space_id}/messages/{message_id}",
+    response_model=MessageResponse,
+    tags=["messages"],
+    summary="Update a message",
+    description="Update the content of an existing message in a space.",
+    response_description="The updated message object.",
+    status_code=status.HTTP_200_OK,
+    responses={
+        200: {"description": "Message successfully updated"},
+        401: {"description": "Authentication required"},
+        403: {"description": "Permission denied"},
+        404: {"description": "Message or space not found"},
+        422: {"description": "Validation error"},
+        500: {"description": "Internal server error"},
+        503: {"description": "Database unavailable"}
+    }
+)
+def update_message(
+    space_id: uuid.UUID,
+    message_id: uuid.UUID,
+    request: UpdateMessageRequest,
+    current_user_id: uuid.UUID = Depends(get_current_user_id_from_query)
+):
+    try:
+        message = db_handler.update_message(message_id, space_id, current_user_id, request.content)
+        return message
+    except PermissionError as e:
+        logger.warning(f"Permission denied for user {current_user_id} to update message {message_id} in space {space_id}")
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=e.message)
+    except NotFoundError as e:
+        logger.warning(f"Message {message_id} or space {space_id} not found for user {current_user_id}")
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=e.message)
+    except DatabaseError as e:
+        logger.error(f"Database error updating message {message_id} in space {space_id} for user {current_user_id}: {e.message}")
+        raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail=e.message)
+    except Exception as e:
+        logger.error(f"Unexpected error updating message {message_id} in space {space_id} for user {current_user_id}: {str(e)}")
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="An unexpected error occurred.")
 
 

@@ -25,6 +25,7 @@ class User(Base):
     first_name = Column(String)
     last_name = Column(String)
     created_at = Column(TIMESTAMP, server_default=text("NOW()"))
+    updated_at = Column(TIMESTAMP, server_default=text("NOW()"), onupdate=text("NOW()"))
 
 class Document(Base):
     __tablename__ = "documents"
@@ -34,7 +35,8 @@ class Document(Base):
     file_path = Column(String, nullable=False)
     mime_type = Column(String, nullable=False)
     uploaded_by = Column(UUID(as_uuid=True), ForeignKey("users.id"))
-    upload_date = Column(TIMESTAMP, server_default=text("NOW()"))
+    created_at = Column(TIMESTAMP, server_default=text("NOW()"))
+    updated_at = Column(TIMESTAMP, server_default=text("NOW()"), onupdate=text("NOW()"))
 
 class Space(Base):
     __tablename__ = "spaces"

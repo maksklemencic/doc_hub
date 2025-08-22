@@ -11,10 +11,14 @@ class LLMResponse(BaseModel):
     context: str = Field(..., description="Context used for generating the response.")
 
 class MessageResponse(BaseModel):
-    created_at: Optional[datetime] = Field(None, description="Timestamp when the message was created.")
     id: uuid.UUID = Field(..., description="Unique identifier (UUID) of the message.")
     space_id: uuid.UUID = Field(..., description="Identifier of the space the message belongs to.")
     user_id: uuid.UUID = Field(..., description="Identifier of the user who created the message.")
+    content: str = Field(..., description="The content of the message.")
+    created_at: Optional[datetime] = Field(None, description="Timestamp when the message was created.")
+    
+    class Config:
+        from_attributes = True
 
 class MessageResponseWrapper(BaseModel):
     data: LLMResponse = Field(..., description="The response data containing the query, response, and context.")
@@ -25,6 +29,16 @@ class CreateMessageRequest(BaseModel):
     stream: bool = Field(False, description="Whether to stream the response or not.")
     top_k: int = Field(5, ge=1, le=100, description="Number of top results to return when using context.")
     use_context: bool = Field(True, description="Whether to use context from the RAG system.")
+
+class UpdateMessageRequest(BaseModel):
+    content: str = Field(..., min_length=1, description="The new content of the message.")
+    
+    class Config:
+        json_schema_extra = {
+            "example": {
+                "content": "What are the key points in document X regarding Y?"
+            }
+        }
 
 class GetMessagesRequest(BaseModel):
     limit: int = Field(10, ge=1, le=100, description="Number of messages to return per page.")

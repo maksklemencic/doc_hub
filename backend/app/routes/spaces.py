@@ -19,15 +19,15 @@ tags_metadata = [
 
 
 # TODO Placeholder for user_id dependency
-def get_current_user_id_from_query(user_id: uuid.UUID = Query(...)) -> uuid.UUID:
+def get_current_user_id_from_query(current_user_id: uuid.UUID = Query(...)) -> uuid.UUID:
     """
-    Temporary dependency to get user_id from query parameters
+    Temporary dependency to get current_user_id from query parameters
     TODO: Replace with actual OAuth implementation
     """
     # Add any validation logic here if needed
-    if not user_id:
+    if not current_user_id:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Authentication required")
-    return user_id
+    return current_user_id
 
 
 @router.post(

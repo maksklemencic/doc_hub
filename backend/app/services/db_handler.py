@@ -26,6 +26,32 @@ def get_document_by_id(doc_id: uuid.UUID) -> Document | None:
         return doc
     finally:
         session.close()
+
+
+def get_paginated_documents(user_id: uuid.UUID, space_id: uuid.UUID, limit: int, offset: int) -> tuple[List[Document], int]:
+    """Get paginated documents for a specific space owned by the user."""
+    logger.info(f"Fetching documents for user {user_id} in space {space_id} with limit {limit} and offset {offset}")
+    with SessionLocal() as session:
+        try:
+            # First verify the user owns the space
+            space = session.query(Space).filter(Space.id == space_id, Space.user_id == user_id).first()
+            if not space:
+                logger.warning(f"Space {space_id} not found or user {user_id} not authorized.")
+                raise NotFoundError("Space", str(space_id))
+
+            # Get documents in the space
+            query = session.query(Document).filter(Document.space_id == space_id)
+            total_count = query.count()
+            documents = query.offset(offset).limit(limit).all()
+            
+            logger.info(f"Successfully fetched {len(documents)} documents for user {user_id} in space {space_id}")
+            return documents, total_count
+        except exc.OperationalError as e:
+            logger.error(f"Database unavailable for user {user_id}: {str(e)}")
+            raise DatabaseError("Database unavailable")
+        except exc.SQLAlchemyError as e:
+            logger.error(f"Unexpected database error for user {user_id}: {str(e)}")
+            raise DatabaseError(f"Error fetching documents: {str(e)}")
         
 
 def add_document(
@@ -163,6 +189,25 @@ def update_space(user_id: uuid.UUID, space_id: uuid.UUID, new_name: str) -> Opti
             raise DatabaseError(f"Error updating space: {str(e)}")
 
 
+def get_space_by_id(space_id: uuid.UUID) -> Optional[Space]:
+    """Get a space by its ID without user authorization check."""
+    logger.info(f"Fetching space {space_id}")
+    with SessionLocal() as session:
+        try:
+            space = session.query(Space).filter(Space.id == space_id).first()
+            if space:
+                logger.info(f"Successfully fetched space {space_id}")
+            else:
+                logger.warning(f"Space {space_id} not found")
+            return space
+        except exc.OperationalError as e:
+            logger.error(f"Database unavailable while fetching space {space_id}: {str(e)}")
+            raise DatabaseError("Database unavailable")
+        except exc.SQLAlchemyError as e:
+            logger.error(f"Unexpected database error while fetching space {space_id}: {str(e)}")
+            raise DatabaseError(f"Error fetching space: {str(e)}")
+
+
 def delete_space(user_id: uuid.UUID, space_id: uuid.UUID):
     logger.info(f"Deleting space {space_id} for user {user_id}")
     with SessionLocal() as session:
@@ -235,6 +280,46 @@ def get_paginated_messages(user_id: uuid.UUID, space_id: uuid.UUID, limit: int, 
         except exc.SQLAlchemyError as e:
             logger.error(f"Unexpected database error for user {user_id}: {str(e)}")
             raise DatabaseError(f"Error fetching messages: {str(e)}")
+
+
+def update_message(message_id: uuid.UUID, space_id: uuid.UUID, user_id: uuid.UUID, content: str) -> Message:
+    """Update message content. Users can only update their own messages."""
+    logger.info(f"Updating message {message_id} in space {space_id} for user {user_id}")
+    with SessionLocal() as session:
+        try:
+            # Verify space ownership and message existence
+            space = session.query(Space).filter(Space.id == space_id, Space.user_id == user_id).first()
+            if not space:
+                logger.warning(f"Space {space_id} not found or user {user_id} not authorized.")
+                raise NotFoundError("Space", str(space_id))
+            
+            message = session.query(Message).filter(
+                Message.id == message_id,
+                Message.space_id == space_id,
+                Message.user_id == user_id
+            ).first()
+            if not message:
+                logger.warning(f"Message {message_id} not found for user {user_id} in space {space_id}")
+                raise NotFoundError("Message", str(message_id))
+            
+            if message.user_id != user_id:
+                logger.warning(f"Permission denied for user {user_id} on message {message_id} in space {space_id}")
+                raise PermissionError("Not authorized to update this message")
+
+            # Update message content
+            message.content = content
+            session.commit()
+            session.refresh(message)
+            logger.info(f"Successfully updated message {message_id} for user {user_id}")
+            return message
+        except exc.OperationalError as e:
+            session.rollback()
+            logger.error(f"Database unavailable for user {user_id}: {str(e)}")
+            raise DatabaseError("Database unavailable")
+        except exc.SQLAlchemyError as e:
+            session.rollback()
+            logger.error(f"Unexpected database error for user {user_id}: {str(e)}")
+            raise DatabaseError(f"Error updating message: {str(e)}")
 
 
 def delete_message(message_id: uuid.UUID, space_id: uuid.UUID, user_id: uuid.UUID):
@@ -313,6 +398,46 @@ def get_user_by_id(user_id: uuid.UUID, current_user_id: uuid.UUID) -> Optional[U
             logger.error(f"Unexpected database error while fetching user {user_id}: {str(e)}")
             raise DatabaseError(f"Error fetching user: {str(e)}")
         
+
+
+def update_user(user_id: uuid.UUID, current_user_id: uuid.UUID, email: Optional[str] = None, first_name: Optional[str] = None, last_name: Optional[str] = None) -> User:
+    """Update user information. Users can only update their own profile."""
+    logger.info(f"Updating user {user_id} by current user {current_user_id}")
+    with SessionLocal() as session:
+        try:
+            if user_id != current_user_id:
+                logger.warning(f"Permission denied for user {current_user_id} to update user {user_id}")
+                raise PermissionError("Not authorized to update this user")
+            
+            user = session.get(User, user_id)
+            if not user:
+                logger.warning(f"User {user_id} not found")
+                raise NotFoundError("User", str(user_id))
+            
+            # Update only provided fields
+            if email is not None:
+                user.email = email
+            if first_name is not None:
+                user.first_name = first_name
+            if last_name is not None:
+                user.last_name = last_name
+            
+            session.commit()
+            session.refresh(user)
+            logger.info(f"Successfully updated user {user_id}")
+            return user
+        except exc.IntegrityError as e:
+            session.rollback()
+            logger.error(f"Conflict error while updating user {user_id}: {str(e)}")
+            raise ConflictError("User with this email already exists")
+        except exc.OperationalError as e:
+            session.rollback()
+            logger.error(f"Database unavailable while updating user {user_id}: {str(e)}")
+            raise DatabaseError("Database unavailable")
+        except exc.SQLAlchemyError as e:
+            session.rollback()
+            logger.error(f"Unexpected database error while updating user {user_id}: {str(e)}")
+            raise DatabaseError(f"Error updating user: {str(e)}")
 
 
 def delete_user(user_id: uuid.UUID, current_user_id: uuid.UUID) -> Optional[User]:
