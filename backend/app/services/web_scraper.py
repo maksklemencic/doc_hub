@@ -1,16 +1,21 @@
-import re
 import logging
-from typing import Optional, Tuple, List
-import requests
-from requests.adapters import HTTPAdapter
-from urllib3.util.retry import Retry
-from bs4 import BeautifulSoup
-import trafilatura
+import re
+from typing import Tuple, Optional
 from urllib.parse import urlparse
 
+import requests
+import trafilatura
+from bs4 import BeautifulSoup
+from requests.adapters import HTTPAdapter
+from urllib3.util.retry import Retry
+
 from ..errors.web_scraper_errors import (
-    WebScraperError, URLFetchError, InvalidURLError, ContentExtractionError,
-    InsufficientContentError, RequestTimeoutError, HTTPError, ParseError
+    ContentExtractionError,
+    HTTPError,
+    InsufficientContentError,
+    InvalidURLError,
+    RequestTimeoutError,
+    URLFetchError,
 )
 
 logger = logging.getLogger(__name__)

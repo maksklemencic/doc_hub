@@ -1,11 +1,12 @@
-from qdrant_client import QdrantClient
-from qdrant_client.http.models import VectorParams, Distance, PointStruct
-from qdrant_client.http import models as qmodels
-import uuid
-from typing import Optional, List
 import logging
+import uuid
+from typing import List, Optional
 
-from ..errors.qdrant_errors import ClientInitializationError, CollectionCreationError, UpsertError, DeleteError, SearchError
+from qdrant_client import QdrantClient
+from qdrant_client.http import models as qmodels
+from qdrant_client.http.models import Distance, PointStruct, VectorParams
+
+from ..errors.qdrant_errors import ClientInitializationError, CollectionCreationError, DeleteError, SearchError, UpsertError
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)

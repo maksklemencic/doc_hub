@@ -1,6 +1,7 @@
-import requests
-import os
 import logging
+import os
+
+import requests
 
 from ..errors.ollama_errors import LLMConnectionError, LLMRequestError, LLMResponseError
 

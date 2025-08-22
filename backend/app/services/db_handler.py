@@ -1,12 +1,13 @@
+import logging
 import os
 import uuid
-import logging
-from sqlalchemy import create_engine, exc
-from sqlalchemy.orm import Session, sessionmaker
 from typing import List, Optional
 
-from ...db_init.db_init import Base, Document, Space, Message, User
-from ..errors.db_errors import NotFoundError, PermissionError, DatabaseError, ConflictError
+from sqlalchemy import create_engine, exc
+from sqlalchemy.orm import sessionmaker
+
+from ..errors.database_errors import ConflictError, DatabaseError, NotFoundError, PermissionError
+from ...db_init.db_init import Document, Message, Space, User
 
 DATABASE_URL = os.environ.get("DATABASE_URL")
 if not DATABASE_URL:

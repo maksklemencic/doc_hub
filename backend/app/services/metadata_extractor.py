@@ -1,14 +1,16 @@
-from langdetect import detect
-from keybert import KeyBERT
-import re
-import typing
-import uuid
 import logging
-from typing import Optional, Dict
+import re
+import uuid
+from typing import Dict
+
+from keybert import KeyBERT
+from langdetect import detect
 
 from ..errors.metadata_extractor_errors import (
-    MetadataExtractorError, LanguageDetectionError, TopicExtractionError,
-    MetadataCreationError, InvalidInputError
+    InvalidInputError,
+    LanguageDetectionError,
+    MetadataCreationError,
+    TopicExtractionError,
 )
 
 logger = logging.getLogger(__name__)

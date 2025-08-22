@@ -1,20 +1,20 @@
-from fastapi import APIRouter, File, UploadFile, Form, HTTPException, Depends, Query
-from pydantic import BaseModel, Field
-import uuid
 import logging
+import uuid
 from pathlib import Path
-from urllib.parse import urlparse
 from typing import Optional
+from urllib.parse import urlparse
 
-from ..services import embedding, qdrant_client, metadata_extractor, document_processor, file_service, db_handler, web_scraper
-from ..models.upload import Base64UploadRequest, FileUploadRequest, WebDocumentUploadRequest, UploadResponse
-from ..errors.document_processor_errors import DocumentProcessorError, UnsupportedDocumentTypeError, DocumentCorruptedError, EmptyDocumentError
-from ..errors.file_errors import FileServiceError, FileSaveError, EmptyFileError
-from ..errors.web_scraper_errors import WebScraperError, URLFetchError, InvalidURLError, ContentExtractionError
-from ..errors.embedding_errors import EmbeddingError, ChunkingError
+from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, UploadFile
+
+from ..errors.database_errors import DatabaseError
+from ..errors.document_processor_errors import DocumentCorruptedError, EmptyDocumentError, UnsupportedDocumentTypeError
+from ..errors.embedding_errors import ChunkingError, EmbeddingError
+from ..errors.file_errors import EmptyFileError, FileSaveError
 from ..errors.metadata_extractor_errors import MetadataExtractorError
 from ..errors.qdrant_errors import QdrantError
-from ..errors.database_errors import DatabaseError
+from ..errors.web_scraper_errors import ContentExtractionError, InvalidURLError, URLFetchError
+from ..models.upload import Base64UploadRequest, UploadResponse, WebDocumentUploadRequest
+from ..services import db_handler, document_processor, embedding, file_service, metadata_extractor, qdrant_client, web_scraper
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
@@ -87,24 +87,24 @@ def upload_base64(
             cleanup_file(saved_file_path)
         if doc_id:
             cleanup_database_document(doc_id)
-        raise HTTPException(status_code=400, detail=f"Document processing failed: {str(e)}")
+        raise HTTPException(status_code=400, detail=f"Document processing failed: {e.message}")
     except (FileSaveError, EmptyFileError) as e:
         logger.error(f"File save error for {request.filename}: {str(e)}")
         if doc_id:
             cleanup_database_document(doc_id)
-        raise HTTPException(status_code=500, detail=f"File save failed: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"File save failed: {e.message}")
     except DatabaseError as e:
         logger.error(f"Database error for {request.filename}: {str(e)}")
         if saved_file_path:
             cleanup_file(saved_file_path)
-        raise HTTPException(status_code=500, detail=f"Database error: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Database error: {e.message}")
     except (EmbeddingError, ChunkingError, MetadataExtractorError, QdrantError) as e:
         logger.error(f"Vector processing error for {request.filename}: {str(e)}")
         if saved_file_path:
             cleanup_file(saved_file_path)
         if doc_id:
             cleanup_database_document(doc_id)
-        raise HTTPException(status_code=500, detail=f"Vector processing failed: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Vector processing failed: {e.message}")
     except Exception as e:
         logger.error(f"Unexpected error uploading {request.filename}: {str(e)}")
         if saved_file_path:
@@ -125,38 +125,23 @@ async def upload_file_multipart(
     doc_id = None
     
     try:
-        # Verify space access
-        verify_space_access(current_user_id, space_id)
-        
         # Validate file
         if not file.filename:
             raise HTTPException(status_code=400, detail="No filename provided")
-        
-        # Validate file size
-        file.file.seek(0, 2)  # Seek to end
-        file_size = file.file.tell()
-        file.file.seek(0)  # Reset to beginning
-        
-        if file_size == 0:
-            raise HTTPException(status_code=400, detail="Empty file uploaded")
-        if file_size > 50 * 1024 * 1024:  # 50MB limit
-            raise HTTPException(status_code=400, detail="File size cannot exceed 50MB")
-        
-        # Validate content type
-        allowed_types = ['application/pdf', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document', 
-                        'image/png', 'image/jpeg', 'image/jpg', 'image/gif', 'image/bmp', 'image/tiff']
-        if file.content_type not in allowed_types:
-            raise HTTPException(status_code=400, detail=f"Unsupported file type: {file.content_type}")
         
         # Read file contents
         logger.debug(f"Reading file contents: {file.filename}")
         contents = await file.read()
         
+        if not contents:
+            raise HTTPException(status_code=400, detail="Empty file uploaded")
+        
         # Process document to extract text
         logger.debug(f"Processing document: {file.filename}")
         pages = document_processor.process_document_for_text(contents, file.content_type)
         
-        # Save file to filesystem (file position already at start)
+        # Reset file position and save to filesystem
+        file.file.seek(0)
         logger.debug(f"Saving file to filesystem")
         saved_file_path = file_service.save_file(file, current_user_id)
         
@@ -185,6 +170,7 @@ async def upload_file_multipart(
         
         logger.info(f"Successfully uploaded file {file.filename} for user {current_user_id}")
         return UploadResponse(
+            status="success",
             document_id=doc_id,
             document_name=file.filename,
             chunk_count=len(chunks),
@@ -197,24 +183,24 @@ async def upload_file_multipart(
             cleanup_file(saved_file_path)
         if doc_id:
             cleanup_database_document(doc_id)
-        raise HTTPException(status_code=400, detail=f"Document processing failed: {str(e)}")
+        raise HTTPException(status_code=400, detail=f"Document processing failed: {e.message}")
     except (FileSaveError, EmptyFileError) as e:
         logger.error(f"File save error for {file.filename}: {str(e)}")
         if doc_id:
             cleanup_database_document(doc_id)
-        raise HTTPException(status_code=500, detail=f"File save failed: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"File save failed: {e.message}")
     except DatabaseError as e:
         logger.error(f"Database error for {file.filename}: {str(e)}")
         if saved_file_path:
             cleanup_file(saved_file_path)
-        raise HTTPException(status_code=500, detail=f"Database error: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Database error: {e.message}")
     except (EmbeddingError, ChunkingError, MetadataExtractorError, QdrantError) as e:
         logger.error(f"Vector processing error for {file.filename}: {str(e)}")
         if saved_file_path:
             cleanup_file(saved_file_path)
         if doc_id:
             cleanup_database_document(doc_id)
-        raise HTTPException(status_code=500, detail=f"Vector processing failed: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Vector processing failed: {e.message}")
     except Exception as e:
         logger.error(f"Unexpected error uploading {file.filename}: {str(e)}")
         if saved_file_path:
@@ -258,9 +244,6 @@ def upload_web_document(
     doc_id = None
     
     try:
-        # Verify space access
-        verify_space_access(current_user_id, request.space_id)
-        
         # Scrape web content
         logger.debug(f"Scraping content from URL: {request.url}")
         page_text, web_metadata = web_scraper.scrape_webpage(request.url)
@@ -278,7 +261,7 @@ def upload_web_document(
         logger.debug(f"Adding web document to database")
         doc_id = db_handler.add_document(
             filename=filename,
-            file_path=None,  # None for web documents
+            file_path="",  # Empty path for web documents
             mime_type="text/html",
             uploaded_by=current_user_id,
             space_id=request.space_id
@@ -304,6 +287,7 @@ def upload_web_document(
         
         logger.info(f"Successfully uploaded web document from {request.url} for user {current_user_id}")
         return UploadResponse(
+            status="success",
             document_id=doc_id,
             document_name=filename,
             chunk_count=len(chunks),
@@ -314,15 +298,15 @@ def upload_web_document(
         logger.warning(f"Web scraping error for {request.url}: {str(e)}")
         if doc_id:
             cleanup_database_document(doc_id)
-        raise HTTPException(status_code=400, detail=f"Web scraping failed: {str(e)}")
+        raise HTTPException(status_code=400, detail=f"Web scraping failed: {e.message}")
     except DatabaseError as e:
         logger.error(f"Database error for {request.url}: {str(e)}")
-        raise HTTPException(status_code=500, detail=f"Database error: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Database error: {e.message}")
     except (EmbeddingError, ChunkingError, MetadataExtractorError, QdrantError) as e:
         logger.error(f"Vector processing error for {request.url}: {str(e)}")
         if doc_id:
             cleanup_database_document(doc_id)
-        raise HTTPException(status_code=500, detail=f"Vector processing failed: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Vector processing failed: {e.message}")
     except Exception as e:
         logger.error(f"Unexpected error uploading web document from {request.url}: {str(e)}")
         if doc_id:

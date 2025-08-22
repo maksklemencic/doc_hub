@@ -1,18 +1,24 @@
+import base64
 import io
-import fitz
-import re
 import logging
+import mimetypes
+import re
+import unicodedata
 from typing import List, Tuple
-from PIL import Image
+
+import fitz
 import pytesseract
 from docx import Document
-import unicodedata
-import base64
-import mimetypes
+from PIL import Image
 
 from ..errors.document_processor_errors import (
-    DocumentProcessorError, UnsupportedDocumentTypeError, DocumentCorruptedError,
-    EmptyDocumentError, TextExtractionError, OCRError, Base64DecodingError
+    Base64DecodingError,
+    DocumentCorruptedError,
+    DocumentProcessorError,
+    EmptyDocumentError,
+    OCRError,
+    TextExtractionError,
+    UnsupportedDocumentTypeError,
 )
 
 logger = logging.getLogger(__name__)

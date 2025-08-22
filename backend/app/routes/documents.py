@@ -1,13 +1,14 @@
+import logging
+import uuid
+
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from fastapi.responses import FileResponse
-import uuid
-import logging
 
-from ..services import db_handler, qdrant_client, file_service
-from ..models.documents import DocumentResponse, GetDocumentsRequest, GetDocumentsResponseWrapper
-from ..errors.db_errors import NotFoundError, PermissionError, DatabaseError
-from ..errors.file_errors import FileNotFoundError, FileDeleteError, FileReadError
+from ..errors.database_errors import DatabaseError, NotFoundError, PermissionError
+from ..errors.file_errors import FileDeleteError, FileNotFoundError, FileReadError
 from ..errors.qdrant_errors import VectorStoreError
+from ..models.documents import GetDocumentsRequest, GetDocumentsResponseWrapper
+from ..services import db_handler, file_service, qdrant_client
 
 
 router = APIRouter()
@@ -67,13 +68,13 @@ def get_documents(
         }
     except NotFoundError as e:
         logger.warning(f"Space {space_id} not found for user {current_user_id}")
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=e.message)
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Space not found")
     except DatabaseError as e:
-        logger.error(f"Database error fetching documents in space {space_id} for user {current_user_id}: {e.message}")
-        raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail=e.message)
+        logger.error(f"Database error fetching documents in space {space_id} for user {current_user_id}: {str(e)}")
+        raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail="Service temporarily unavailable")
     except Exception as e:
         logger.error(f"Unexpected error fetching documents in space {space_id} for user {current_user_id}: {str(e)}")
-        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="An unexpected error occurred.")
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="An unexpected error occurred")
 
 
 @router.get(
@@ -98,17 +99,24 @@ def view_document(
     current_user_id: uuid.UUID = Depends(get_current_user_id_from_query)
 ):
     try:
-        # Get document from database with authorization check
+        # Get document from database with direct authorization check
         document = db_handler.get_document_by_id(doc_id)
         if not document:
             logger.warning(f"Document {doc_id} not found")
             raise NotFoundError("Document", str(doc_id))
         
-        # Check if user has access to this document (through space ownership)
-        space = db_handler.get_space_by_id(document.space_id)
-        if not space or space.user_id != current_user_id:
-            logger.warning(f"Permission denied for user {current_user_id} to access document {doc_id}")
-            raise PermissionError("Not authorized to view this document")
+        # Direct authorization check: verify document belongs to user's space
+        if document.uploaded_by != current_user_id:
+            # Also check space ownership as secondary authorization
+            space = db_handler.get_space_by_id(document.space_id)
+            if not space or space.user_id != current_user_id:
+                logger.warning(f"Permission denied for user {current_user_id} to access document {doc_id} - not owner and not space owner")
+                raise PermissionError("Not authorized to view this document")
+        
+        # Additional check: ensure web documents (no file_path) are handled properly
+        if not document.file_path:
+            logger.warning(f"Document {doc_id} is a web document without file content")
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Web documents cannot be downloaded")
 
         # Get file content using file service
         content, mime_type = file_service.get_file_content(document.file_path)
@@ -120,22 +128,22 @@ def view_document(
         )
     except PermissionError as e:
         logger.warning(f"Permission denied for user {current_user_id} to view document {doc_id}")
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=e.message)
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Access denied")
     except NotFoundError as e:
         logger.warning(f"Document {doc_id} not found")
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=e.message)
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Document not found")
     except FileNotFoundError as e:
-        logger.error(f"File not found for document {doc_id}: {e.file_path}")
+        logger.error(f"File not found for document {doc_id}: {str(e)}")
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Document file not found")
     except FileReadError as e:
-        logger.error(f"Failed to read file for document {doc_id}: {e.message}")
+        logger.error(f"Failed to read file for document {doc_id}: {str(e)}")
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Failed to read document file")
     except DatabaseError as e:
-        logger.error(f"Database error accessing document {doc_id}: {e.message}")
-        raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail=e.message)
+        logger.error(f"Database error accessing document {doc_id}: {str(e)}")
+        raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail="Service temporarily unavailable")
     except Exception as e:
         logger.error(f"Unexpected error viewing document {doc_id}: {str(e)}")
-        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="An unexpected error occurred.")
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="An unexpected error occurred")
     
     
 @router.delete(
@@ -160,20 +168,23 @@ def delete_document(
     current_user_id: uuid.UUID = Depends(get_current_user_id_from_query)
 ):
     try:
-        # Get document from database with authorization check
+        # Get document from database with direct authorization check
         document = db_handler.get_document_by_id(doc_id)
         if not document:
             logger.warning(f"Document {doc_id} not found")
             raise NotFoundError("Document", str(doc_id))
         
-        # Check if user has access to this document (through space ownership)
-        space = db_handler.get_space_by_id(document.space_id)
-        if not space or space.user_id != current_user_id:
-            logger.warning(f"Permission denied for user {current_user_id} to delete document {doc_id}")
-            raise PermissionError("Not authorized to delete this document")
+        # Direct authorization check: verify document belongs to user's space
+        if document.uploaded_by != current_user_id:
+            # Also check space ownership as secondary authorization
+            space = db_handler.get_space_by_id(document.space_id)
+            if not space or space.user_id != current_user_id:
+                logger.warning(f"Permission denied for user {current_user_id} to delete document {doc_id} - not owner and not space owner")
+                raise PermissionError("Not authorized to delete this document")
 
-        # 1. Delete from filesystem using file service
-        file_service.delete_file_and_cleanup(document.file_path)
+        # 1. Delete from filesystem using file service (only if file exists)
+        if document.file_path:
+            file_service.delete_file_and_cleanup(document.file_path)
         
         # 2. Delete from vector database
         qdrant_client.delete_document(doc_id)
@@ -186,12 +197,12 @@ def delete_document(
         
     except PermissionError as e:
         logger.warning(f"Permission denied for user {current_user_id} to delete document {doc_id}")
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=e.message)
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Access denied")
     except NotFoundError as e:
         logger.warning(f"Document {doc_id} not found")
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=e.message)
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Document not found")
     except FileNotFoundError as e:
-        logger.warning(f"File not found for document {doc_id}: {e.file_path}")
+        logger.warning(f"File not found for document {doc_id}: {str(e)}")
         # Continue with deletion from vector DB and database even if file is missing
         try:
             qdrant_client.delete_document(doc_id)
@@ -202,14 +213,14 @@ def delete_document(
             logger.error(f"Failed to cleanup document {doc_id} after missing file: {str(cleanup_e)}")
             raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Document cleanup failed")
     except FileDeleteError as e:
-        logger.error(f"Failed to delete file for document {doc_id}: {e.message}")
+        logger.error(f"Failed to delete file for document {doc_id}: {str(e)}")
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Failed to delete document file")
     except VectorStoreError as e:
-        logger.error(f"Failed to delete from vector store for document {doc_id}: {e.message}")
+        logger.error(f"Failed to delete from vector store for document {doc_id}: {str(e)}")
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Failed to delete from vector database")
     except DatabaseError as e:
-        logger.error(f"Database error deleting document {doc_id}: {e.message}")
-        raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail=e.message)
+        logger.error(f"Database error deleting document {doc_id}: {str(e)}")
+        raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail="Service temporarily unavailable")
     except Exception as e:
         logger.error(f"Unexpected error deleting document {doc_id}: {str(e)}")
-        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="An unexpected error occurred.")
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="An unexpected error occurred")

@@ -1,10 +1,11 @@
-from fastapi import APIRouter, Depends, HTTPException, Query, status
-import uuid
 import logging
+import uuid
 
+from fastapi import APIRouter, Depends, HTTPException, Query, status
+
+from ..errors.database_errors import ConflictError, DatabaseError, NotFoundError, PermissionError
 from ..models.users import CreateUserRequest, UpdateUserRequest, UserResponse
 from ..services import db_handler
-from ..errors.db_errors import ServiceError, DatabaseError, NotFoundError, PermissionError, ConflictError
 
 
 router = APIRouter()

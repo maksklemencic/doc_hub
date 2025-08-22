@@ -1,7 +1,8 @@
-from pydantic import BaseModel, Field
-from typing import Optional
-from datetime import datetime
 import uuid
+from datetime import datetime
+from typing import Optional
+
+from pydantic import BaseModel, Field
 
 class CreateUserRequest(BaseModel):
     email: str = Field(...,min_length=1,max_length=254,description="The email address of the user.")

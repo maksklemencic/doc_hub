@@ -1,9 +1,11 @@
-from sentence_transformers import SentenceTransformer
-from typing import List, Tuple
-import os
 import logging
+import os
+from typing import List, Tuple
+
 from chonkie import RecursiveChunker
-from ..errors.embedding_errors import ModelLoadingError, ChunkingError, InvalidInputError, EmbeddingError
+from sentence_transformers import SentenceTransformer
+
+from ..errors.embedding_errors import ChunkingError, EmbeddingError, InvalidInputError, ModelLoadingError
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)

@@ -1,12 +1,15 @@
-from fastapi import FastAPI, HTTPException, Request, status
-from fastapi.responses import JSONResponse
-from fastapi.exceptions import RequestValidationError
-import debugpy
-from .routes import upload, documents, spaces, messages, users
-from backend.app.errors.db_errors import ServiceError
-import os
 import logging
+import os
+
+import debugpy
 from dotenv import load_dotenv
+from fastapi import FastAPI, HTTPException, Request, status
+from fastapi.exceptions import RequestValidationError
+from fastapi.responses import JSONResponse
+
+from .errors.database_errors import ServiceError
+from .middleware.rate_limit import RateLimitMiddleware
+from .routes import documents, messages, spaces, upload, users
 
 load_dotenv()
 
@@ -37,6 +40,9 @@ app = FastAPI(
     docs_url="/docs",
     redoc_url="/redoc"
 )
+
+# Add rate limiting middleware
+app.add_middleware(RateLimitMiddleware, calls=100, period=60)  # 100 requests per minute
 app.include_router(upload.router, prefix="/upload")
 app.include_router(documents.router)
 app.include_router(spaces.router, prefix="/spaces")
@@ -51,8 +57,7 @@ async def validation_exception_handler(request: Request, exc: RequestValidationE
     return JSONResponse(
         status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
         content={
-            "detail": error_message,
-            "path": request.url.path,
+            "detail": "Invalid input data",
             "error_code": "validation_error"
         }
     )
@@ -64,8 +69,7 @@ async def http_exception_handler(request: Request, exc: HTTPException):
     return JSONResponse(
         status_code=exc.status_code,
         content={
-            "detail": exc.detail,
-            "path": request.url.path
+            "detail": exc.detail
         }
     )
     
@@ -83,8 +87,7 @@ async def service_exception_handler(request: Request, exc: ServiceError):
     return JSONResponse(
         status_code=status_code,
         content={
-            "detail": exc.message,
-            "path": request.url.path,
+            "detail": "Service error occurred",
             "error_code": exc.code
         }
     )
@@ -96,7 +99,6 @@ async def generic_exception_handler(request: Request, exc: Exception):
         status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
         content={
             "detail": "An unexpected error occurred",
-            "path": request.url.path,
             "error_code": "unexpected_error"
         }
     )

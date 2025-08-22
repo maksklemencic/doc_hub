@@ -1,8 +1,9 @@
-from pydantic import BaseModel, Field, validator
-import uuid
 import base64
 import re
+import uuid
 from typing import Optional
+
+from pydantic import BaseModel, Field, validator
 
 
 class Base64UploadRequest(BaseModel):
