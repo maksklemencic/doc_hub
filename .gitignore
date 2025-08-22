@@ -7,3 +7,5 @@ backend/app/debug
 uploads
 github
 .vscode/
+OAUTH_SETUP.md
+client_secret*

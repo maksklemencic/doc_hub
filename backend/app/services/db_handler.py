@@ -30,17 +30,14 @@ def get_document_by_id(doc_id: uuid.UUID) -> Document | None:
 
 
 def get_paginated_documents(user_id: uuid.UUID, space_id: uuid.UUID, limit: int, offset: int) -> tuple[List[Document], int]:
-    """Get paginated documents for a specific space owned by the user."""
     logger.info(f"Fetching documents for user {user_id} in space {space_id} with limit {limit} and offset {offset}")
     with SessionLocal() as session:
         try:
-            # First verify the user owns the space
             space = session.query(Space).filter(Space.id == space_id, Space.user_id == user_id).first()
             if not space:
                 logger.warning(f"Space {space_id} not found or user {user_id} not authorized.")
                 raise NotFoundError("Space", str(space_id))
 
-            # Get documents in the space
             query = session.query(Document).filter(Document.space_id == space_id)
             total_count = query.count()
             documents = query.offset(offset).limit(limit).all()
@@ -466,3 +463,114 @@ def delete_user(user_id: uuid.UUID, current_user_id: uuid.UUID) -> Optional[User
             session.rollback()
             logger.error(f"Database unavailable while deleting user {user_id}: {str(e)}")
             raise DatabaseError("Database unavailable")
+
+
+# OAuth-related user methods
+def get_user_by_email(email: str) -> Optional[User]:
+    """Get user by email address (used for OAuth login)."""
+    logger.info(f"Fetching user by email: {email}")
+    with SessionLocal() as session:
+        try:
+            user = session.query(User).filter(User.email == email).first()
+            if user:
+                logger.info(f"Successfully fetched user by email: {email}")
+            else:
+                logger.info(f"No user found with email: {email}")
+            return user
+        except exc.OperationalError as e:
+            logger.error(f"Database unavailable while fetching user by email {email}: {str(e)}")
+            raise DatabaseError("Database unavailable")
+        except exc.SQLAlchemyError as e:
+            logger.error(f"Unexpected database error while fetching user by email {email}: {str(e)}")
+            raise DatabaseError(f"Error fetching user: {str(e)}")
+
+
+def create_user_from_oauth(email: str, name: str, picture: str = None, google_id: str = None) -> User:
+    """Create a new user from OAuth information."""
+    logger.info(f"Creating user from OAuth with email: {email}")
+    with SessionLocal() as session:
+        try:
+            # Split name into first_name and last_name for backward compatibility
+            name_parts = name.split(' ', 1) if name else ['', '']
+            first_name = name_parts[0] if len(name_parts) > 0 else ''
+            last_name = name_parts[1] if len(name_parts) > 1 else ''
+            
+            user = User(
+                email=email,
+                name=name,
+                first_name=first_name,
+                last_name=last_name,
+                picture=picture,
+                google_id=google_id
+            )
+            session.add(user)
+            session.commit()
+            session.refresh(user)
+            logger.info(f"Successfully created user from OAuth with email: {email}")
+            return user
+        except exc.IntegrityError as e:
+            session.rollback()
+            logger.error(f"Conflict error while creating OAuth user with email '{email}': {str(e)}")
+            raise ConflictError("User with this email or Google ID already exists")
+        except exc.OperationalError as e:
+            session.rollback()
+            logger.error(f"Database unavailable while creating OAuth user with email '{email}': {str(e)}")
+            raise DatabaseError("Database unavailable")
+        except exc.SQLAlchemyError as e:
+            session.rollback()
+            logger.error(f"Unexpected database error while creating OAuth user with email '{email}': {str(e)}")
+            raise DatabaseError(f"Error creating user: {str(e)}")
+
+
+def update_user_profile(user_id: uuid.UUID, name: str = None, picture: str = None) -> User:
+    """Update user profile information (used for OAuth updates)."""
+    logger.info(f"Updating user profile for user {user_id}")
+    with SessionLocal() as session:
+        try:
+            user = session.get(User, user_id)
+            if not user:
+                logger.warning(f"User {user_id} not found")
+                raise NotFoundError("User", str(user_id))
+            
+            # Update provided fields
+            if name is not None:
+                user.name = name
+                # Also update first_name and last_name for backward compatibility
+                name_parts = name.split(' ', 1) if name else ['', '']
+                user.first_name = name_parts[0] if len(name_parts) > 0 else ''
+                user.last_name = name_parts[1] if len(name_parts) > 1 else ''
+            
+            if picture is not None:
+                user.picture = picture
+            
+            session.commit()
+            session.refresh(user)
+            logger.info(f"Successfully updated user profile for user {user_id}")
+            return user
+        except exc.OperationalError as e:
+            session.rollback()
+            logger.error(f"Database unavailable while updating user profile {user_id}: {str(e)}")
+            raise DatabaseError("Database unavailable")
+        except exc.SQLAlchemyError as e:
+            session.rollback()
+            logger.error(f"Unexpected database error while updating user profile {user_id}: {str(e)}")
+            raise DatabaseError(f"Error updating user profile: {str(e)}")
+
+
+def get_user_by_id_simple(user_id: uuid.UUID) -> Optional[User]:
+    """Get user by ID without authorization check (used for internal OAuth operations)."""
+    logger.info(f"Fetching user by ID: {user_id}")
+    with SessionLocal() as session:
+        try:
+            user = session.get(User, user_id)
+            if user:
+                logger.info(f"Successfully fetched user by ID: {user_id}")
+            else:
+                logger.info(f"No user found with ID: {user_id}")
+            return user
+        except exc.OperationalError as e:
+            logger.error(f"Database unavailable while fetching user by ID {user_id}: {str(e)}")
+            raise DatabaseError("Database unavailable")
+        except exc.SQLAlchemyError as e:
+            logger.error(f"Unexpected database error while fetching user by ID {user_id}: {str(e)}")
+            raise DatabaseError(f"Error fetching user: {str(e)}")

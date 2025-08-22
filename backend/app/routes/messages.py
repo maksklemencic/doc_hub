@@ -1,13 +1,14 @@
 import logging
 import uuid
 
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi import APIRouter, Depends, HTTPException, status
 
+from ..dependencies.auth import get_current_user
 from ..errors.database_errors import DatabaseError, NotFoundError, PermissionError
 from ..errors.embedding_errors import EmbeddingError, InvalidInputError
 from ..errors.ollama_errors import LLMError
 from ..errors.qdrant_errors import VectorStoreError
-from ..models.messages import CreateMessageRequest, GetMessagesRequest, GetMessagesResponseWrapper, MessageResponse, RAGQueryRequest, RAGQueryResponse, UpdateMessageRequest
+from ..models.messages import CreateMessageRequest, GetMessagesRequest, GetMessagesResponseWrapper, MessageResponse, UpdateMessageRequest, MessageResponseWrapper
 from ..services import db_handler, embedding, ollama_client, qdrant_client
 
 router = APIRouter()
@@ -21,15 +22,6 @@ tags_metadata = [
     }
 ]
 
-# Placeholder for user_id dependency
-def get_current_user_id_from_query(current_user_id: uuid.UUID = Query(...)) -> uuid.UUID:
-    """
-    Temporary dependency to get current_user_id from query parameters
-    TODO: Replace with actual OAuth implementation
-    """
-    if not current_user_id:
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Authentication required")
-    return current_user_id
 
 @router.post(
     "/{space_id}/messages",
@@ -51,7 +43,7 @@ def get_current_user_id_from_query(current_user_id: uuid.UUID = Query(...)) -> u
 def create_message(
     space_id: uuid.UUID,
     request: CreateMessageRequest,
-    current_user_id: uuid.UUID = Depends(get_current_user_id_from_query)
+    current_user_id: uuid.UUID = Depends(get_current_user)
 ):
     try:
         if request.use_context is True:
@@ -84,10 +76,11 @@ def create_message(
                 "context": context
             },
             "message": {
-                "created_at": db_message.created_at,
                 "id": db_message.id,
                 "space_id": db_message.space_id,
-                "user_id": db_message.user_id
+                "user_id": db_message.user_id,
+                "content": request.content,
+                "created_at": db_message.created_at
             }
         }
     
@@ -133,7 +126,7 @@ def create_message(
 def get_messages(
     space_id: uuid.UUID,
     request: GetMessagesRequest = Depends(),
-    current_user_id: uuid.UUID = Depends(get_current_user_id_from_query)
+    current_user_id: uuid.UUID = Depends(get_current_user)
 ):
     try:
         messages, total_count = db_handler.get_paginated_messages(current_user_id, space_id, request.limit, request.offset)
@@ -178,7 +171,7 @@ def update_message(
     space_id: uuid.UUID,
     message_id: uuid.UUID,
     request: UpdateMessageRequest,
-    current_user_id: uuid.UUID = Depends(get_current_user_id_from_query)
+    current_user_id: uuid.UUID = Depends(get_current_user)
 ):
     try:
         message = db_handler.update_message(message_id, space_id, current_user_id, request.content)
@@ -216,7 +209,7 @@ def update_message(
 def delete_message(
     space_id: uuid.UUID,
     message_id: uuid.UUID,
-    current_user_id: uuid.UUID = Depends(get_current_user_id_from_query)
+    current_user_id: uuid.UUID = Depends(get_current_user)
 ):
     try:
         db_handler.delete_message(message_id, space_id, current_user_id)

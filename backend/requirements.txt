@@ -17,6 +17,9 @@ chonkie
 SQLAlchemy
 psycopg2-binary
 trafilatura
-# playwright
 beautifulsoup4
 lxml_html_clean
+python-jose[cryptography]
+authlib
+pydantic[email]
+pydantic-settings

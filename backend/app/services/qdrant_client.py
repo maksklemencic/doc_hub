@@ -38,21 +38,6 @@ def store_document(
         embeddings: list, 
         metadata: list[dict],
     ):
-    # if not isinstance(chunks, list) or not isinstance(embeddings, list) or not isinstance(metadata, list):
-    #     logger.error("Invalid input: chunks, embeddings, and metadata must be lists")
-    #     raise InvalidInputError("Chunks, embeddings, and metadata must be lists")
-    
-    # if not chunks or len(chunks) != len(embeddings) or len(chunks) != len(metadata):
-    #     logger.error(f"Input length mismatch: chunks ({len(chunks)}), embeddings ({len(embeddings)}), metadata ({len(metadata)})")
-    #     raise InvalidInputError("Chunks, embeddings, and metadata must have equal non-zero lengths")
-    
-    # for i, (chunk, embedding, meta) in enumerate(zip(chunks, embeddings, metadata)):
-    #     if not isinstance(chunk, str) or not isinstance(embedding, list) or not isinstance(meta, dict):
-    #         logger.error(f"Invalid input at index {i}: chunk must be str, embedding must be list, metadata must be dict")
-    #         raise InvalidInputError(f"Invalid input at index {i}: chunk must be str, embedding must be list, metadata must be dict")
-    #     if not all(isinstance(x, (int, float)) for x in embedding):
-    #         logger.error(f"Invalid embedding at index {i}: must be a list of numbers")
-    #         raise InvalidInputError(f"Invalid embedding at index {i}: must be a list of numbers")
     try:
         ensure_collection()
         points = [
@@ -91,16 +76,6 @@ def delete_document(doc_id: uuid.UUID):
         raise DeleteError(COLLECTION_NAME, str(e))
 
 def query_top_k(query_vector, user_id: uuid.UUID, space_id: Optional[uuid.UUID] = None, document_ids: Optional[List[uuid.UUID]] = None, k=5):
-    # if not isinstance(query_vector, list) or not all(isinstance(x, (int, float)) for x in query_vector):
-    #     logger.error("Invalid query_vector: must be a list of numbers")
-    #     raise InvalidInputError("query_vector must be a list of numbers")
-    # if len(query_vector) != 384:
-    #     logger.error(f"Invalid query_vector dimension: {len(query_vector)}, expected 384")
-    #     raise InvalidInputError(f"query_vector must have dimension 384")
-    # if not isinstance(k, int) or k <= 0:
-    #     logger.error(f"Invalid k: {k} must be a positive integer")
-    #     raise InvalidInputError("k must be a positive integer")
-    
     try:
         ensure_collection()
         must_filters = [

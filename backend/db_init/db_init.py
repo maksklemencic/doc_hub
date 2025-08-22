@@ -24,6 +24,9 @@ class User(Base):
     email = Column(String, unique=True, nullable=False)
     first_name = Column(String)
     last_name = Column(String)
+    name = Column(String)  # Full name from OAuth
+    picture = Column(String)  # Profile picture URL
+    google_id = Column(String, unique=True)  # Google OAuth ID
     created_at = Column(TIMESTAMP, server_default=text("NOW()"))
     updated_at = Column(TIMESTAMP, server_default=text("NOW()"), onupdate=text("NOW()"))
 

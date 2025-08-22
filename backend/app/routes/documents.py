@@ -1,9 +1,10 @@
 import logging
 import uuid
 
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.responses import FileResponse
 
+from ..dependencies.auth import get_current_user
 from ..errors.database_errors import DatabaseError, NotFoundError, PermissionError
 from ..errors.file_errors import FileDeleteError, FileNotFoundError, FileReadError
 from ..errors.qdrant_errors import VectorStoreError
@@ -20,16 +21,6 @@ tags_metadata = [
         "description": "Operations related to managing documents within spaces."
     }
 ]
-
-# Placeholder for user_id dependency
-def get_current_user_id_from_query(current_user_id: uuid.UUID = Query(...)) -> uuid.UUID:
-    """
-    Temporary dependency to get current_user_id from query parameters
-    TODO: Replace with actual OAuth implementation
-    """
-    if not current_user_id:
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Authentication required")
-    return current_user_id
 
 
 @router.get(
@@ -52,7 +43,7 @@ def get_current_user_id_from_query(current_user_id: uuid.UUID = Query(...)) -> u
 def get_documents(
     space_id: uuid.UUID,
     request: GetDocumentsRequest = Depends(),
-    current_user_id: uuid.UUID = Depends(get_current_user_id_from_query)
+    current_user_id: uuid.UUID = Depends(get_current_user)
 ):
     try:
         documents, total_count = db_handler.get_paginated_documents(
@@ -78,7 +69,7 @@ def get_documents(
 
 
 @router.get(
-    "documents/view/{doc_id}",
+    "/documents/view/{doc_id}",
     tags=["documents"],
     summary="View a document",
     description="Retrieve and view a document file by its ID.",
@@ -96,7 +87,7 @@ def get_documents(
 )
 def view_document(
     doc_id: uuid.UUID,
-    current_user_id: uuid.UUID = Depends(get_current_user_id_from_query)
+    current_user_id: uuid.UUID = Depends(get_current_user)
 ):
     try:
         # Get document from database with direct authorization check
@@ -147,7 +138,7 @@ def view_document(
     
     
 @router.delete(
-    "documents/{doc_id}",
+    "/documents/{doc_id}",
     tags=["documents"],
     summary="Delete a document",
     description="Delete a document and all associated data (file, vector embeddings, database record).",
@@ -165,7 +156,7 @@ def view_document(
 )
 def delete_document(
     doc_id: uuid.UUID,
-    current_user_id: uuid.UUID = Depends(get_current_user_id_from_query)
+    current_user_id: uuid.UUID = Depends(get_current_user)
 ):
     try:
         # Get document from database with direct authorization check

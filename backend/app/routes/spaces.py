@@ -3,6 +3,7 @@ import uuid
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 
+from ..dependencies.auth import get_current_user
 from ..errors.database_errors import ConflictError, DatabaseError, NotFoundError, PermissionError
 from ..models.spaces import CreateSpaceRequest, GetSpacesRequest, GetSpacesResponseWrapper, SpaceResponse, UpdateSpaceRequest
 from ..services import db_handler
@@ -19,16 +20,6 @@ tags_metadata = [
 ]
 
 
-# TODO Placeholder for user_id dependency
-def get_current_user_id_from_query(current_user_id: uuid.UUID = Query(...)) -> uuid.UUID:
-    """
-    Temporary dependency to get current_user_id from query parameters
-    TODO: Replace with actual OAuth implementation
-    """
-    # Add any validation logic here if needed
-    if not current_user_id:
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Authentication required")
-    return current_user_id
 
 
 @router.post(
@@ -50,7 +41,7 @@ def get_current_user_id_from_query(current_user_id: uuid.UUID = Query(...)) -> u
 )
 def create_space(
     request: CreateSpaceRequest,
-    current_user_id: uuid.UUID = Depends(get_current_user_id_from_query)  # Placeholder for user_id dependency
+    current_user_id: uuid.UUID = Depends(get_current_user)
 ):
     try:
         db_space = db_handler.create_space(current_user_id, request.name)
@@ -83,7 +74,7 @@ def create_space(
 )
 def get_spaces(
     request: GetSpacesRequest = Depends(),
-    current_user_id: uuid.UUID = Depends(get_current_user_id_from_query)  # Placeholder for user_id dependency
+    current_user_id: uuid.UUID = Depends(get_current_user)
 ):
     try:
         spaces, total_count = db_handler.get_paginated_spaces(user_id=current_user_id, limit=request.limit, offset=request.offset)
@@ -123,7 +114,7 @@ def get_spaces(
 def update_space(
     request: UpdateSpaceRequest, 
     space_id: uuid.UUID,
-    current_user_id: uuid.UUID = Depends(get_current_user_id_from_query)  # Placeholder for user_id dependency
+    current_user_id: uuid.UUID = Depends(get_current_user)
 ):
     try:
         space = db_handler.update_space(current_user_id, space_id, request.name)
@@ -160,7 +151,7 @@ def update_space(
 )
 def delete_space(
     space_id: uuid.UUID,
-    current_user_id: uuid.UUID = Depends(get_current_user_id_from_query)  # Placeholder for user_id dependency
+    current_user_id: uuid.UUID = Depends(get_current_user)
 ):
     try:
         db_handler.delete_space(current_user_id, space_id)

@@ -8,8 +8,9 @@ from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 
 from .errors.database_errors import ServiceError
+from .middleware.auth_middleware import AuthMiddleware
 from .middleware.rate_limit import RateLimitMiddleware
-from .routes import documents, messages, spaces, upload, users
+from .routes import auth, documents, messages, spaces, upload
 
 load_dotenv()
 
@@ -33,21 +34,27 @@ app = FastAPI(
     title="📄 Documents Hub API",
     description="API for managing documents and interacting with a RAG system.",
     version="1.0.0",
-    openapi_tags=spaces.tags_metadata + 
+    openapi_tags=auth.tags_metadata +
+                spaces.tags_metadata + 
                 messages.tags_metadata +
-                users.tags_metadata +
-                documents.tags_metadata,
+                documents.tags_metadata +
+                upload.tags_metadata,
     docs_url="/docs",
     redoc_url="/redoc"
 )
 
-# Add rate limiting middleware
+# Add middlewares
+app.add_middleware(AuthMiddleware)  # JWT authentication middleware
 app.add_middleware(RateLimitMiddleware, calls=100, period=60)  # 100 requests per minute
+
+# Include routers
+app.include_router(auth.router, prefix="/auth")
 app.include_router(upload.router, prefix="/upload")
 app.include_router(documents.router)
 app.include_router(spaces.router, prefix="/spaces")
 app.include_router(messages.router, prefix="/spaces")
-app.include_router(users.router, prefix="/users")
+# User management is now handled entirely through OAuth (/auth endpoints)
+# app.include_router(users.router, prefix="/users")  # Removed - OAuth handles all user operations
 
 @app.exception_handler(RequestValidationError)
 async def validation_exception_handler(request: Request, exc: RequestValidationError):
@@ -102,7 +109,3 @@ async def generic_exception_handler(request: Request, exc: Exception):
             "error_code": "unexpected_error"
         }
     )
-
-@app.get("/")
-def read_root():
-    return {"message": "FastAPI is running!"}

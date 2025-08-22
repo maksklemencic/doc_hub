@@ -183,7 +183,6 @@ def scrape_webpage(url: str) -> Tuple[str, dict]:
     
     validate_url(url)
     
-    # Fetch content using static scraping only
     session = setup_session()
     content = fetch_static_content(url, session)
     
@@ -196,7 +195,6 @@ def scrape_webpage(url: str) -> Tuple[str, dict]:
     }
     
     try:
-        # Try trafilatura first
         final_content, traf_metadata = extract_with_trafilatura(content, MIN_CONTENT_LENGTH, url)
         if final_content:
             metadata.update(traf_metadata)
@@ -206,7 +204,6 @@ def scrape_webpage(url: str) -> Tuple[str, dict]:
         logger.debug(f"Trafilatura extraction failed for {url}, trying BeautifulSoup")
     
     try:
-        # Fallback to BeautifulSoup
         final_content, soup_metadata = extract_with_beautifulsoup(content, MIN_CONTENT_LENGTH, MIN_LINE_LENGTH, url)
         metadata.update(soup_metadata)
         logger.info(f"Successfully scraped webpage using BeautifulSoup: {url}")

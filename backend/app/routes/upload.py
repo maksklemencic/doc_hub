@@ -1,17 +1,17 @@
 import logging
 import uuid
 from pathlib import Path
-from typing import Optional
 from urllib.parse import urlparse
 
-from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, UploadFile
+from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile, status
 
-from ..errors.database_errors import DatabaseError
+from ..dependencies.auth import get_current_user
+from ..errors.database_errors import DatabaseError, PermissionError
 from ..errors.document_processor_errors import DocumentCorruptedError, EmptyDocumentError, UnsupportedDocumentTypeError
 from ..errors.embedding_errors import ChunkingError, EmbeddingError
 from ..errors.file_errors import EmptyFileError, FileSaveError
 from ..errors.metadata_extractor_errors import MetadataExtractorError
-from ..errors.qdrant_errors import QdrantError
+from ..errors.qdrant_errors import VectorStoreError
 from ..errors.web_scraper_errors import ContentExtractionError, InvalidURLError, URLFetchError
 from ..models.upload import Base64UploadRequest, UploadResponse, WebDocumentUploadRequest
 from ..services import db_handler, document_processor, embedding, file_service, metadata_extractor, qdrant_client, web_scraper
@@ -19,14 +19,35 @@ from ..services import db_handler, document_processor, embedding, file_service, 
 logger = logging.getLogger(__name__)
 router = APIRouter()
 
-def get_current_user_id_from_query(current_user_id: uuid.UUID = Query(..., description="Current user ID")) -> uuid.UUID:
-    return current_user_id
+tags_metadata = [
+    {
+        "name": "upload",
+        "description": "Endpoints for uploading documents via various methods including base64, file upload, and web scraping."
+    }
+]
 
 
-@router.post("/base64", response_model=UploadResponse, status_code=201)
+@router.post(
+    "/base64", 
+    response_model=UploadResponse, 
+    status_code=status.HTTP_201_CREATED,
+    tags=["upload"],
+    summary="Upload a base64-encoded document",
+    description="Uploads a document provided as a base64-encoded string, processes it, and stores it in the specified space.",
+    response_description="Details of the uploaded document including ID, name, chunk count, and file path.",
+    responses={
+        201: {"description": "Document successfully uploaded"},
+        400: {"description": "Bad request; Invalid input or document processing error"},
+        401: {"description": "Authentication required"},
+        404: {"description": "Space not found"},
+        422: {"description": "Validation error"},
+        500: {"description": "Internal server error"},
+        503: {"description": "Database or vector store unavailable"}
+    }
+)
 def upload_base64(
     request: Base64UploadRequest, 
-    current_user_id: uuid.UUID = Depends(get_current_user_id_from_query)
+    current_user_id: uuid.UUID = Depends(get_current_user)
 ):
     logger.info(f"Starting base64 upload for user {current_user_id}, file: {request.filename}")
     
@@ -98,7 +119,7 @@ def upload_base64(
         if saved_file_path:
             cleanup_file(saved_file_path)
         raise HTTPException(status_code=500, detail=f"Database error: {e.message}")
-    except (EmbeddingError, ChunkingError, MetadataExtractorError, QdrantError) as e:
+    except (EmbeddingError, ChunkingError, MetadataExtractorError, VectorStoreError) as e:
         logger.error(f"Vector processing error for {request.filename}: {str(e)}")
         if saved_file_path:
             cleanup_file(saved_file_path)
@@ -113,11 +134,27 @@ def upload_base64(
             cleanup_database_document(doc_id)
         raise HTTPException(status_code=500, detail="An unexpected error occurred during upload")
 
-@router.post("/file", response_model=UploadResponse, status_code=201)
+@router.post("/file", 
+            response_model=UploadResponse, 
+            status_code=status.HTTP_201_CREATED,
+            tags=["upload"],
+            summary="Upload a document via multipart/form-data",
+            description="Uploads a document via multipart/form-data, processes it, and stores it in the specified space.",
+            response_description="Details of the uploaded document including ID, name, chunk count, and file path.",
+            responses={
+                201: {"description": "Document successfully uploaded"},
+                400: {"description": "Bad request; Invalid input or document processing error"},
+                401: {"description": "Authentication required"},
+                404: {"description": "Space not found"},
+                422: {"description": "Validation error"},
+                500: {"description": "Internal server error"},
+                503: {"description": "Database or vector store unavailable"}
+            }
+)
 async def upload_file_multipart(
     file: UploadFile = File(..., description="File to upload"),
     space_id: uuid.UUID = Form(..., description="ID of the space to upload the document to"),
-    current_user_id: uuid.UUID = Depends(get_current_user_id_from_query)
+    current_user_id: uuid.UUID = Depends(get_current_user)
 ):
     logger.info(f"Starting file upload for user {current_user_id}, file: {file.filename}")
     
@@ -194,7 +231,7 @@ async def upload_file_multipart(
         if saved_file_path:
             cleanup_file(saved_file_path)
         raise HTTPException(status_code=500, detail=f"Database error: {e.message}")
-    except (EmbeddingError, ChunkingError, MetadataExtractorError, QdrantError) as e:
+    except (EmbeddingError, ChunkingError, MetadataExtractorError, VectorStoreError) as e:
         logger.error(f"Vector processing error for {file.filename}: {str(e)}")
         if saved_file_path:
             cleanup_file(saved_file_path)
@@ -234,10 +271,26 @@ def generate_web_document_filename(url: str) -> str:
         # Fallback to a generic name
         return f"webpage_{uuid.uuid4().hex[:8]}.html"
 
-@router.post("/web", response_model=UploadResponse, status_code=201)
+@router.post("/web", 
+            response_model=UploadResponse, 
+            status_code=status.HTTP_201_CREATED,
+            tags=["upload"],
+            summary="Upload a document from a web URL",
+            description="Fetches and processes a document from the provided web URL, then stores it in the specified space.",
+            response_description="Details of the uploaded document including ID, name, chunk count, and URL.",
+            responses={
+                201: {"description": "Document successfully uploaded"},
+                400: {"description": "Bad request; Invalid URL or web scraping error"},
+                401: {"description": "Authentication required"},
+                404: {"description": "Space not found"},
+                422: {"description": "Validation error"},
+                500: {"description": "Internal server error"},
+                503: {"description": "Database or vector store unavailable"}
+            }
+)
 def upload_web_document(
     request: WebDocumentUploadRequest,
-    current_user_id: uuid.UUID = Depends(get_current_user_id_from_query)
+    current_user_id: uuid.UUID = Depends(get_current_user)
 ):
     logger.info(f"Starting web document upload for user {current_user_id}, URL: {request.url}")
     
@@ -302,11 +355,16 @@ def upload_web_document(
     except DatabaseError as e:
         logger.error(f"Database error for {request.url}: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Database error: {e.message}")
-    except (EmbeddingError, ChunkingError, MetadataExtractorError, QdrantError) as e:
+    except (EmbeddingError, ChunkingError, MetadataExtractorError, VectorStoreError) as e:
         logger.error(f"Vector processing error for {request.url}: {str(e)}")
         if doc_id:
             cleanup_database_document(doc_id)
         raise HTTPException(status_code=500, detail=f"Vector processing failed: {e.message}")
+    except PermissionError as e:
+        logger.error(f"Forbidden error for {request.url}: {str(e)}")
+        if doc_id:
+            cleanup_database_document(doc_id)
+        raise HTTPException(status_code=403, detail=f"Access forbidden: {e.message}")
     except Exception as e:
         logger.error(f"Unexpected error uploading web document from {request.url}: {str(e)}")
         if doc_id:

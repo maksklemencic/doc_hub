@@ -33,7 +33,6 @@ def clean_text(text: str) -> str:
 
 
 def extract_text_from_pdf(file_bytes: bytes) -> List[Tuple[int, str]]:
-    """Extract text from PDF file using PyMuPDF and OCR fallback."""
     logger.info("Starting PDF text extraction")
     try:
         doc = fitz.open(stream=file_bytes, filetype="pdf")
@@ -75,7 +74,6 @@ def extract_text_from_pdf(file_bytes: bytes) -> List[Tuple[int, str]]:
 
 
 def extract_text_from_docx(file_bytes: bytes) -> List[Tuple[int, str]]:
-    """Extract text from DOCX file including tables."""
     logger.info("Starting DOCX text extraction")
     try:
         doc = Document(io.BytesIO(file_bytes))
@@ -112,7 +110,6 @@ def extract_text_from_docx(file_bytes: bytes) -> List[Tuple[int, str]]:
 
 
 def extract_text_from_image(image_bytes: bytes) -> List[Tuple[int, str]]:
-    """Extract text from image using OCR."""
     logger.info("Starting image OCR text extraction")
     try:
         image = Image.open(io.BytesIO(image_bytes))
@@ -146,7 +143,6 @@ def normalize_file_type(mime_type: str) -> str:
 
 
 def process_document_for_text(file_bytes: bytes, mime_type: str) -> List[Tuple[int, str]]:
-    """Process document and extract text based on MIME type."""
     logger.info(f"Processing document with MIME type: {mime_type}")
     
     handlers = {
@@ -173,7 +169,6 @@ def process_document_for_text(file_bytes: bytes, mime_type: str) -> List[Tuple[i
         raise DocumentProcessorError(f"Document processing failed: {str(e)}")
 
 def base64_to_text(base64_text: str, mime_type: str) -> List[Tuple[int, str]]:
-    """Decode base64 text and process as document."""
     logger.info("Processing base64 encoded document")
     try:
         file_bytes = base64.b64decode(base64_text)
