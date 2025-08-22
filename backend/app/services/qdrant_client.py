@@ -5,7 +5,7 @@ import uuid
 from typing import Optional, List
 import logging
 
-from backend.app.errors.qdrant_errors import ClientInitializationError, CollectionCreationError, UpsertError, DeleteError, SearchError
+from ..errors.qdrant_errors import ClientInitializationError, CollectionCreationError, UpsertError, DeleteError, SearchError
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
