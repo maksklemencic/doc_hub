@@ -1,0 +1,35 @@
+services:
+  test_db:
+    image: postgres:15
+    container_name: test_db
+    env_file:
+      - .env.test
+    ports:
+      - "5433:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U user -d test_db"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    volumes:
+      - postgres_data_test:/var/lib/postgresql/data
+
+  backend_test:
+    build:
+      context: .
+      dockerfile: docker/backend/Dockerfile
+    depends_on:
+      test_db:
+        condition: service_healthy
+    env_file:
+      - .env.test
+    environment:
+      - PYTHONPATH=/app
+      - TESTING=true
+    volumes:
+      - .:/app
+    working_dir: /app
+    command: ["pytest", "backend/tests", "-v"]
+
+volumes:
+  postgres_data_test:

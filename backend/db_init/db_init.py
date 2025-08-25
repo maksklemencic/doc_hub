@@ -2,7 +2,7 @@ import os
 import uuid
 from sqlalchemy import UniqueConstraint, create_engine, Column, String, TIMESTAMP, ForeignKey, inspect, text
 from sqlalchemy.dialects.postgresql import UUID
-from sqlalchemy.ext.declarative import declarative_base
+from sqlalchemy.orm import declarative_base
 from sqlalchemy.orm import sessionmaker
 
 DATABASE_URL = os.environ.get("DATABASE_URL")

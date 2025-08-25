@@ -2,7 +2,7 @@ import uuid
 from datetime import datetime
 from typing import List, Optional
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, ConfigDict
 
 from .shared import PaginationMetadata
 
@@ -12,17 +12,17 @@ class SpaceResponse(BaseModel):
     # user_id: uuid.UUID TODO to be deleted later
     created_at: Optional[datetime] = Field(None, description="Timestamp when the space was created, in ISO 8601 format.")
     updated_at: Optional[datetime] = Field(None, description="Timestamp when the space was last updated, in ISO 8601 format.")
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
         
 class CreateSpaceRequest(BaseModel):
     name: str = Field(..., min_length=1, max_length=100, description="The name of the space to create, between 1 and 100 characters.")
-    class Config:
-        json_schema_extra = {
+    model_config = ConfigDict(
+        json_schema_extra={
             "example": {
                 "name": "My New Space"
             }
         }
+    )
 
 class GetSpacesRequest(BaseModel):
     limit: int = Field(10, ge=1, le=100, description="Number of spaces to return per page, between 1 and 100.")
@@ -30,7 +30,7 @@ class GetSpacesRequest(BaseModel):
 
 
 class GetSpacesResponseWrapper(BaseModel):
-    spaces: List[SpaceResponse] = Field(..., max_items=100, description="List of spaces, up to 100 items per page.")
+    spaces: List[SpaceResponse] = Field(..., max_length=100, description="List of spaces, up to 100 items per page.")
     pagination: PaginationMetadata = Field(..., description="Pagination metadata including limit, offset, and total count.")
 
 class UpdateSpaceRequest(BaseModel):

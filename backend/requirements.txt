@@ -23,3 +23,6 @@ python-jose[cryptography]
 authlib
 pydantic[email]
 pydantic-settings
+pytest
+pytest-asyncio
+httpx

@@ -171,11 +171,12 @@ def get_paginated_spaces(user_id: uuid.UUID, limit: int, offset: int) -> List[Sp
     with SessionLocal() as session:
         try:
             query = session.query(Space).filter(Space.user_id == user_id)
-            if not query.count():
-                logger.warning(f"No spaces found for user {user_id}")
-                raise NotFoundError("Space", "No spaces found")
-
             total_count = query.count()
+            
+            if total_count == 0:
+                logger.info(f"No spaces found for user {user_id}")
+                return [], 0
+
             spaces = query.offset(offset).limit(limit).all()
             logger.info(f"Successfully fetched {len(spaces)} spaces for user {user_id}")
             return spaces, total_count
@@ -184,17 +185,20 @@ def get_paginated_spaces(user_id: uuid.UUID, limit: int, offset: int) -> List[Sp
             raise DatabaseError("Database unavailable")
         except exc.SQLAlchemyError as e:
             logger.error(f"Unexpected database error for user {user_id}: {str(e)}")
-            raise DatabaseError(f"Error fetching messages: {str(e)}")
+            raise DatabaseError(f"Error fetching spaces: {str(e)}")
     
 
 def update_space(user_id: uuid.UUID, space_id: uuid.UUID, new_name: str) -> Optional[Space]:
     logger.info(f"Updating space {space_id} for user {user_id} to new name '{new_name}'")
     with SessionLocal() as session:  
         try:
-            space = session.query(Space).filter(Space.user_id == user_id, Space.id == space_id).first()
+            # First check if space exists at all
+            space = session.query(Space).filter(Space.id == space_id).first()
             if not space:
-                logger.warning(f"Space {space_id} not found for user {user_id}")
+                logger.warning(f"Space {space_id} not found")
                 raise NotFoundError("Space", str(space_id))
+            
+            # Then check if user has permission to update it
             if space.user_id != user_id:
                 logger.warning(f"Permission denied for user {user_id} on space {space_id}")
                 raise PermissionError("Not authorized to update this space")
@@ -239,13 +243,17 @@ def delete_space(user_id: uuid.UUID, space_id: uuid.UUID):
     logger.info(f"Deleting space {space_id} for user {user_id}")
     with SessionLocal() as session:
         try:
-            space = session.query(Space).filter(Space.user_id == user_id, Space.id == space_id).first()
+            # First check if space exists at all
+            space = session.query(Space).filter(Space.id == space_id).first()
             if not space:
-                logger.warning(f"Space {space_id} not found for user {user_id}")
+                logger.warning(f"Space {space_id} not found")
                 raise NotFoundError("Space", str(space_id))
+            
+            # Then check if user has permission to delete it
             if space.user_id != user_id:
                 logger.warning(f"Permission denied for user {user_id} on space {space_id}")
-                raise PermissionError("Not authorized to update this space")
+                raise PermissionError("Not authorized to delete this space")
+            
             session.delete(space)
             session.commit()
             logger.info(f"Successfully deleted space {space_id} for user {user_id}")

@@ -2,7 +2,7 @@ import uuid
 from datetime import datetime
 from typing import List, Optional
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, ConfigDict
 
 from .shared import PaginationMetadata
 
@@ -19,8 +19,7 @@ class MessageResponse(BaseModel):
     response: Optional[str] = Field(None, description="The AI response to the message.")
     created_at: Optional[datetime] = Field(None, description="Timestamp when the message was created.")
     
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 class MessageResponseWrapper(BaseModel):
     data: LLMResponse = Field(..., description="The response data containing the query, response, and context.")
@@ -53,13 +52,14 @@ class UpdateMessageRequest(BaseModel):
     content: str = Field(..., min_length=1, description="The new content of the message.")
     response: Optional[str] = Field(None, description="The new AI response to the message.")
     
-    class Config:
-        json_schema_extra = {
+    model_config = ConfigDict(
+        json_schema_extra={
             "example": {
                 "content": "What are the key points in document X regarding Y?",
                 "response": "Based on the documents, the key points are..."
             }
         }
+    )
 
 class GetMessagesRequest(BaseModel):
     limit: int = Field(10, ge=1, le=100, description="Number of messages to return per page.")

@@ -2,7 +2,7 @@ import uuid
 from datetime import datetime
 from typing import List, Optional
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, ConfigDict
 
 from .shared import PaginationMetadata
 
@@ -47,8 +47,7 @@ class DocumentResponse(BaseModel):
     created_at: Optional[datetime] = Field(None, description="Timestamp when the document was uploaded, in ISO 8601 format.")
     updated_at: Optional[datetime] = Field(None, description="Timestamp when the document was last updated, in ISO 8601 format.")
     
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
         
 class DocumentWithChunksResponse(BaseModel):
     document: DocumentResponse = Field(..., description="Document information from the database.")

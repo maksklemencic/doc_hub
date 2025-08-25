@@ -3,7 +3,7 @@ import re
 import uuid
 from typing import Optional
 
-from pydantic import BaseModel, Field, validator
+from pydantic import BaseModel, Field, field_validator
 
 
 class Base64UploadRequest(BaseModel):
@@ -12,7 +12,8 @@ class Base64UploadRequest(BaseModel):
     content_base64: str = Field(..., description="Base64 encoded file content")
     space_id: uuid.UUID = Field(..., description="ID of the space to upload the document to")
     
-    @validator('mime_type')
+    @field_validator('mime_type')
+    @classmethod
     def validate_mime_type(cls, v):
         allowed_types = ['application/pdf', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document', 
                         'image/png', 'image/jpeg', 'image/jpg', 'image/gif', 'image/bmp', 'image/tiff']
@@ -20,7 +21,8 @@ class Base64UploadRequest(BaseModel):
             raise ValueError(f'Unsupported MIME type: {v}. Allowed types: {", ".join(allowed_types)}')
         return v
     
-    @validator('content_base64')
+    @field_validator('content_base64')
+    @classmethod
     def validate_base64(cls, v):
         try:
             decoded = base64.b64decode(v, validate=True)
@@ -32,7 +34,8 @@ class Base64UploadRequest(BaseModel):
         except Exception:
             raise ValueError('Invalid base64 encoding')
     
-    @validator('filename')
+    @field_validator('filename')
+    @classmethod
     def validate_filename(cls, v):
         # Check for valid filename characters
         if not re.match(r'^[a-zA-Z0-9._-]+\.[a-zA-Z0-9]+$', v):
@@ -44,7 +47,8 @@ class WebDocumentUploadRequest(BaseModel):
     url: str = Field(..., description="URL of the web document to scrape and upload")
     space_id: uuid.UUID = Field(..., description="ID of the space to upload the document to")
     
-    @validator('url')
+    @field_validator('url')
+    @classmethod
     def validate_url(cls, v):
         url_pattern = re.compile(
             r'^https?://'  # http:// or https://

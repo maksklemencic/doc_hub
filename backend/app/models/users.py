@@ -4,7 +4,7 @@
 
 from typing import Optional
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, ConfigDict
 
 
 class UpdateUserRequest(BaseModel):
@@ -13,11 +13,12 @@ class UpdateUserRequest(BaseModel):
     first_name: Optional[str] = Field(None, min_length=1, max_length=50, description="The first name of the user.")
     last_name: Optional[str] = Field(None, min_length=1, max_length=100, description="The last name of the user.")
     
-    class Config:
-        json_schema_extra = {
+    model_config = ConfigDict(
+        json_schema_extra={
             "example": {
                 "first_name": "John",
                 "last_name": "Doe",
                 "email": "john.doe@example.com"
             }
         }
+    )

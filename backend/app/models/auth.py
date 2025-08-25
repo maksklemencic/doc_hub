@@ -2,7 +2,7 @@ import uuid
 from datetime import datetime
 from typing import Optional
 
-from pydantic import BaseModel, EmailStr, Field
+from pydantic import BaseModel, EmailStr, Field, ConfigDict
 
 
 class TokenData(BaseModel):
@@ -23,8 +23,7 @@ class GoogleUserInfo(BaseModel):
     picture: Optional[str] = Field(None, description="Profile picture URL")
     locale: Optional[str] = Field(None, description="User locale")
     
-    class Config:
-        populate_by_name = True
+    model_config = ConfigDict(populate_by_name=True)
 
 
 class AuthTokenResponse(BaseModel):
