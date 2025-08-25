@@ -33,7 +33,6 @@ class AuthMiddleware(BaseHTTPMiddleware):
         ]
     
     async def dispatch(self, request: Request, call_next):
-        """Process the request and validate JWT token if present."""
         
         # Skip authentication for excluded paths
         if any(request.url.path.startswith(path) for path in self.exclude_paths):

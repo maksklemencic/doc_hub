@@ -130,16 +130,21 @@ def extract_text_from_image(image_bytes: bytes) -> List[Tuple[int, str]]:
 
 
 def normalize_file_type(mime_type: str) -> str:
+    # Supported file types: images, Word documents, PDF
+    supported_types = {
+        "application/pdf": "pdf",
+        "application/vnd.openxmlformats-officedocument.wordprocessingml.document": "docx",
+        "application/msword": "docx",  # .doc files
+    }
+    
     if mime_type.startswith("image/"):
         return "image"
     
-    ext = mimetypes.guess_extension(mime_type)
-    if not ext:
-        logger.error(f"Unknown MIME type: {mime_type}")
-        raise UnsupportedDocumentTypeError(mime_type, ["PDF", "DOCX", "images"])
+    if mime_type in supported_types:
+        return supported_types[mime_type]
     
-    ext = ext.lstrip(".").lower()
-    return ext
+    logger.error(f"Unsupported MIME type: {mime_type}")
+    raise UnsupportedDocumentTypeError(mime_type, ["PDF", "DOCX/DOC", "images"])
 
 
 def process_document_for_text(file_bytes: bytes, mime_type: str) -> List[Tuple[int, str]]:
@@ -148,7 +153,7 @@ def process_document_for_text(file_bytes: bytes, mime_type: str) -> List[Tuple[i
     handlers = {
         "pdf": extract_text_from_pdf,
         "docx": extract_text_from_docx,
-        "img": extract_text_from_image
+        "image": extract_text_from_image
     }
 
     try:

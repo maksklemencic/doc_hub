@@ -8,7 +8,15 @@ from ..dependencies.auth import get_current_user
 from ..errors.database_errors import DatabaseError, NotFoundError, PermissionError
 from ..errors.file_errors import FileDeleteError, FileNotFoundError, FileReadError
 from ..errors.qdrant_errors import VectorStoreError
-from ..models.documents import GetDocumentsRequest, GetDocumentsResponseWrapper
+from ..models.documents import (
+    ChunkItemResponse,
+    ChunkMetadata,
+    ChunksResponse,
+    DocumentWithChunksResponse, 
+    GetChunksRequest, 
+    GetDocumentsRequest, 
+    GetDocumentsResponseWrapper
+)
 from ..services import db_handler, file_service, qdrant_client
 
 
@@ -90,19 +98,11 @@ def view_document(
     current_user_id: uuid.UUID = Depends(get_current_user)
 ):
     try:
-        # Get document from database with direct authorization check
-        document = db_handler.get_document_by_id(doc_id)
+        # Get document with authorization check - only returns user's own documents
+        document = db_handler.get_user_document_by_id(doc_id, current_user_id)
         if not document:
-            logger.warning(f"Document {doc_id} not found")
+            logger.warning(f"Document {doc_id} not found or not owned by user {current_user_id}")
             raise NotFoundError("Document", str(doc_id))
-        
-        # Direct authorization check: verify document belongs to user's space
-        if document.uploaded_by != current_user_id:
-            # Also check space ownership as secondary authorization
-            space = db_handler.get_space_by_id(document.space_id)
-            if not space or space.user_id != current_user_id:
-                logger.warning(f"Permission denied for user {current_user_id} to access document {doc_id} - not owner and not space owner")
-                raise PermissionError("Not authorized to view this document")
         
         # Additional check: ensure web documents (no file_path) are handled properly
         if not document.file_path:
@@ -135,8 +135,125 @@ def view_document(
     except Exception as e:
         logger.error(f"Unexpected error viewing document {doc_id}: {str(e)}")
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="An unexpected error occurred")
-    
-    
+
+
+@router.get(
+    "/documents/{doc_id}",
+    response_model=DocumentWithChunksResponse,
+    tags=["documents"],
+    summary="Get document with chunks",
+    description="Retrieve detailed information about a document including its metadata and text chunks from the vector database.",
+    response_description="Document information with paginated chunks and their metadata.",
+    status_code=status.HTTP_200_OK,
+    responses={
+        200: {"description": "Document and chunks successfully retrieved"},
+        401: {"description": "Authentication required"},
+        403: {"description": "Permission denied - document not accessible to user"},
+        404: {"description": "Document not found"},
+        422: {"description": "Invalid document ID format or query parameters"},
+        500: {"description": "Internal server error"},
+        503: {"description": "Database or vector store unavailable"}
+    }
+)
+def get_document_with_chunks(
+    doc_id: uuid.UUID,
+    chunks_request: GetChunksRequest = Depends(),
+    current_user_id: uuid.UUID = Depends(get_current_user)
+):
+    try:
+        # Get document with authorization check - only returns user's own documents
+        document = db_handler.get_user_document_by_id(doc_id, current_user_id)
+        if not document:
+            logger.warning(f"Document {doc_id} not found or not owned by user {current_user_id}")
+            raise NotFoundError("Document", str(doc_id))
+        
+        # Get chunks from vector database with pagination
+        chunks_data, total_chunks = qdrant_client.get_document_chunks(
+            document_id=doc_id,
+            user_id=current_user_id,
+            limit=chunks_request.limit,
+            offset=chunks_request.offset
+        )
+        
+        # Extract shared metadata from first chunk (all chunks share the same document metadata)
+        shared_metadata = None
+        chunk_items = []
+        
+        if chunks_data:
+            first_payload = chunks_data[0].payload
+            shared_metadata = ChunkMetadata(
+                language=first_payload.get('language', ''),
+                topics=first_payload.get('topics', []),
+                document_id=first_payload.get('document_id', ''),
+                mime_type=first_payload.get('mime_type', ''),
+                user_id=first_payload.get('user_id', ''),
+                space_id=first_payload.get('space_id', ''),
+                title=first_payload.get('title', ''),
+                date=first_payload.get('date', ''),
+                filename=first_payload.get('filename', ''),
+                sitename=first_payload.get('sitename', ''),
+                url=first_payload.get('url', '')
+            )
+            
+            # Convert chunks to individual items with only chunk-specific data
+            for chunk_point in chunks_data:
+                payload = chunk_point.payload
+                chunk_items.append(ChunkItemResponse(
+                    text=payload.get('text', ''),
+                    chunk_index=payload.get('chunk_index', 0),
+                    page_number=payload.get('page_number', 1),
+                    author=payload.get('author', '')
+                ))
+        else:
+            # If no chunks, create empty metadata from document info
+            shared_metadata = ChunkMetadata(
+                language='',
+                topics=[],
+                document_id=str(doc_id),
+                mime_type=document.mime_type,
+                user_id=str(current_user_id),
+                space_id=str(document.space_id),
+                title='',
+                date='',
+                filename=document.filename,
+                sitename='',
+                url=''
+            )
+        
+        chunks_response = ChunksResponse(
+            meta=shared_metadata,
+            items=chunk_items,
+            pagination={
+                "limit": chunks_request.limit,
+                "offset": chunks_request.offset,
+                "total_count": total_chunks
+            }
+        )
+        
+        logger.info(f"Retrieved document {doc_id} with {len(chunk_items)} chunks for user {current_user_id}")
+        
+        return DocumentWithChunksResponse(
+            document=document,
+            chunks=chunks_response
+        )
+        
+    except PermissionError as e:
+        logger.warning(f"Permission denied for user {current_user_id} to access document {doc_id}")
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Access denied")
+    except NotFoundError as e:
+        logger.warning(f"Document {doc_id} not found")
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Document not found")
+    except VectorStoreError as e:
+        logger.error(f"Vector store error retrieving chunks for document {doc_id}: {str(e)}")
+        raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail="Vector database unavailable")
+    except DatabaseError as e:
+        logger.error(f"Database error accessing document {doc_id}: {str(e)}")
+        raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail="Service temporarily unavailable")
+    except Exception as e:
+        logger.error(f"Unexpected error retrieving document {doc_id} with chunks: {str(e)}")
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="An unexpected error occurred")
+
+
 @router.delete(
     "/documents/{doc_id}",
     tags=["documents"],
@@ -159,19 +276,11 @@ def delete_document(
     current_user_id: uuid.UUID = Depends(get_current_user)
 ):
     try:
-        # Get document from database with direct authorization check
-        document = db_handler.get_document_by_id(doc_id)
+        # Get document with authorization check - only returns user's own documents
+        document = db_handler.get_user_document_by_id(doc_id, current_user_id)
         if not document:
-            logger.warning(f"Document {doc_id} not found")
+            logger.warning(f"Document {doc_id} not found or not owned by user {current_user_id}")
             raise NotFoundError("Document", str(doc_id))
-        
-        # Direct authorization check: verify document belongs to user's space
-        if document.uploaded_by != current_user_id:
-            # Also check space ownership as secondary authorization
-            space = db_handler.get_space_by_id(document.space_id)
-            if not space or space.user_id != current_user_id:
-                logger.warning(f"Permission denied for user {current_user_id} to delete document {doc_id} - not owner and not space owner")
-                raise PermissionError("Not authorized to delete this document")
 
         # 1. Delete from filesystem using file service (only if file exists)
         if document.file_path:

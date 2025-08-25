@@ -59,6 +59,7 @@ class Message(Base):
     space_id = Column(UUID(as_uuid=True), ForeignKey("spaces.id"), nullable=False)
     user_id = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=False)
     content = Column(String, nullable=False)
+    response = Column(String, nullable=True)  # AI response to the message
     created_at = Column(TIMESTAMP, server_default=text("NOW()"))
 
 
@@ -72,6 +73,30 @@ def create_tables():
         conn.execute(text("CREATE EXTENSION IF NOT EXISTS pgcrypto;"))
     Base.metadata.create_all(engine)
     print("Tables created successfully!")
+    
+def create_indexes():
+    """Create performance indexes after table creation."""
+    with engine.connect() as conn:
+        print("Creating performance indexes...")
+        indexes = [
+            "CREATE INDEX IF NOT EXISTS idx_documents_space_id ON documents(space_id);",
+            "CREATE INDEX IF NOT EXISTS idx_documents_uploaded_by ON documents(uploaded_by);", 
+            "CREATE INDEX IF NOT EXISTS idx_documents_created_at ON documents(created_at DESC);",
+            "CREATE INDEX IF NOT EXISTS idx_documents_space_uploaded ON documents(space_id, uploaded_by);",
+            "CREATE INDEX IF NOT EXISTS idx_messages_space_user ON messages(space_id, user_id);",
+            "CREATE INDEX IF NOT EXISTS idx_messages_created_at ON messages(created_at DESC);",
+            "CREATE INDEX IF NOT EXISTS idx_spaces_user_id ON spaces(user_id);",
+            "CREATE INDEX IF NOT EXISTS idx_users_google_id ON users(google_id);",
+        ]
+        
+        for index_sql in indexes:
+            try:
+                conn.execute(text(index_sql))
+            except Exception as e:
+                print(f"Index creation warning: {str(e)}")
+        
+        conn.commit()
+        print("Indexes created successfully!")
 
 def insert_test_data():
     session = SessionLocal()
@@ -104,6 +129,7 @@ if __name__ == "__main__":
     if database_is_empty(engine):
         print("Database is empty. Creating tables...")
         create_tables()
+        create_indexes()
     else:
         print("Database already has tables. Skipping creation.")
 

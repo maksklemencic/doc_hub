@@ -75,22 +75,19 @@ def delete_document(doc_id: uuid.UUID):
         logger.error(f"Failed to delete document {doc_id} from {COLLECTION_NAME}: {str(e)}")
         raise DeleteError(COLLECTION_NAME, str(e))
 
-def query_top_k(query_vector, user_id: uuid.UUID, space_id: Optional[uuid.UUID] = None, document_ids: Optional[List[uuid.UUID]] = None, k=5):
+def query_top_k(query_vector, user_id: uuid.UUID, space_id: uuid.UUID, document_ids: Optional[List[uuid.UUID]] = None, k: int = 5):
     try:
         ensure_collection()
         must_filters = [
             qmodels.FieldCondition(
                 key="user_id",
                 match=qmodels.MatchValue(value=str(user_id))
+            ),
+            qmodels.FieldCondition(
+                key="space_id",
+                match=qmodels.MatchValue(value=str(space_id))
             )
         ]
-        if space_id:
-            must_filters.append(
-                qmodels.FieldCondition(
-                    key="space_id",
-                    match=qmodels.MatchValue(value=str(space_id))
-                )
-            )
         if document_ids:
             must_filters.append(
                 qmodels.FieldCondition(
@@ -109,4 +106,57 @@ def query_top_k(query_vector, user_id: uuid.UUID, space_id: Optional[uuid.UUID] 
         return results
     except Exception as e:
         logger.error(f"Failed to search in {COLLECTION_NAME}: {str(e)}")
+        raise SearchError(COLLECTION_NAME, str(e))
+
+def get_document_chunks(document_id: uuid.UUID, user_id: uuid.UUID, limit: int = 50, offset: int = 0):
+    """Get all chunks for a specific document with pagination."""
+    try:
+        ensure_collection()
+        
+        # First get the total count
+        count_result = client.count(
+            collection_name=COLLECTION_NAME,
+            count_filter=qmodels.Filter(
+                must=[
+                    qmodels.FieldCondition(
+                        key="document_id",
+                        match=qmodels.MatchValue(value=str(document_id))
+                    ),
+                    qmodels.FieldCondition(
+                        key="user_id",
+                        match=qmodels.MatchValue(value=str(user_id))
+                    )
+                ]
+            )
+        )
+        total_count = count_result.count
+        
+        # Get the chunks with pagination, ordered by chunk_index
+        results = client.scroll(
+            collection_name=COLLECTION_NAME,
+            scroll_filter=qmodels.Filter(
+                must=[
+                    qmodels.FieldCondition(
+                        key="document_id",
+                        match=qmodels.MatchValue(value=str(document_id))
+                    ),
+                    qmodels.FieldCondition(
+                        key="user_id",
+                        match=qmodels.MatchValue(value=str(user_id))
+                    )
+                ]
+            ),
+            limit=limit,
+            offset=offset,
+            with_payload=True,
+            with_vectors=False  # We don't need vectors for this operation
+        )
+        
+        # Sort by chunk_index to maintain document order
+        chunks = sorted(results[0], key=lambda x: x.payload.get('chunk_index', 0))
+        
+        logger.info(f"Retrieved {len(chunks)} chunks for document {document_id} (total: {total_count})")
+        return chunks, total_count
+    except Exception as e:
+        logger.error(f"Failed to get chunks for document {document_id}: {str(e)}")
         raise SearchError(COLLECTION_NAME, str(e))

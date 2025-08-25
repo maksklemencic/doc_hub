@@ -5,12 +5,18 @@ import debugpy
 from dotenv import load_dotenv
 from fastapi import FastAPI, HTTPException, Request, status
 from fastapi.exceptions import RequestValidationError
+from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
+from starlette.middleware.base import BaseHTTPMiddleware
 
 from .errors.database_errors import ServiceError
 from .middleware.auth_middleware import AuthMiddleware
+from .middleware.https_enforcement import HTTPSEnforcementMiddleware
 from .middleware.rate_limit import RateLimitMiddleware
 from .routes import auth, documents, messages, spaces, upload
+
+if os.getenv("ENVIRONMENT", "") == "development":
+    debugpy.listen(("0.0.0.0", 5678))
 
 load_dotenv()
 
@@ -27,35 +33,103 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
-if os.getenv("DEBUG_MODE", "false").lower() == "true":
-    debugpy.listen(("0.0.0.0", 5678))
 
 app = FastAPI(
     title="📄 Documents Hub API",
-    description="API for managing documents and interacting with a RAG system.",
+    description="API for managing documents and interacting with a RAG system. Current version: v1",
     version="1.0.0",
     openapi_tags=auth.tags_metadata +
                 spaces.tags_metadata + 
                 messages.tags_metadata +
                 documents.tags_metadata +
-                upload.tags_metadata,
+                upload.tags_metadata +
+                [{"name": "info", "description": "API information and versioning"}],
     docs_url="/docs",
     redoc_url="/redoc"
 )
 
-# Add middlewares
-app.add_middleware(AuthMiddleware)  # JWT authentication middleware
-app.add_middleware(RateLimitMiddleware, calls=100, period=60)  # 100 requests per minute
+# Middleware setup
+MAX_UPLOAD_SIZE = os.getenv("MAX_UPLOAD_SIZE_MB", 50)  * 1024 * 1024  # 50MB limit
+async def file_size_middleware(app, request: Request, call_next):
+    if request.method == "POST" and "multipart/form-data" in request.headers.get("content-type", ""):
+        content_length = request.headers.get("content-length")
+        if content_length and int(content_length) > MAX_UPLOAD_SIZE:
+            return JSONResponse(
+                status_code=413,
+                content={
+                    "detail": f"File too large. Maximum size is {MAX_UPLOAD_SIZE // (1024*1024)}MB",
+                    "error_code": "file_too_large"
+                }
+            )
+    return await call_next(request)
 
-# Include routers
-app.include_router(auth.router, prefix="/auth")
-app.include_router(upload.router, prefix="/upload")
-app.include_router(documents.router)
-app.include_router(spaces.router, prefix="/spaces")
-app.include_router(messages.router, prefix="/spaces")
-# User management is now handled entirely through OAuth (/auth endpoints)
-# app.include_router(users.router, prefix="/users")  # Removed - OAuth handles all user operations
+class FileSizeLimitMiddleware(BaseHTTPMiddleware):
+    async def dispatch(self, request, call_next):
+        return await file_size_middleware(self.app, request, call_next)
 
+if os.getenv("ENVIRONMENT") == "production":
+    
+    FALLBACK_ALLOWED_ORIGINS = [
+        "https://www.yourdomain.com"
+    ]
+    
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=os.getenv("ALLOWED_ORIGINS", ",".join(FALLBACK_ALLOWED_ORIGINS)).split(","),
+        allow_credentials=True,
+        allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+        allow_headers=["*"],
+        expose_headers=["*"],
+    )
+    app.add_middleware(HTTPSEnforcementMiddleware)
+    app.add_middleware(RateLimitMiddleware, calls=100, period=60)
+
+else:
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=["*"],
+        allow_credentials=True,
+        allow_methods=["*"],
+        allow_headers=["*"],
+    )
+
+app.add_middleware(FileSizeLimitMiddleware)
+app.add_middleware(AuthMiddleware)
+
+API_V1_PREFIX = "/api/v1"
+
+app.include_router(auth.router, prefix=f"{API_V1_PREFIX}/auth", tags=["v1"])
+app.include_router(upload.router, prefix=f"{API_V1_PREFIX}/upload", tags=["v1"])
+app.include_router(documents.router, prefix=f"{API_V1_PREFIX}", tags=["v1"])
+app.include_router(spaces.router, prefix=f"{API_V1_PREFIX}/spaces", tags=["v1"])
+app.include_router(messages.router, prefix=f"{API_V1_PREFIX}/spaces", tags=["v1"])
+
+# API Info endpoint
+@app.get("/", tags=["info"])
+async def api_info():
+    return {
+        "name": "Documents Hub API",
+        "version": "1.0.0",
+        "description": "API for managing documents and interacting with a RAG system",
+        "current_version": "v1",
+        "available_versions": ["v1"],
+        "endpoints": {
+            "v1": f"{API_V1_PREFIX}",
+            "docs": "/docs",
+            "redoc": "/redoc"
+        },
+        "features": [
+            "Document upload and processing",
+            "RAG-based question answering",
+            "Space management",
+            "Message history",
+            "Async processing",
+            "JWT authentication",
+            "OAuth integration"
+        ]
+    }
+
+# Global exception handlers
 @app.exception_handler(RequestValidationError)
 async def validation_exception_handler(request: Request, exc: RequestValidationError):
     error_details = exc.errors()

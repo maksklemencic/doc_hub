@@ -55,14 +55,12 @@ def upload_base64(
     doc_id = None
     
     try:
-        # Process document to extract text
         logger.debug(f"Processing document: {request.filename}")
         pages = document_processor.base64_to_text(
             base64_text=request.content_base64, 
             mime_type=request.mime_type
         )
         
-        # Save file to filesystem
         logger.debug(f"Saving file to filesystem")
         saved_file_path = file_service.save_base64_file(
             request.content_base64, 
@@ -70,7 +68,6 @@ def upload_base64(
             current_user_id
         )
 
-        # Add document to database
         logger.debug(f"Adding document to database")
         doc_id = db_handler.add_document(
             filename=request.filename,
@@ -80,16 +77,23 @@ def upload_base64(
             space_id=request.space_id
         )
         
-        # Prepare metadata for vector storage
-        metadata = create_document_metadata(
-            document_id=doc_id,
-            filename=request.filename,
-            mime_type=request.mime_type,
-            user_id=current_user_id,
-            space_id=request.space_id
-        )
+        metadata = {
+            # Basic metadata
+            "document_id": str(doc_id),
+            "filename": request.filename or "",
+            "mime_type": request.mime_type or "",
+            "user_id": str(current_user_id),
+            "space_id": str(request.space_id),
+        }
         
-        # Create embeddings and store in vector database
+        # metadata = metadata_extractor.create_document_metadata(
+        #     document_id=doc_id,
+        #     filename=request.filename,
+        #     mime_type=request.mime_type,
+        #     user_id=current_user_id,
+        #     space_id=request.space_id
+        # )
+        
         logger.debug(f"Creating embeddings and storing in vector database")
         chunks = save_to_vector_db(pages, metadata)
         
@@ -162,18 +166,15 @@ async def upload_file_multipart(
     doc_id = None
     
     try:
-        # Validate file
         if not file.filename:
             raise HTTPException(status_code=400, detail="No filename provided")
         
-        # Read file contents
         logger.debug(f"Reading file contents: {file.filename}")
         contents = await file.read()
         
         if not contents:
             raise HTTPException(status_code=400, detail="Empty file uploaded")
         
-        # Process document to extract text
         logger.debug(f"Processing document: {file.filename}")
         pages = document_processor.process_document_for_text(contents, file.content_type)
         
@@ -182,7 +183,6 @@ async def upload_file_multipart(
         logger.debug(f"Saving file to filesystem")
         saved_file_path = file_service.save_file(file, current_user_id)
         
-        # Add document to database
         logger.debug(f"Adding document to database")
         doc_id = db_handler.add_document(
             filename=file.filename,
@@ -192,16 +192,23 @@ async def upload_file_multipart(
             space_id=space_id
         )
         
-        # Prepare metadata for vector storage
-        metadata = create_document_metadata(
-            document_id=doc_id,
-            filename=file.filename,
-            mime_type=file.content_type,
-            user_id=current_user_id,
-            space_id=space_id
-        )
+        metadata = {
+            # Basic metadata
+            "document_id": str(doc_id),
+            "filename": file.filename or "",
+            "mime_type": file.content_type or "",
+            "user_id": str(current_user_id),
+            "space_id": str(space_id),
+        }
         
-        # Create embeddings and store in vector database
+        # metadata = metadata_extractor.create_document_metadata(
+        #     document_id=doc_id,
+        #     filename=file.filename,
+        #     mime_type=file.content_type,
+        #     user_id=current_user_id,
+        #     space_id=space_id
+        # )
+        
         logger.debug(f"Creating embeddings and storing in vector database")
         chunks = save_to_vector_db(pages, metadata)
         
@@ -248,10 +255,8 @@ async def upload_file_multipart(
 
     
 def generate_web_document_filename(url: str) -> str:
-    """Generate a safe filename from a URL."""
     try:
         parsed = urlparse(url)
-        # Use domain + path for filename
         domain = parsed.netloc.replace('www.', '')
         path = parsed.path.strip('/').replace('/', '_')
         
@@ -260,15 +265,11 @@ def generate_web_document_filename(url: str) -> str:
         else:
             filename = domain
             
-        # Clean filename to remove invalid characters
         filename = "".join(c for c in filename if c.isalnum() or c in ('_', '-', '.'))
-        
-        # Limit length and add extension
         filename = filename[:200] + ".html"
         
         return filename
     except Exception:
-        # Fallback to a generic name
         return f"webpage_{uuid.uuid4().hex[:8]}.html"
 
 @router.post("/web", 
@@ -297,20 +298,15 @@ def upload_web_document(
     doc_id = None
     
     try:
-        # Scrape web content
         logger.debug(f"Scraping content from URL: {request.url}")
         page_text, web_metadata = web_scraper.scrape_webpage(request.url)
         
-        # Convert to pages format
         pages = [(1, page_text)]
         
-        # Generate filename from URL
         filename = generate_web_document_filename(request.url)
         
-        # Web documents are not saved to filesystem
         saved_file_path = None
         
-        # Add document to database
         logger.debug(f"Adding web document to database")
         doc_id = db_handler.add_document(
             filename=filename,
@@ -319,22 +315,35 @@ def upload_web_document(
             uploaded_by=current_user_id,
             space_id=request.space_id
         )
-
-        # Prepare metadata for vector storage
-        metadata = create_document_metadata(
-            document_id=doc_id,
-            filename=filename,
-            mime_type="text/html",
-            user_id=current_user_id,
-            space_id=request.space_id,
-            url=request.url,
-            title=web_metadata.get('title', ''),
-            author=web_metadata.get('author', ''),
-            date=web_metadata.get('date', ''),
-            sitename=web_metadata.get('sitename', '')
-        )
         
-        # Create embeddings and store in vector database
+        metadata = {
+            # Basic metadata
+            "document_id": str(doc_id),
+            "filename": filename,
+            "mime_type": "text/html",
+            "user_id": str(current_user_id),
+            "space_id": str(request.space_id),
+            # Other metadata fields
+            "url": request.url,
+            "title": web_metadata.get('title', ''),
+            "author": web_metadata.get('author', ''),
+            "date": web_metadata.get('date', ''),
+            "sitename": web_metadata.get('sitename', ''),
+        }
+
+        # metadata = metadata_extractor.create_document_metadata(
+        #     document_id=doc_id,
+        #     filename=filename,
+        #     mime_type="text/html",
+        #     user_id=current_user_id,
+        #     space_id=request.space_id,
+        #     url=request.url,
+        #     title=web_metadata.get('title', ''),
+        #     author=web_metadata.get('author', ''),
+        #     date=web_metadata.get('date', ''),
+        #     sitename=web_metadata.get('sitename', '')
+        # )
+        
         logger.debug(f"Creating embeddings and storing in vector database")
         chunks = save_to_vector_db(pages, metadata)
         
@@ -370,36 +379,9 @@ def upload_web_document(
         if doc_id:
             cleanup_database_document(doc_id)
         raise HTTPException(status_code=500, detail="An unexpected error occurred during upload")
-    
-    
-def create_document_metadata(
-    document_id: uuid.UUID,
-    filename: str,
-    mime_type: str,
-    user_id: uuid.UUID,
-    space_id: uuid.UUID,
-    url: str = "",
-    title: str = "",
-    author: str = "",
-    date: str = "",
-    sitename: str = ""
-) -> dict:
-    """Create standardized metadata object for all document types."""
-    return {
-        'document_id': str(document_id),
-        'filename': filename,
-        'mime_type': mime_type,
-        'user_id': str(user_id),
-        'space_id': str(space_id),
-        'url': url,
-        'title': title,
-        'author': author,
-        'date': date,
-        'sitename': sitename,
-    }
+
 
 def cleanup_file(file_path: str) -> None:
-    """Clean up a file if it exists."""
     try:
         if file_path and Path(file_path).exists():
             file_service.delete_file_and_cleanup(file_path)
@@ -408,23 +390,38 @@ def cleanup_file(file_path: str) -> None:
         logger.warning(f"Failed to cleanup file {file_path}: {str(e)}")
 
 def cleanup_database_document(doc_id: uuid.UUID) -> None:
-    """Clean up database document and associated vector data."""
+    db_success = False
+    vector_success = False
+    
+    # Try to delete from database
     try:
         db_handler.delete_document(doc_id)
-        qdrant_client.delete_document(doc_id)
-        logger.info(f"Cleaned up document: {doc_id}")
+        db_success = True
+        logger.debug(f"Successfully deleted document {doc_id} from database")
     except Exception as e:
-        logger.warning(f"Failed to cleanup document {doc_id}: {str(e)}")
+        logger.warning(f"Failed to delete document {doc_id} from database: {str(e)}")
+    
+    # Try to delete from vector store
+    try:
+        qdrant_client.delete_document(doc_id)
+        vector_success = True
+        logger.debug(f"Successfully deleted document {doc_id} from vector store")
+    except Exception as e:
+        logger.warning(f"Failed to delete document {doc_id} from vector store: {str(e)}")
+    
+    if db_success and vector_success:
+        logger.info(f"Cleaned up document {doc_id} successfully")
+    else:
+        logger.warning(f"Partial cleanup of document {doc_id} - DB: {db_success}, Vector: {vector_success}")
 
 def save_to_vector_db(pages: list[(int, str)], init_metadata: dict):
-    """Process pages into chunks, create embeddings, and store in vector database."""
     logger.debug("Creating chunks from pages")
     chunks, page_numbers = embedding.chunk_pages_with_recursive_chunker(pages=pages)
     
     logger.debug(f"Generating embeddings for {len(chunks)} chunks")
     embeddings = embedding.get_embeddings(chunks=chunks)
         
-    logger.debug("Creating metadata for chunks")
+    logger.debug("Creating extended metadata for chunks")
     metadata = metadata_extractor.create_metadata(
         chunks=chunks, 
         page_numbers=page_numbers, 

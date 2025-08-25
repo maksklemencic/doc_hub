@@ -8,8 +8,18 @@ from ..errors.database_errors import DatabaseError, NotFoundError, PermissionErr
 from ..errors.embedding_errors import EmbeddingError, InvalidInputError
 from ..errors.ollama_errors import LLMError
 from ..errors.qdrant_errors import VectorStoreError
-from ..models.messages import CreateMessageRequest, GetMessagesRequest, GetMessagesResponseWrapper, MessageResponse, UpdateMessageRequest, MessageResponseWrapper
+from ..models.messages import (
+    AsyncMessageResponse, 
+    CreateMessageRequest, 
+    GetMessagesRequest, 
+    GetMessagesResponseWrapper, 
+    MessageResponse, 
+    TaskStatusResponse,
+    UpdateMessageRequest, 
+    MessageResponseWrapper
+)
 from ..services import db_handler, embedding, ollama_client, qdrant_client
+from ..services.background_tasks import task_manager, TaskStatus
 
 router = APIRouter()
 
@@ -46,13 +56,36 @@ def create_message(
     current_user_id: uuid.UUID = Depends(get_current_user)
 ):
     try:
+        # Handle async processing
+        if request.async_processing:
+            # Create background task for async processing
+            task_data = {
+                "space_id": str(space_id),
+                "user_id": str(current_user_id),
+                "content": request.content,
+                "use_context": request.use_context,
+                "only_space_documents": request.only_space_documents,
+                "top_k": request.top_k,
+                "stream": request.stream
+            }
+            
+            task_id = task_manager.create_task("generate_llm_response", task_data)
+            
+            return AsyncMessageResponse(
+                task_id=task_id,
+                status="pending",
+                message=f"Message processing started. Use task ID {task_id} to check status."
+            )
+        
+        # Synchronous processing (existing logic)
         if request.use_context is True:
             query_embedding = embedding.get_embeddings([request.content])[0]
 
             top_k_chunks = qdrant_client.query_top_k(
                 query_embedding, 
                 user_id=current_user_id, 
-                k=request.top_k
+                k=request.top_k,
+                space_id=space_id if request.only_space_documents else None
             )
             
             context = "\n".join([res.payload["text"] for res in top_k_chunks])
@@ -67,7 +100,7 @@ def create_message(
         )
 
         
-        db_message = db_handler.create_message(request.content, space_id, current_user_id)
+        db_message = db_handler.create_message(request.content, response, space_id, current_user_id)
         
         return {
             "data": {
@@ -79,11 +112,15 @@ def create_message(
                 "id": db_message.id,
                 "space_id": db_message.space_id,
                 "user_id": db_message.user_id,
-                "content": request.content,
+                "content": db_message.content,
+                "response": db_message.response,
                 "created_at": db_message.created_at
             }
         }
     
+    except PermissionError as e:
+        logger.warning(f"Permission denied for user {current_user_id} to create message in space {space_id}")
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=e.message)
     except NotFoundError as e:
         logger.warning(f"Space {space_id} not found for user {current_user_id}")
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=e.message)
@@ -104,6 +141,56 @@ def create_message(
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=f"Vector error: {e.message}")
     except Exception as e:
         logger.error(f"Unexpected error creating message in space {space_id} for user {current_user_id}: {str(e)}")
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="An unexpected error occurred.")
+
+
+@router.get(
+    "/tasks/{task_id}",
+    response_model=TaskStatusResponse,
+    tags=["messages"],
+    summary="Get task status",
+    description="Get the status of a background task (e.g., async message processing).",
+    response_description="Current status and progress of the background task.",
+    status_code=status.HTTP_200_OK,
+    responses={
+        200: {"description": "Task status retrieved successfully"},
+        401: {"description": "Authentication required"},
+        404: {"description": "Task not found"},
+        500: {"description": "Internal server error"}
+    }
+)
+def get_task_status(
+    task_id: str,
+    current_user_id: uuid.UUID = Depends(get_current_user)
+):
+    try:
+        task = task_manager.get_task_status(task_id)
+        if not task:
+            logger.warning(f"Task {task_id} not found")
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Task not found")
+        
+        # Basic authorization check - ensure task belongs to user
+        # (In a real implementation, you'd store user_id with the task)
+        task_user_id = task.metadata.get("user_id")
+        if task_user_id and task_user_id != str(current_user_id):
+            logger.warning(f"Permission denied for user {current_user_id} to access task {task_id}")
+            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Access denied")
+        
+        return TaskStatusResponse(
+            task_id=task.task_id,
+            status=task.status.value,
+            progress=task.progress,
+            result=task.result,
+            error=task.error,
+            created_at=task.created_at,
+            started_at=task.started_at,
+            completed_at=task.completed_at
+        )
+    
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Unexpected error retrieving task status {task_id}: {str(e)}")
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="An unexpected error occurred.")
 
 
@@ -174,7 +261,7 @@ def update_message(
     current_user_id: uuid.UUID = Depends(get_current_user)
 ):
     try:
-        message = db_handler.update_message(message_id, space_id, current_user_id, request.content)
+        message = db_handler.update_message(message_id, space_id, current_user_id, request.content, request.response)
         return message
     except PermissionError as e:
         logger.warning(f"Permission denied for user {current_user_id} to update message {message_id} in space {space_id}")

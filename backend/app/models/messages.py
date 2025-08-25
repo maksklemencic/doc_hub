@@ -16,6 +16,7 @@ class MessageResponse(BaseModel):
     space_id: uuid.UUID = Field(..., description="Identifier of the space the message belongs to.")
     user_id: uuid.UUID = Field(..., description="Identifier of the user who created the message.")
     content: str = Field(..., description="The content of the message.")
+    response: Optional[str] = Field(None, description="The AI response to the message.")
     created_at: Optional[datetime] = Field(None, description="Timestamp when the message was created.")
     
     class Config:
@@ -30,14 +31,33 @@ class CreateMessageRequest(BaseModel):
     stream: bool = Field(False, description="Whether to stream the response or not.")
     top_k: int = Field(5, ge=1, le=100, description="Number of top results to return when using context.")
     use_context: bool = Field(True, description="Whether to use context from the RAG system.")
+    only_space_documents: bool = Field(True, description="Whether to restrict context to documents within the same space.")
+    async_processing: bool = Field(False, description="Whether to process the message asynchronously in the background.")
+
+class AsyncMessageResponse(BaseModel):
+    task_id: str = Field(..., description="Background task ID for async message processing.")
+    status: str = Field(..., description="Initial task status.")
+    message: str = Field(..., description="Status message.")
+
+class TaskStatusResponse(BaseModel):
+    task_id: str = Field(..., description="Background task ID.")
+    status: str = Field(..., description="Current task status.")
+    progress: float = Field(..., ge=0.0, le=100.0, description="Task completion progress (0-100).")
+    result: Optional[dict] = Field(None, description="Task result if completed.")
+    error: Optional[str] = Field(None, description="Error message if failed.")
+    created_at: Optional[datetime] = Field(None, description="Task creation timestamp.")
+    started_at: Optional[datetime] = Field(None, description="Task start timestamp.")
+    completed_at: Optional[datetime] = Field(None, description="Task completion timestamp.")
 
 class UpdateMessageRequest(BaseModel):
     content: str = Field(..., min_length=1, description="The new content of the message.")
+    response: Optional[str] = Field(None, description="The new AI response to the message.")
     
     class Config:
         json_schema_extra = {
             "example": {
-                "content": "What are the key points in document X regarding Y?"
+                "content": "What are the key points in document X regarding Y?",
+                "response": "Based on the documents, the key points are..."
             }
         }
 

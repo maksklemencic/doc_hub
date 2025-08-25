@@ -330,36 +330,36 @@ async def update_current_user_profile(
         )
 
 
-@router.get(
-    "/health",
-    tags=["auth"],
-    summary="Authentication service health check",
-    description="Check if the authentication service is operational.",
-    responses={
-        200: {"description": "Service is healthy"},
-        503: {"description": "Service unavailable"}
-    }
-)
-async def auth_health_check():
-    """Health check for authentication service."""
-    try:
-        logger.debug("Performing authentication service health check")
+# @router.get(
+#     "/health",
+#     tags=["auth"],
+#     summary="Authentication service health check",
+#     description="Check if the authentication service is operational.",
+#     responses={
+#         200: {"description": "Service is healthy"},
+#         503: {"description": "Service unavailable"}
+#     }
+# )
+# async def auth_health_check():
+#     """Health check for authentication service."""
+#     try:
+#         logger.debug("Performing authentication service health check")
         
-        # Try to get Google provider configuration
-        await oauth_service.get_google_provider_cfg()
+#         # Try to get Google provider configuration
+#         await oauth_service.get_google_provider_cfg()
         
-        logger.info("Authentication service health check passed")
-        return {"status": "healthy", "service": "authentication"}
+#         logger.info("Authentication service health check passed")
+#         return {"status": "healthy", "service": "authentication"}
         
-    except OAuthProviderError as e:
-        logger.error(f"OAuth provider unavailable during health check: {e.message}")
-        raise HTTPException(
-            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            detail="OAuth provider unavailable"
-        )
-    except Exception as e:
-        logger.error(f"Unexpected error during auth health check: {str(e)}")
-        raise HTTPException(
-            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            detail="Authentication service unavailable"
-        )
+#     except OAuthProviderError as e:
+#         logger.error(f"OAuth provider unavailable during health check: {e.message}")
+#         raise HTTPException(
+#             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+#             detail="OAuth provider unavailable"
+#         )
+#     except Exception as e:
+#         logger.error(f"Unexpected error during auth health check: {str(e)}")
+#         raise HTTPException(
+#             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+#             detail="Authentication service unavailable"
+#         )

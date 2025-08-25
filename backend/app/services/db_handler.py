@@ -3,7 +3,7 @@ import os
 import uuid
 from typing import List, Optional
 
-from sqlalchemy import create_engine, exc
+from sqlalchemy import create_engine, exc, or_
 from sqlalchemy.orm import sessionmaker
 
 from ..errors.database_errors import ConflictError, DatabaseError, NotFoundError, PermissionError
@@ -20,13 +20,42 @@ logger = logging.getLogger(__name__)
 
 
 # Documents CRUD operations
-def get_document_by_id(doc_id: uuid.UUID) -> Document | None:
-    session = SessionLocal()
-    try:
-        doc = session.query(Document).filter(Document.id == doc_id).first()
-        return doc
-    finally:
-        session.close()
+def get_user_document_by_id(doc_id: uuid.UUID, user_id: uuid.UUID) -> Document | None:
+    """Get document if user uploaded it OR owns the space it's in."""
+    logger.info(f"Fetching document {doc_id} for user {user_id}")
+    with SessionLocal() as session:
+        try:
+            # Try to get document with two-tier authorization:
+            # 1. User uploaded the document, OR
+            # 2. User owns the space containing the document
+            # First check if document exists at all
+            doc_exists = session.query(Document).filter(Document.id == doc_id).first()
+            if not doc_exists:
+                logger.warning(f"Document {doc_id} does not exist.")
+                raise NotFoundError("Document", str(doc_id))
+            
+            # Then check authorization
+            doc = session.query(Document)\
+                .join(Space, Document.space_id == Space.id)\
+                .filter(
+                    Document.id == doc_id,
+                    or_(
+                        Document.uploaded_by == user_id,  # User uploaded it
+                        Space.user_id == user_id          # User owns the space
+                    )
+                ).first()
+                
+            if not doc:
+                logger.warning(f"User {user_id} not authorized to access document {doc_id}.")
+                raise PermissionError("Not authorized to access this document")
+                
+            return doc
+        except exc.OperationalError as e:
+            logger.error(f"Database unavailable while fetching document {doc_id} for user {user_id}: {str(e)}")
+            raise DatabaseError("Database unavailable")
+        except exc.SQLAlchemyError as e:
+            logger.error(f"Unexpected database error while fetching document {doc_id} for user {user_id}: {str(e)}")
+            raise DatabaseError(f"Error fetching document: {str(e)}")
 
 
 def get_paginated_documents(user_id: uuid.UUID, space_id: uuid.UUID, limit: int, offset: int) -> tuple[List[Document], int]:
@@ -231,16 +260,22 @@ def delete_space(user_id: uuid.UUID, space_id: uuid.UUID):
             raise DatabaseError(f"Error updating space: {str(e)}")
 
 # Messages CRUD Operaions
-def create_message(content: str, space_id: uuid.UUID, user_id: uuid.UUID) -> Message:
+def create_message(content: str, response: str, space_id: uuid.UUID, user_id: uuid.UUID) -> Message:
     logger.info(f"Creating message in space {space_id} for user {user_id}")
     with SessionLocal() as session:
         try:
-            space = session.query(Space).filter(Space.id == space_id, Space.user_id == user_id).first()
-            if not space:
-                logger.warning(f"Space {space_id} not found or user {user_id} not authorized.")
+            # Check if space exists
+            space_exists = session.query(Space).filter(Space.id == space_id).first()
+            if not space_exists:
+                logger.warning(f"Space {space_id} does not exist.")
                 raise NotFoundError("Space", str(space_id))
+            
+            # Check if user owns the space
+            if space_exists.user_id != user_id:
+                logger.warning(f"User {user_id} not authorized to create message in space {space_id}.")
+                raise PermissionError("Not authorized to create messages in this space")
 
-            message = Message(content=content, space_id=space_id, user_id=user_id)
+            message = Message(content=content, response=response, space_id=space_id, user_id=user_id)
             session.add(message)
             session.commit()
             session.refresh(message)
@@ -280,32 +315,30 @@ def get_paginated_messages(user_id: uuid.UUID, space_id: uuid.UUID, limit: int, 
             raise DatabaseError(f"Error fetching messages: {str(e)}")
 
 
-def update_message(message_id: uuid.UUID, space_id: uuid.UUID, user_id: uuid.UUID, content: str) -> Message:
-    """Update message content. Users can only update their own messages."""
+def update_message(message_id: uuid.UUID, space_id: uuid.UUID, user_id: uuid.UUID, content: str, response: str = None) -> Message:
+    """Update message content. Users can update any message in spaces they own."""
     logger.info(f"Updating message {message_id} in space {space_id} for user {user_id}")
     with SessionLocal() as session:
         try:
-            # Verify space ownership and message existence
+            # Verify space ownership
             space = session.query(Space).filter(Space.id == space_id, Space.user_id == user_id).first()
             if not space:
                 logger.warning(f"Space {space_id} not found or user {user_id} not authorized.")
                 raise NotFoundError("Space", str(space_id))
             
+            # Get message in the owned space (regardless of message author)
             message = session.query(Message).filter(
                 Message.id == message_id,
-                Message.space_id == space_id,
-                Message.user_id == user_id
+                Message.space_id == space_id
             ).first()
             if not message:
-                logger.warning(f"Message {message_id} not found for user {user_id} in space {space_id}")
+                logger.warning(f"Message {message_id} not found in space {space_id}")
                 raise NotFoundError("Message", str(message_id))
-            
-            if message.user_id != user_id:
-                logger.warning(f"Permission denied for user {user_id} on message {message_id} in space {space_id}")
-                raise PermissionError("Not authorized to update this message")
 
             # Update message content
             message.content = content
+            if response is not None:
+                message.response = response
             session.commit()
             session.refresh(message)
             logger.info(f"Successfully updated message {message_id} for user {user_id}")
@@ -321,20 +354,24 @@ def update_message(message_id: uuid.UUID, space_id: uuid.UUID, user_id: uuid.UUI
 
 
 def delete_message(message_id: uuid.UUID, space_id: uuid.UUID, user_id: uuid.UUID):
+    """Delete message. Users can delete any message in spaces they own."""
     logger.info(f"Deleting message {message_id} in space {space_id} for user {user_id}")
     with SessionLocal() as session:
         try:
+            # Verify space ownership
+            space = session.query(Space).filter(Space.id == space_id, Space.user_id == user_id).first()
+            if not space:
+                logger.warning(f"Space {space_id} not found or user {user_id} not authorized.")
+                raise NotFoundError("Space", str(space_id))
+            
+            # Get message in the owned space (regardless of message author)
             message = session.query(Message).filter(
                 Message.id == message_id,
-                Message.space_id == space_id,
-                Message.user_id == user_id
+                Message.space_id == space_id
             ).first()
             if not message:
-                logger.warning(f"Message {message_id} not found for user {user_id} in space {space_id}")
+                logger.warning(f"Message {message_id} not found in space {space_id}")
                 raise NotFoundError("Message", str(message_id))
-            if message.user_id != user_id:
-                logger.warning(f"Permission denied for user {user_id} on message {message_id} in space {space_id}")
-                raise PermissionError("Not authorized to delete this message")
 
             session.delete(message)
             session.commit()
