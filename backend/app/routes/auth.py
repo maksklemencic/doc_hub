@@ -1,4 +1,5 @@
 import logging
+import os
 from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
@@ -89,19 +90,17 @@ async def oauth_callback(
     code: Optional[str] = Query(None, description="Authorization code from OAuth provider"),
     error: Optional[str] = Query(None, description="Error from OAuth provider")
 ):
+    frontend_url = f"{os.environ.get('FRONTEND_URL', 'http://localhost:3000')}/auth/callback"
+    
     if error:
         logger.warning(f"OAuth error received from provider: {error}")
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"OAuth authentication failed: {error}"
-        )
+        error_url = f"{frontend_url}?error=oauth_provider_error&error_description={error}"
+        return RedirectResponse(url=error_url)
     
     if not code:
         logger.warning("OAuth callback received without authorization code")
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Authorization code not provided"
-        )
+        error_url = f"{frontend_url}?error=no_code&error_description=Authorization+code+not+provided"
+        return RedirectResponse(url=error_url)
     
     try:
         logger.info("Processing OAuth callback with authorization code")
@@ -109,50 +108,41 @@ async def oauth_callback(
         # Complete OAuth flow
         auth_response = await oauth_service.authenticate_user(code)
         logger.info(f"User authentication completed successfully: {auth_response.user.email}")
-        return auth_response
+        
+        # Redirect to frontend with auth data as URL parameters
+        redirect_url = f"{frontend_url}?access_token={auth_response.access_token}&expires_in={auth_response.expires_in}&user_id={auth_response.user.id}&user_email={auth_response.user.email}&user_name={auth_response.user.name}"
+        
+        logger.info(f"Redirecting user to frontend: {frontend_url}")
+        return RedirectResponse(url=redirect_url)
         
     except InvalidAuthorizationCodeError as e:
         logger.warning(f"Invalid authorization code in OAuth callback: {e.message}")
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Invalid or expired authorization code"
-        )
+        error_url = f"{frontend_url}?error=invalid_code&error_description=Invalid+or+expired+authorization+code"
+        return RedirectResponse(url=error_url)
     except TokenExchangeError as e:
         logger.error(f"Token exchange failed in OAuth callback: {e.message}")
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Failed to exchange authorization code for tokens"
-        )
+        error_url = f"{frontend_url}?error=token_exchange_failed&error_description=Failed+to+exchange+authorization+code+for+tokens"
+        return RedirectResponse(url=error_url)
     except UserInfoError as e:
         logger.error(f"Failed to retrieve user info in OAuth callback: {e.message}")
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Failed to retrieve user information"
-        )
+        error_url = f"{frontend_url}?error=user_info_failed&error_description=Failed+to+retrieve+user+information"
+        return RedirectResponse(url=error_url)
     except OAuthProviderError as e:
         logger.error(f"OAuth provider error in callback: {e.message}")
-        raise HTTPException(
-            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            detail="OAuth service temporarily unavailable"
-        )
+        error_url = f"{frontend_url}?error=oauth_provider_error&error_description=OAuth+service+temporarily+unavailable"
+        return RedirectResponse(url=error_url)
     except DatabaseError as e:
         logger.error(f"Database error during OAuth authentication: {e.message}")
-        raise HTTPException(
-            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            detail="Database service temporarily unavailable"
-        )
+        error_url = f"{frontend_url}?error=database_error&error_description=Database+service+temporarily+unavailable"
+        return RedirectResponse(url=error_url)
     except AuthenticationFailedError as e:
         logger.error(f"Authentication failed in OAuth callback: {e.message}")
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Authentication failed"
-        )
+        error_url = f"{frontend_url}?error=auth_failed&error_description=Authentication+failed"
+        return RedirectResponse(url=error_url)
     except Exception as e:
         logger.error(f"Unexpected error in OAuth callback: {str(e)}")
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Authentication callback failed"
-        )
+        error_url = f"{frontend_url}?error=unexpected_error&error_description=Authentication+callback+failed"
+        return RedirectResponse(url=error_url)
 
 
 @router.post(

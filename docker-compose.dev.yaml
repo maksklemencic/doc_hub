@@ -106,15 +106,22 @@ services:
         condition: service_completed_successfully
 
 
-  # frontend:
-  #   build:
-  #     context: ./frontend
-  #     dockerfile: ../docker/frontend/Dockerfile
-  #   ports:
-  #     - "3000:3000"
-  #   env_file: .env
-  #   depends_on:
-  #     - backend
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: ../docker/frontend/Dockerfile
+    ports:
+      - "3000:3000"
+    env_file:
+      - .env.dev
+    volumes:
+      - ./frontend:/app
+      # - ./.env.dev:/app/.env.local
+      - /app/node_modules
+      - /app/.next
+    depends_on:
+      - backend
+    restart: unless-stopped
 
 volumes:
   ollama_data:
