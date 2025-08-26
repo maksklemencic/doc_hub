@@ -49,7 +49,7 @@ app = FastAPI(
 )
 
 # Middleware setup
-MAX_UPLOAD_SIZE = os.getenv("MAX_UPLOAD_SIZE_MB", 50)  * 1024 * 1024  # 50MB limit
+MAX_UPLOAD_SIZE = int(os.getenv("MAX_UPLOAD_SIZE_MB", "50")) * 1024 * 1024  # 50MB limit
 async def file_size_middleware(app, request: Request, call_next):
     if request.method == "POST" and "multipart/form-data" in request.headers.get("content-type", ""):
         content_length = request.headers.get("content-length")

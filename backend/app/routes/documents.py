@@ -54,6 +54,10 @@ def get_documents(
     current_user_id: uuid.UUID = Depends(get_current_user)
 ):
     try:
+        # FIRST: Validate space ownership before any processing
+        logger.debug(f"Validating space {space_id} ownership for user {current_user_id}")
+        db_handler.validate_space_ownership(space_id, current_user_id)
+        
         documents, total_count = db_handler.get_paginated_documents(
             current_user_id, space_id, request.limit, request.offset
         )
@@ -67,10 +71,13 @@ def get_documents(
         }
     except NotFoundError as e:
         logger.warning(f"Space {space_id} not found for user {current_user_id}")
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Space not found")
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=e.message)
+    except PermissionError as e:
+        logger.warning(f"Permission denied for user {current_user_id} on space {space_id}")
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=e.message)
     except DatabaseError as e:
         logger.error(f"Database error fetching documents in space {space_id} for user {current_user_id}: {str(e)}")
-        raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail="Service temporarily unavailable")
+        raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail=f"Database error: {e.message}")
     except Exception as e:
         logger.error(f"Unexpected error fetching documents in space {space_id} for user {current_user_id}: {str(e)}")
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="An unexpected error occurred")
@@ -119,19 +126,19 @@ def view_document(
         )
     except PermissionError as e:
         logger.warning(f"Permission denied for user {current_user_id} to view document {doc_id}")
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Access denied")
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=e.message)
     except NotFoundError as e:
         logger.warning(f"Document {doc_id} not found")
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Document not found")
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=e.message)
     except FileNotFoundError as e:
         logger.error(f"File not found for document {doc_id}: {str(e)}")
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Document file not found")
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Document file not found on disk")
     except FileReadError as e:
         logger.error(f"Failed to read file for document {doc_id}: {str(e)}")
-        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Failed to read document file")
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=f"Failed to read document file: {e.message}")
     except DatabaseError as e:
         logger.error(f"Database error accessing document {doc_id}: {str(e)}")
-        raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail="Service temporarily unavailable")
+        raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail=f"Database error: {e.message}")
     except Exception as e:
         logger.error(f"Unexpected error viewing document {doc_id}: {str(e)}")
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="An unexpected error occurred")
@@ -239,16 +246,16 @@ def get_document_with_chunks(
         
     except PermissionError as e:
         logger.warning(f"Permission denied for user {current_user_id} to access document {doc_id}")
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Access denied")
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=e.message)
     except NotFoundError as e:
         logger.warning(f"Document {doc_id} not found")
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Document not found")
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=e.message)
     except VectorStoreError as e:
         logger.error(f"Vector store error retrieving chunks for document {doc_id}: {str(e)}")
-        raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail="Vector database unavailable")
+        raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail=f"Vector database error: {e.message}")
     except DatabaseError as e:
         logger.error(f"Database error accessing document {doc_id}: {str(e)}")
-        raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail="Service temporarily unavailable")
+        raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail=f"Database error: {e.message}")
     except Exception as e:
         logger.error(f"Unexpected error retrieving document {doc_id} with chunks: {str(e)}")
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="An unexpected error occurred")
@@ -290,23 +297,23 @@ def delete_document(
         qdrant_client.delete_document(doc_id)
         
         # 3. Delete from database
-        db_handler.delete_document(doc_id)
+        db_handler.delete_document(doc_id, current_user_id)
         
         logger.info(f"Successfully deleted document {doc_id} for user {current_user_id}")
         return
         
     except PermissionError as e:
         logger.warning(f"Permission denied for user {current_user_id} to delete document {doc_id}")
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Access denied")
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=e.message)
     except NotFoundError as e:
         logger.warning(f"Document {doc_id} not found")
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Document not found")
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=e.message)
     except FileNotFoundError as e:
         logger.warning(f"File not found for document {doc_id}: {str(e)}")
         # Continue with deletion from vector DB and database even if file is missing
         try:
             qdrant_client.delete_document(doc_id)
-            db_handler.delete_document(doc_id)
+            db_handler.delete_document(doc_id, current_user_id)
             logger.info(f"Successfully deleted document {doc_id} (file was missing) for user {current_user_id}")
             return
         except Exception as cleanup_e:
@@ -320,7 +327,7 @@ def delete_document(
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Failed to delete from vector database")
     except DatabaseError as e:
         logger.error(f"Database error deleting document {doc_id}: {str(e)}")
-        raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail="Service temporarily unavailable")
+        raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail=f"Database error: {e.message}")
     except Exception as e:
         logger.error(f"Unexpected error deleting document {doc_id}: {str(e)}")
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="An unexpected error occurred")

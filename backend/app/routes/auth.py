@@ -45,7 +45,6 @@ tags_metadata = [
     }
 )
 async def login():
-    """Initiate OAuth login flow."""
     try:
         logger.info("Initiating OAuth login flow")
         auth_url = await oauth_service.get_authorization_url()
@@ -90,7 +89,6 @@ async def oauth_callback(
     code: Optional[str] = Query(None, description="Authorization code from OAuth provider"),
     error: Optional[str] = Query(None, description="Error from OAuth provider")
 ):
-    """Handle OAuth callback and complete authentication."""
     if error:
         logger.warning(f"OAuth error received from provider: {error}")
         raise HTTPException(

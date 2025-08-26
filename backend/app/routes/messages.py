@@ -56,6 +56,10 @@ def create_message(
     current_user_id: uuid.UUID = Depends(get_current_user)
 ):
     try:
+        # FIRST: Validate space ownership before any processing
+        logger.debug(f"Validating space {space_id} ownership for user {current_user_id}")
+        db_handler.validate_space_ownership(space_id, current_user_id)
+        
         # Handle async processing
         if request.async_processing:
             # Create background task for async processing
@@ -216,6 +220,10 @@ def get_messages(
     current_user_id: uuid.UUID = Depends(get_current_user)
 ):
     try:
+        # FIRST: Validate space ownership before any processing
+        logger.debug(f"Validating space {space_id} ownership for user {current_user_id}")
+        db_handler.validate_space_ownership(space_id, current_user_id)
+        
         messages, total_count = db_handler.get_paginated_messages(current_user_id, space_id, request.limit, request.offset)
         return {
             "messages": messages,
@@ -228,6 +236,9 @@ def get_messages(
     except NotFoundError as e:
         logger.warning(f"Space {space_id} not found for user {current_user_id}")
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=e.message)
+    except PermissionError as e:
+        logger.warning(f"Permission denied for user {current_user_id} on space {space_id}")
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=e.message)
     except DatabaseError as e:
         logger.error(f"Database error fetching messages in space {space_id} for user {current_user_id}: {e.message}")
         raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail=e.message)
@@ -261,6 +272,10 @@ def update_message(
     current_user_id: uuid.UUID = Depends(get_current_user)
 ):
     try:
+        # FIRST: Validate space ownership before any processing
+        logger.debug(f"Validating space {space_id} ownership for user {current_user_id}")
+        db_handler.validate_space_ownership(space_id, current_user_id)
+        
         message = db_handler.update_message(message_id, space_id, current_user_id, request.content, request.response)
         return message
     except PermissionError as e:
@@ -299,6 +314,10 @@ def delete_message(
     current_user_id: uuid.UUID = Depends(get_current_user)
 ):
     try:
+        # FIRST: Validate space ownership before any processing
+        logger.debug(f"Validating space {space_id} ownership for user {current_user_id}")
+        db_handler.validate_space_ownership(space_id, current_user_id)
+        
         db_handler.delete_message(message_id, space_id, current_user_id)
     except PermissionError as e:
         logger.warning(f"Permission denied for user {current_user_id} to delete message {message_id} in space {space_id}")

@@ -37,5 +37,8 @@ At its core, Documents Hub leverages cutting-edge technologies to provide a seam
 ## Backend
 Docs are avaiable at: http://localhost:8000/docs#/
 
+## Tests
+docker-compose -f docker-compose.test.yaml up --build --abort-on-container-exit
+
 ## Check Qdrant Database
 http://localhost:6333/dashboard

@@ -133,4 +133,4 @@ if __name__ == "__main__":
     else:
         print("Database already has tables. Skipping creation.")
 
-    insert_test_data()
+    # insert_test_data()

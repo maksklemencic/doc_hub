@@ -6,7 +6,7 @@ from urllib.parse import urlparse
 from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile, status
 
 from ..dependencies.auth import get_current_user
-from ..errors.database_errors import DatabaseError, PermissionError
+from ..errors.database_errors import DatabaseError, NotFoundError, PermissionError
 from ..errors.document_processor_errors import DocumentCorruptedError, EmptyDocumentError, UnsupportedDocumentTypeError
 from ..errors.embedding_errors import ChunkingError, EmbeddingError
 from ..errors.file_errors import EmptyFileError, FileSaveError
@@ -55,6 +55,10 @@ def upload_base64(
     doc_id = None
     
     try:
+        # FIRST: Validate space ownership before any processing
+        logger.debug(f"Validating space {request.space_id} ownership for user {current_user_id}")
+        db_handler.validate_space_ownership(request.space_id, current_user_id)
+        
         logger.debug(f"Processing document: {request.filename}")
         pages = document_processor.base64_to_text(
             base64_text=request.content_base64, 
@@ -106,6 +110,20 @@ def upload_base64(
             file_path=saved_file_path
         )
 
+    except NotFoundError as e:
+        logger.warning(f"Space not found for {request.filename}: {str(e)}")
+        if saved_file_path:
+            cleanup_file(saved_file_path)
+        if doc_id:
+            cleanup_database_document(doc_id)
+        raise HTTPException(status_code=404, detail=e.message)
+    except PermissionError as e:
+        logger.warning(f"Permission denied for {request.filename}: {str(e)}")
+        if saved_file_path:
+            cleanup_file(saved_file_path)
+        if doc_id:
+            cleanup_database_document(doc_id)
+        raise HTTPException(status_code=403, detail=e.message)
     except (UnsupportedDocumentTypeError, DocumentCorruptedError, EmptyDocumentError) as e:
         logger.warning(f"Document processing error for {request.filename}: {str(e)}")
         if saved_file_path:
@@ -122,7 +140,7 @@ def upload_base64(
         logger.error(f"Database error for {request.filename}: {str(e)}")
         if saved_file_path:
             cleanup_file(saved_file_path)
-        raise HTTPException(status_code=500, detail=f"Database error: {e.message}")
+        raise HTTPException(status_code=503, detail=f"Database error: {e.message}")
     except (EmbeddingError, ChunkingError, MetadataExtractorError, VectorStoreError) as e:
         logger.error(f"Vector processing error for {request.filename}: {str(e)}")
         if saved_file_path:
@@ -168,6 +186,10 @@ async def upload_file_multipart(
     try:
         if not file.filename:
             raise HTTPException(status_code=400, detail="No filename provided")
+        
+        # FIRST: Validate space ownership before any processing
+        logger.debug(f"Validating space {space_id} ownership for user {current_user_id}")
+        db_handler.validate_space_ownership(space_id, current_user_id)
         
         logger.debug(f"Reading file contents: {file.filename}")
         contents = await file.read()
@@ -221,6 +243,20 @@ async def upload_file_multipart(
             file_path=saved_file_path
         )
         
+    except NotFoundError as e:
+        logger.warning(f"Space not found for {file.filename}: {str(e)}")
+        if saved_file_path:
+            cleanup_file(saved_file_path)
+        if doc_id:
+            cleanup_database_document(doc_id)
+        raise HTTPException(status_code=404, detail=e.message)
+    except PermissionError as e:
+        logger.warning(f"Permission denied for {file.filename}: {str(e)}")
+        if saved_file_path:
+            cleanup_file(saved_file_path)
+        if doc_id:
+            cleanup_database_document(doc_id)
+        raise HTTPException(status_code=403, detail=e.message)
     except (UnsupportedDocumentTypeError, DocumentCorruptedError, EmptyDocumentError) as e:
         logger.warning(f"Document processing error for {file.filename}: {str(e)}")
         if saved_file_path:
@@ -237,7 +273,7 @@ async def upload_file_multipart(
         logger.error(f"Database error for {file.filename}: {str(e)}")
         if saved_file_path:
             cleanup_file(saved_file_path)
-        raise HTTPException(status_code=500, detail=f"Database error: {e.message}")
+        raise HTTPException(status_code=503, detail=f"Database error: {e.message}")
     except (EmbeddingError, ChunkingError, MetadataExtractorError, VectorStoreError) as e:
         logger.error(f"Vector processing error for {file.filename}: {str(e)}")
         if saved_file_path:
@@ -298,6 +334,10 @@ def upload_web_document(
     doc_id = None
     
     try:
+        # FIRST: Validate space ownership before any processing
+        logger.debug(f"Validating space {request.space_id} ownership for user {current_user_id}")
+        db_handler.validate_space_ownership(request.space_id, current_user_id)
+        
         logger.debug(f"Scraping content from URL: {request.url}")
         page_text, web_metadata = web_scraper.scrape_webpage(request.url)
         
@@ -356,6 +396,16 @@ def upload_web_document(
             url=request.url
         )
         
+    except NotFoundError as e:
+        logger.warning(f"Space not found for {request.url}: {str(e)}")
+        if doc_id:
+            cleanup_database_document(doc_id)
+        raise HTTPException(status_code=404, detail=e.message)
+    except PermissionError as e:
+        logger.warning(f"Permission denied for {request.url}: {str(e)}")
+        if doc_id:
+            cleanup_database_document(doc_id)
+        raise HTTPException(status_code=403, detail=e.message)
     except (InvalidURLError, URLFetchError, ContentExtractionError) as e:
         logger.warning(f"Web scraping error for {request.url}: {str(e)}")
         if doc_id:
@@ -363,17 +413,14 @@ def upload_web_document(
         raise HTTPException(status_code=400, detail=f"Web scraping failed: {e.message}")
     except DatabaseError as e:
         logger.error(f"Database error for {request.url}: {str(e)}")
-        raise HTTPException(status_code=500, detail=f"Database error: {e.message}")
+        if doc_id:
+            cleanup_database_document(doc_id)
+        raise HTTPException(status_code=503, detail=f"Database error: {e.message}")
     except (EmbeddingError, ChunkingError, MetadataExtractorError, VectorStoreError) as e:
         logger.error(f"Vector processing error for {request.url}: {str(e)}")
         if doc_id:
             cleanup_database_document(doc_id)
         raise HTTPException(status_code=500, detail=f"Vector processing failed: {e.message}")
-    except PermissionError as e:
-        logger.error(f"Forbidden error for {request.url}: {str(e)}")
-        if doc_id:
-            cleanup_database_document(doc_id)
-        raise HTTPException(status_code=403, detail=f"Access forbidden: {e.message}")
     except Exception as e:
         logger.error(f"Unexpected error uploading web document from {request.url}: {str(e)}")
         if doc_id:
@@ -393,9 +440,9 @@ def cleanup_database_document(doc_id: uuid.UUID) -> None:
     db_success = False
     vector_success = False
     
-    # Try to delete from database
+    # Try to delete from database (no authorization needed for cleanup)
     try:
-        db_handler.delete_document(doc_id)
+        db_handler.delete_document(doc_id)  # No user_id for cleanup operations
         db_success = True
         logger.debug(f"Successfully deleted document {doc_id} from database")
     except Exception as e:

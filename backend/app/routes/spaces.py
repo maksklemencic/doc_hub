@@ -20,8 +20,6 @@ tags_metadata = [
 ]
 
 
-
-
 @router.post(
     "/", 
     response_model=SpaceResponse,

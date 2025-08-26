@@ -88,61 +88,129 @@ def add_document(
     uploaded_by: uuid.UUID, 
     space_id: uuid.UUID) -> uuid.UUID:
     
-    session = SessionLocal()
-    try:
-        doc = Document(
-            filename=filename,
-            file_path=file_path,
-            mime_type=mime_type,
-            uploaded_by=uploaded_by,
-            space_id=space_id
-        )
-        session.add(doc)
-        session.commit()
-        session.refresh(doc)
-        return doc.id
-    except exc.SQLAlchemyError as e:
-        session.rollback()
-        raise RuntimeError(f"Error adding document: {e}")
-    finally:
-        session.close()
+    logger.info(f"Adding document {filename} to space {space_id} for user {uploaded_by}")
+    with SessionLocal() as session:
+        try:
+            doc = Document(
+                filename=filename,
+                file_path=file_path,
+                mime_type=mime_type,
+                uploaded_by=uploaded_by,
+                space_id=space_id
+            )
+            session.add(doc)
+            session.commit()
+            session.refresh(doc)
+            logger.info(f"Successfully added document {doc.id} to database")
+            return doc.id
+        except exc.IntegrityError as e:
+            session.rollback()
+            logger.error(f"Integrity error adding document {filename}: {str(e)}")
+            if "documents_space_id_fkey" in str(e):
+                raise NotFoundError("Space", str(space_id))
+            elif "unique" in str(e).lower():
+                raise ConflictError(f"Document with filename '{filename}' already exists in this space")
+            else:
+                raise DatabaseError(f"Database constraint violation: {str(e)}")
+        except exc.OperationalError as e:
+            session.rollback()
+            logger.error(f"Database unavailable while adding document {filename}: {str(e)}")
+            raise DatabaseError("Database unavailable")
+        except exc.SQLAlchemyError as e:
+            session.rollback()
+            logger.error(f"Database error adding document {filename}: {str(e)}")
+            raise DatabaseError(f"Error adding document: {str(e)}")
         
 
-def update_document(doc_id: uuid.UUID, **kwargs) -> Document:
-    session = SessionLocal()
-    try:
-        doc = session.get(Document, doc_id)
-        if not doc:
-            raise ValueError(f"Document with id {doc_id} not found")
-        for key, value in kwargs.items():
-            if hasattr(doc, key):
-                setattr(doc, key, value)
-        session.commit()
-        session.refresh(doc)
-        return doc
-    except exc.SQLAlchemyError as e:
-        session.rollback()
-        raise RuntimeError(f"Error updating document: {e}")
-    finally:
-        session.close()
+def update_document(doc_id: uuid.UUID, user_id: uuid.UUID, **kwargs) -> Document:
+    """Update document with proper authorization and error handling."""
+    logger.info(f"Updating document {doc_id} for user {user_id}")
+    with SessionLocal() as session:
+        try:
+            # First check if document exists
+            doc = session.get(Document, doc_id)
+            if not doc:
+                logger.warning(f"Document {doc_id} not found")
+                raise NotFoundError("Document", str(doc_id))
+            
+            # Check authorization: user must be the uploader or own the space
+            space = session.get(Space, doc.space_id)
+            if doc.uploaded_by != user_id and (not space or space.user_id != user_id):
+                logger.warning(f"User {user_id} not authorized to update document {doc_id}")
+                raise PermissionError("Not authorized to update this document")
+            
+            # Update document
+            for key, value in kwargs.items():
+                if hasattr(doc, key):
+                    setattr(doc, key, value)
+            session.commit()
+            session.refresh(doc)
+            logger.info(f"Successfully updated document {doc_id}")
+            return doc
+        except exc.OperationalError as e:
+            session.rollback()
+            logger.error(f"Database unavailable while updating document {doc_id}: {str(e)}")
+            raise DatabaseError("Database unavailable")
+        except exc.SQLAlchemyError as e:
+            session.rollback()
+            logger.error(f"Database error updating document {doc_id}: {str(e)}")
+            raise DatabaseError(f"Error updating document: {str(e)}")
         
 
-def delete_document(doc_id: uuid.UUID) -> bool:
-    session = SessionLocal()
-    try:
-        doc = session.get(Document, doc_id)
-        if not doc:
-            raise ValueError(f"Document with id {doc_id} not found")
-        session.delete(doc)
-        session.commit()
-        return True
-    except exc.SQLAlchemyError as e:
-        session.rollback()
-        raise RuntimeError(f"Error deleting document: {e}")
-    finally:
-        session.close()
+def delete_document(doc_id: uuid.UUID, user_id: uuid.UUID = None) -> bool:
+    """Delete document with proper authorization and error handling."""
+    logger.info(f"Deleting document {doc_id}" + (f" for user {user_id}" if user_id else ""))
+    with SessionLocal() as session:
+        try:
+            # First check if document exists
+            doc = session.get(Document, doc_id)
+            if not doc:
+                logger.warning(f"Document {doc_id} not found")
+                raise NotFoundError("Document", str(doc_id))
+            
+            # Check authorization if user_id provided
+            if user_id:
+                space = session.get(Space, doc.space_id)
+                if doc.uploaded_by != user_id and (not space or space.user_id != user_id):
+                    logger.warning(f"User {user_id} not authorized to delete document {doc_id}")
+                    raise PermissionError("Not authorized to delete this document")
+            
+            session.delete(doc)
+            session.commit()
+            logger.info(f"Successfully deleted document {doc_id}")
+            return True
+        except exc.OperationalError as e:
+            session.rollback()
+            logger.error(f"Database unavailable while deleting document {doc_id}: {str(e)}")
+            raise DatabaseError("Database unavailable")
+        except exc.SQLAlchemyError as e:
+            session.rollback()
+            logger.error(f"Database error deleting document {doc_id}: {str(e)}")
+            raise DatabaseError(f"Error deleting document: {str(e)}")
 
 # Spaces CRUD operations
+def validate_space_ownership(space_id: uuid.UUID, user_id: uuid.UUID) -> None:
+    """Validate that a space exists and belongs to the user."""
+    logger.debug(f"Validating space {space_id} ownership for user {user_id}")
+    with SessionLocal() as session:
+        try:
+            space = session.query(Space).filter(Space.id == space_id).first()
+            if not space:
+                logger.warning(f"Space {space_id} not found")
+                raise NotFoundError("Space", str(space_id))
+            
+            if space.user_id != user_id:
+                logger.warning(f"Permission denied for user {user_id} on space {space_id}")
+                raise PermissionError("Not authorized to access this space")
+                
+            logger.debug(f"Space {space_id} ownership validated for user {user_id}")
+        except exc.OperationalError as e:
+            logger.error(f"Database unavailable while validating space {space_id}: {str(e)}")
+            raise DatabaseError("Database unavailable")
+        except exc.SQLAlchemyError as e:
+            logger.error(f"Database error validating space {space_id}: {str(e)}")
+            raise DatabaseError(f"Error validating space: {str(e)}")
+
 def create_space(user_id: uuid.UUID, name: str) -> Space:
     logger.info(f"Creating space '{name}' for user {user_id}")
     with SessionLocal() as session:
