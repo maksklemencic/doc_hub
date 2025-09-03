@@ -6,6 +6,7 @@ import { useAuth } from '@/hooks/use-auth'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
+import { Spinner } from '@/components/ui/spinner'
 import { ROUTES } from '@/constants'
 import { FileText, Folder, Upload, Search } from 'lucide-react'
 
@@ -24,7 +25,7 @@ export default function Home() {
   if (isLoading) {
     return (
       <div className="flex items-center justify-center h-screen">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900"></div>
+        <Spinner size="lg" />
       </div>
     )
   }
@@ -32,8 +33,9 @@ export default function Home() {
   // Show authenticated dashboard
   if (isAuthenticated && user) {
     return (
-      <div className="p-2 h-full bg-accent">
-        <div className="bg-white border-1 rounded-lg h-full p-6 space-y-6">
+      <div className="p-2 h-full bg-background">
+        {/* border-1 rounded-lg */}
+        <div className="bg-white h-full py-2 px-6 space-y-6">
           {/* Header */}
           <div className="space-y-2">
             <h1 className="text-3xl font-bold tracking-tight">
@@ -128,7 +130,7 @@ export default function Home() {
   // If not authenticated, show redirecting
   return (
     <div className="flex items-center justify-center h-screen">
-      <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900"></div>
+      <Spinner size="lg" />
     </div>
   )
 }

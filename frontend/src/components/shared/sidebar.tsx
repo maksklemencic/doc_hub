@@ -5,6 +5,7 @@ import { useState } from 'react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { useAuth } from '@/hooks/use-auth'
+import Image from 'next/image'
 import { 
   FileText, 
   Folder, 
@@ -94,15 +95,19 @@ export function Sidebar({ className }: SidebarProps) {
 
   return (
     <div className={cn(
-      'flex h-full w-64 flex-col border-r border-border bg-accent ',
+      'flex h-full w-64 flex-col border-r border-border bg-background ',
       className
     )}>
       {/* Header */}
       <div className="flex h-16 items-center border-b border-border px-4">
         <div className="flex items-center gap-2">
-          <div className="flex h-8 w-8 items-center justify-center rounded-md bg-primary">
-            <FileText className="h-4 w-4 text-primary-foreground" />
-          </div>
+          <Image 
+            src="/doc-hub-180.png" 
+            alt="Doc Hub Logo" 
+            width={46} 
+            height={46} 
+            className="rounded-md" 
+          />
           <span className="text-lg font-semibold">Doc Hub</span>
         </div>
       </div>

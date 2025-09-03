@@ -35,7 +35,7 @@ export function Navbar({ title }: NavbarProps) {
   // }
 
   return (
-    <nav className="bg-accent h-16 flex items-center px-2">
+    <nav className="bg-background h-16 flex items-center px-2">
       <div className="bg-gradient-to-r from-yellow-300 to-blue-400 h-12 w-full rounded-lg flex items-center justify-between px-6">
         {/* Page Title */}
         <h1 className="text-xl font-semibold text-white">

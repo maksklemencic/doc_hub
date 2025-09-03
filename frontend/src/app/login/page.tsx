@@ -2,6 +2,7 @@
 
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { Spinner } from '@/components/ui/spinner'
 import { useAuth } from '@/hooks/use-auth'
 import { useRouter } from 'next/navigation'
 import { useEffect, useRef, useState } from 'react'
@@ -80,7 +81,10 @@ export default function LoginPage() {
       <main className="min-h-screen flex items-center justify-center">
         <Card className="max-w-md w-full mx-4">
           <CardContent className="p-6">
-            <div className="text-center">Loading...</div>
+            <div className="flex flex-col items-center gap-4">
+              <Spinner />
+              <div className="text-center text-sm text-muted-foreground">Loading...</div>
+            </div>
           </CardContent>
         </Card>
       </main>
@@ -92,7 +96,10 @@ export default function LoginPage() {
       <main className="min-h-screen flex items-center justify-center">
         <Card className="max-w-md w-full mx-4">
           <CardContent className="p-6">
-            <div className="text-center">Redirecting...</div>
+            <div className="flex flex-col items-center gap-4">
+              <Spinner />
+              <div className="text-center text-sm text-muted-foreground">Redirecting...</div>
+            </div>
           </CardContent>
         </Card>
       </main>
