@@ -1,19 +1,7 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
-  // Configure for Turbopack (used in dev script)
-  experimental: {
-    turbo: {
-      rules: {
-        '*.svg': {
-          loaders: ['@svgr/webpack'],
-          as: '*.js',
-        },
-      },
-    },
-  },
-  
-  // Fallback webpack config for non-turbopack builds
+  // Enable webpack polling for Windows Docker hot reload
   webpack: (config, { dev }) => {
     if (dev) {
       config.watchOptions = {

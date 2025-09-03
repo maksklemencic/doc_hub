@@ -87,6 +87,38 @@ export function AuthProvider({ children }: AuthProviderProps) {
   // Hydrate auth state from localStorage on client-side
   useEffect(() => {
     if (typeof window !== 'undefined') {
+      // Check if we're in development mode with auth bypass
+      const devModeBypass = process.env.NEXT_PUBLIC_DEV_MODE_BYPASS_AUTH === 'true'
+      
+      if (devModeBypass) {
+        // Auto-login with mock user in development mode
+        const mockUser: User = {
+          id: 'dev-user-123',
+          email: 'dev@example.com',
+          name: 'Dev User',
+          picture: undefined,
+          created_at: '2024-01-01T00:00:00.000Z' // Fixed date to avoid hydration mismatch
+        }
+        
+        const mockAuthResponse: AuthTokenResponse = {
+          access_token: 'dev-mock-token',
+          token_type: 'Bearer',
+          expires_in: 86400, // 24 hours
+          user: mockUser
+        }
+        
+        // Set mock data in localStorage
+        localStorage.setItem(STORAGE_KEYS.ACCESS_TOKEN, mockAuthResponse.access_token)
+        localStorage.setItem(STORAGE_KEYS.USER, JSON.stringify(mockAuthResponse.user))
+        
+        // Set mock cookie
+        document.cookie = `access_token=${mockAuthResponse.access_token}; path=/; max-age=${mockAuthResponse.expires_in}; SameSite=Lax`
+        
+        dispatch({ type: 'LOGIN_SUCCESS', payload: mockAuthResponse })
+        return
+      }
+      
+      // Normal flow - check localStorage
       const token = localStorage.getItem(STORAGE_KEYS.ACCESS_TOKEN)
       const userData = localStorage.getItem(STORAGE_KEYS.USER)
       const user = userData ? JSON.parse(userData) : null

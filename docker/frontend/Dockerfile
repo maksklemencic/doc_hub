@@ -12,7 +12,7 @@ COPY package*.json ./
 # Install all dependencies (including dev)
 RUN npm ci
 
-# Set environment variables for hot reload
+# Set environment variables for hot reload with webpack polling
 ENV CHOKIDAR_USEPOLLING=true
 ENV WATCHPACK_POLLING=true
 ENV NEXT_TELEMETRY_DISABLED=1

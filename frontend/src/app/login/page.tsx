@@ -4,12 +4,20 @@ import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { useAuth } from '@/hooks/use-auth'
 import { useRouter } from 'next/navigation'
-import { useEffect } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { ROUTES } from '@/constants'
+import type { GoogleOneTapCredentialResponse, GoogleOneTapNotification } from '@/types/google'
 
 export default function LoginPage() {
-  const { isAuthenticated, isLoading } = useAuth()
+  const { isAuthenticated, isLoading, login } = useAuth()
   const router = useRouter()
+  const oneTapInitialized = useRef(false)
+  const [devModeBypass, setDevModeBypass] = useState(false)
+  
+  // Check if we're in dev mode with auth bypass (client-side only)
+  useEffect(() => {
+    setDevModeBypass(process.env.NEXT_PUBLIC_DEV_MODE_BYPASS_AUTH === 'true')
+  }, [])
 
   // Redirect to dashboard if already authenticated
   useEffect(() => {
@@ -18,8 +26,51 @@ export default function LoginPage() {
     }
   }, [isAuthenticated, isLoading, router])
 
+  // Initialize Google One Tap
+  useEffect(() => {
+    if (oneTapInitialized.current || isAuthenticated || isLoading) return
+
+    const initializeGoogleOneTap = () => {
+      if (typeof window !== 'undefined' && window.google?.accounts?.id) {
+        console.log('Initializing Google One Tap...')
+        
+        // Cancel any existing prompts and reset state
+        try {
+          window.google.accounts.id.cancel()
+        } catch (e) {
+          console.log('No existing One Tap to cancel')
+        }
+        
+        window.google.accounts.id.initialize({
+          client_id: process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID || '857769039470-qsvau0fmapps8ef132q5rra9cnvfltmb.apps.googleusercontent.com',
+          callback: handleGoogleOneTapResponse,
+          auto_select: false,
+          cancel_on_tap_outside: false,
+        })
+
+        oneTapInitialized.current = true
+      } else {
+        console.log('Google One Tap API not loaded yet')
+      }
+    }
+
+    // Load Google One Tap script
+    if (!document.getElementById('google-one-tap-script')) {
+      const script = document.createElement('script')
+      script.id = 'google-one-tap-script'
+      script.src = 'https://accounts.google.com/gsi/client'
+      script.onload = initializeGoogleOneTap
+      document.head.appendChild(script)
+    } else {
+      initializeGoogleOneTap()
+    }
+  }, [isAuthenticated, isLoading])
+
+  const handleGoogleOneTapResponse = (response: GoogleOneTapCredentialResponse) => {
+    handleGoogleLogin()
+  }
+
   const handleGoogleLogin = () => {
-    // Redirect to your backend's OAuth login endpoint
     const loginUrl = `${process.env.NEXT_PUBLIC_API_URL}/auth/login`
     window.location.href = loginUrl
   }
@@ -56,11 +107,21 @@ export default function LoginPage() {
           <p className="text-muted-foreground">
             Sign in to access your documents and spaces
           </p>
+          {devModeBypass && (
+            <div className="mt-3 p-3 bg-yellow-100 border border-yellow-300 rounded-md">
+              <p className="text-sm text-yellow-800 font-medium">
+                🔧 Development Mode Active
+              </p>
+              <p className="text-xs text-yellow-700 mt-1">
+                Authentication bypass enabled - you'll be automatically signed in
+              </p>
+            </div>
+          )}
         </CardHeader>
         <CardContent>
           <Button 
             onClick={handleGoogleLogin}
-            className="w-full"
+            className="w-full mb-4"
             size="lg"
           >
             <svg className="w-5 h-5 mr-2" viewBox="0 0 24 24">
