@@ -4,6 +4,7 @@ import * as React from 'react'
 import { useState, useEffect } from 'react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { useAuth } from '@/hooks/use-auth'
 import { useRouter, usePathname } from 'next/navigation'
 import Image from 'next/image'
@@ -14,7 +15,8 @@ import {
   Check,
   X,
   Edit2,
-  PanelLeftClose
+  PanelLeftClose,
+  User
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
@@ -297,18 +299,13 @@ export function Sidebar({ className }: SidebarProps) {
 
           {/* User Profile & Logout */}
           <div className="border-t border-border p-4">
-            {/* <div className="flex items-center gap-3 mb-3">
-              {user?.picture ? (
-                <img
-                  src={user.picture}
-                  alt={user.name}
-                  className="h-8 w-8 rounded-full"
-                />
-              ) : (
-                <div className="flex h-8 w-8 items-center justify-center rounded-full bg-muted">
+            <div className="flex items-center gap-3 mb-3">
+              <Avatar className="h-8 w-8">
+                <AvatarImage src={user?.picture} alt={user?.name || 'User'} />
+                <AvatarFallback>
                   <User className="h-4 w-4" />
-                </div>
-              )}
+                </AvatarFallback>
+              </Avatar>
               <div className="flex-1 min-w-0">
                 <p className="text-sm font-medium truncate">
                   {user?.name || 'User'}
@@ -317,7 +314,7 @@ export function Sidebar({ className }: SidebarProps) {
                   {user?.email}
                 </p>
               </div>
-            </div> */}
+            </div>
             
             <Button
               variant="ghost"

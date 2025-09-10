@@ -94,8 +94,8 @@ export function AuthProvider({ children }: AuthProviderProps) {
         // Auto-login with mock user in development mode
         const mockUser: User = {
           id: 'dev-user-123',
-          email: 'dev@example.com',
-          name: 'Dev User',
+          email: 'maks.klemencic6@gmail.com',
+          name: 'Maks Klemenčič',
           picture: undefined,
           created_at: '2024-01-01T00:00:00.000Z' // Fixed date to avoid hydration mismatch
         }
