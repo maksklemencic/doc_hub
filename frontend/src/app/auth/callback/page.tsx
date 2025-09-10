@@ -4,6 +4,7 @@ import { useEffect, useRef } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { useAuth } from '@/hooks/use-auth'
 import { Card, CardContent } from '@/components/ui/card'
+import { Spinner } from '@/components/ui/spinner'
 import { ROUTES } from '@/constants'
 
 export default function CallbackPage() {
@@ -84,11 +85,9 @@ export default function CallbackPage() {
     <main className="min-h-screen flex items-center justify-center">
       <Card className="max-w-md w-full mx-4">
         <CardContent className="p-6">
-          <div className="text-center space-y-4">
-            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900 mx-auto"></div>
-            <p className="text-muted-foreground">
-              Completing sign in...
-            </p>
+          <div className="flex flex-col items-center gap-4">
+            <Spinner />
+            <div className="text-center text-sm text-muted-foreground">Completing sign in...</div>
           </div>
         </CardContent>
       </Card>

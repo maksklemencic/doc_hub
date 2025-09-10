@@ -78,31 +78,17 @@ export default function LoginPage() {
 
   if (isLoading) {
     return (
-      <main className="min-h-screen flex items-center justify-center">
-        <Card className="max-w-md w-full mx-4">
-          <CardContent className="p-6">
-            <div className="flex flex-col items-center gap-4">
-              <Spinner />
-              <div className="text-center text-sm text-muted-foreground">Loading...</div>
-            </div>
-          </CardContent>
-        </Card>
-      </main>
+      <div className="flex items-center justify-center h-screen">
+        <Spinner size="lg" />
+      </div>
     )
   }
 
   if (isAuthenticated) {
     return (
-      <main className="min-h-screen flex items-center justify-center">
-        <Card className="max-w-md w-full mx-4">
-          <CardContent className="p-6">
-            <div className="flex flex-col items-center gap-4">
-              <Spinner />
-              <div className="text-center text-sm text-muted-foreground">Redirecting...</div>
-            </div>
-          </CardContent>
-        </Card>
-      </main>
+      <div className="flex items-center justify-center h-screen">
+        <Spinner size="lg" />
+      </div>
     )
   }
 

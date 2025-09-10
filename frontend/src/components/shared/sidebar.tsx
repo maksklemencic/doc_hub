@@ -1,10 +1,11 @@
 'use client'
 
 import * as React from 'react'
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { useAuth } from '@/hooks/use-auth'
+import { useRouter, usePathname } from 'next/navigation'
 import Image from 'next/image'
 import { 
   FolderClosed, 
@@ -30,18 +31,40 @@ interface Space {
 
 export function Sidebar({ className }: SidebarProps) {
   const { user, logout } = useAuth()
+  const router = useRouter()
+  const pathname = usePathname()
   
-  // Mock data - replace with actual state management/API calls
-  const [spaces, setSpaces] = useState<Space[]>([
-    { id: '1', name: 'Work Projects', isActive: true, documentCount: 12 },
-    { id: '2', name: 'Personal Documents', isActive: false, documentCount: 8 },
-    { id: '3', name: 'Team Shared', isActive: false, documentCount: 24 },
-  ])
+  // Initialize with correct active state based on current URL
+  const initializeSpaces = () => {
+    const pathMatch = pathname.match(/^\/spaces\/(.+)$/)
+    const activeSpaceId = pathMatch ? pathMatch[1] : null
+    
+    return [
+      { id: '1', name: 'Work Projects', isActive: activeSpaceId === '1', documentCount: 12 },
+      { id: '2', name: 'Personal Documents', isActive: activeSpaceId === '2', documentCount: 8 },
+      { id: '3', name: 'Team Shared', isActive: activeSpaceId === '3', documentCount: 24 },
+    ]
+  }
+  
+  const [spaces, setSpaces] = useState<Space[]>(initializeSpaces)
   
   const [isCreatingSpace, setIsCreatingSpace] = useState(false)
   const [newSpaceName, setNewSpaceName] = useState('')
   const [editingSpaceId, setEditingSpaceId] = useState<string | null>(null)
   const [editingSpaceName, setEditingSpaceName] = useState('')
+
+  // Update active space based on current URL
+  useEffect(() => {
+    const pathMatch = pathname.match(/^\/spaces\/(.+)$/)
+    const activeSpaceId = pathMatch ? pathMatch[1] : null
+    
+    setSpaces(prevSpaces => 
+      prevSpaces.map(space => ({
+        ...space,
+        isActive: space.id === activeSpaceId
+      }))
+    )
+  }, [pathname])
   
   const handleCreateSpace = () => {
     if (newSpaceName.trim()) {
@@ -96,11 +119,8 @@ export function Sidebar({ className }: SidebarProps) {
       setEditingSpaceName('')
     }
     
-    // Set active space
-    setSpaces(spaces.map(space => ({
-      ...space,
-      isActive: space.id === spaceId
-    })))
+    // Navigate to space page
+    router.push(`/spaces/${spaceId}`)
   }
 
   return (
@@ -152,9 +172,9 @@ export function Sidebar({ className }: SidebarProps) {
                 </Button>
               </div>
               
-              <div className="space-y-1">
+              <div className="space-y-2">
                 {spaces.map((space) => (
-                  <div key={space.id} className="group relative">
+                  <div key={space.id} className="group h-8 relative">
                     {editingSpaceId === space.id ? (
                       <div className="flex items-center h-8 px-2  pr-0">
                         <FolderClosed className="h-4 w-4 text-muted-foreground flex-shrink-0 ml-0.5" />
@@ -186,34 +206,29 @@ export function Sidebar({ className }: SidebarProps) {
                         </Button>
                       </div>
                     ) : (
-                      <Button
-                        variant={"ghost"}
-                        className={cn(
-                          "w-full justify-start relative group",
-                          space.isActive 
-                            ? "bg-primary hover:bg-primary/90 text-primary-foreground" 
-                            : "hover:bg-secondary/20"
-                        )}
-                        size="sm"
-                        onClick={() => handleSpaceClick(space.id)}
+                      <div className={cn(
+                        "w-full relative group flex items-center px-3 py-2 rounded-lg transition-colors cursor-pointer",
+                        space.isActive 
+                          ? "bg-primary hover:bg-primary/90 text-primary-foreground" 
+                          : "hover:bg-secondary/20"
+                      )}
+                      onClick={() => handleSpaceClick(space.id)}
                       >
                         <FolderClosed className={cn(
-                          "mr-2 h-4 w-4",
+                          "mr-2 h-4 w-4 flex-shrink-0",
                           space.isActive ? "text-primary-foreground" : "text-muted-foreground"
                         )} />
                         <span className={cn(
-                          "flex-1 text-left truncate group-hover:mr-4",
+                          "flex-1 text-left truncate text-sm",
                           space.isActive ? "text-primary-foreground font-medium" : ""
                         )}>
                           {space.name}
                         </span>
-                        <Button
-                          variant="ghost"
-                          size="sm"
+                        <button
                           className={cn(
-                            "h-6 w-6 p-0 opacity-0 group-hover:opacity-100 transition-opacity absolute right-8",
+                            "h-6 w-6 p-0 opacity-0 group-hover:opacity-100 transition-opacity absolute right-8 flex-shrink-0 rounded hover:bg-black/10 flex items-center justify-center",
                             space.isActive 
-                              ? "text-primary-foreground/60 hover:text-primary-foreground hover:bg-primary-foreground/10" 
+                              ? "text-primary-foreground/60 hover:text-primary-foreground" 
                               : "text-muted-foreground hover:text-foreground"
                           )}
                           onClick={(e) => {
@@ -222,14 +237,14 @@ export function Sidebar({ className }: SidebarProps) {
                           }}
                         >
                           <Edit2 className="h-3 w-3" />
-                        </Button>
+                        </button>
                         <span className={cn(
-                          "text-xs w-6 text-right",
+                          "text-xs w-6 text-right flex-shrink-0",
                           space.isActive ? "text-primary-foreground/80" : "text-muted-foreground"
                         )}>
                           {space.documentCount}
                         </span>
-                      </Button>
+                      </div>
                     )}
                   </div>
                 ))}
