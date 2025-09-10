@@ -7,14 +7,13 @@ import { Input } from '@/components/ui/input'
 import { useAuth } from '@/hooks/use-auth'
 import Image from 'next/image'
 import { 
-  FileText, 
-  Folder, 
+  FolderClosed, 
   LogOut,
   Plus,
   Check,
   X,
   Edit2,
-  Search
+  PanelLeftClose
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
@@ -64,6 +63,11 @@ export function Sidebar({ className }: SidebarProps) {
   }
   
   const handleStartEdit = (space: Space) => {
+    // Cancel any ongoing space creation
+    if (isCreatingSpace) {
+      setIsCreatingSpace(false)
+      setNewSpaceName('')
+    }
     setEditingSpaceId(space.id)
     setEditingSpaceName(space.name)
   }
@@ -86,6 +90,12 @@ export function Sidebar({ className }: SidebarProps) {
   }
   
   const handleSpaceClick = (spaceId: string) => {
+    // Cancel any ongoing edit
+    if (editingSpaceId) {
+      setEditingSpaceId(null)
+      setEditingSpaceName('')
+    }
+    
     // Set active space
     setSpaces(spaces.map(space => ({
       ...space,
@@ -95,201 +105,215 @@ export function Sidebar({ className }: SidebarProps) {
 
   return (
     <div className={cn(
-      'flex h-full w-64 flex-col border-r border-border bg-background ',
+      'flex h-full flex-col border-r border-border bg-background',
       className
     )}>
-      {/* Header */}
-      <div className="flex h-16 items-center border-b border-border px-4">
-        <div className="flex items-center gap-2">
-          <Image 
-            src="/doc-hub-180.png" 
-            alt="Doc Hub Logo" 
-            width={46} 
-            height={46} 
-            className="rounded-md" 
-          />
-          <span className="text-lg font-semibold">Doc Hub</span>
-        </div>
-      </div>
-
-      {/* Navigation */}
-      <nav className="flex-1 p-4">
-        {/* Spaces Section */}
-        <div className="space-y-2">
-          <div className="flex items-center justify-between">
-            <h3 className="text-sm font-medium text-muted-foreground px-2">Spaces</h3>
-            <Button
+          {/* Header */}
+          <div className="flex h-16 items-center justify-between border-border px-4">
+            <div className="flex items-center gap-2">
+              {/* <Image 
+                src="/doc-hub-180.png" 
+                alt="Doc Hub Logo" 
+                width={46} 
+                height={46} 
+                className="rounded-md" 
+              /> */}
+              <span className='text-2xl'>📄</span>
+              <span className="text-lg font-semibold">Doc Hub</span>
+            </div>
+            <Button 
               variant="ghost"
-              size="sm"
-              className="h-6 w-6 p-0 text-muted-foreground hover:text-foreground"
-              onClick={() => setIsCreatingSpace(true)}
-            >
-              <Plus className="h-3 w-3" />
+              size="icon"
+              >
+              <PanelLeftClose/>
             </Button>
           </div>
-          
-          <div className="space-y-1">
-            {spaces.map((space) => (
-              <div key={space.id} className="group relative">
-                {editingSpaceId === space.id ? (
-                  <div className="flex items-center gap-1 px-2">
-                    <Folder className="h-4 w-4 text-muted-foreground flex-shrink-0" />
+
+          {/* Navigation */}
+          <nav className="flex-1 p-4">
+            {/* Spaces Section */}
+            <div className="space-y-2">
+              <div className="flex items-center justify-between">
+                <h3 className="text-sm font-medium text-muted-foreground px-2">Spaces</h3>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="h-8 w-8 p-0 text-muted-foreground hover:text-foreground"
+                  onClick={() => {
+                    // Cancel any ongoing edit
+                    if (editingSpaceId) {
+                      setEditingSpaceId(null)
+                      setEditingSpaceName('')
+                    }
+                    setIsCreatingSpace(true)
+                  }}
+                >
+                  <Plus className="h-3 w-3" />
+                </Button>
+              </div>
+              
+              <div className="space-y-1">
+                {spaces.map((space) => (
+                  <div key={space.id} className="group relative">
+                    {editingSpaceId === space.id ? (
+                      <div className="flex items-center h-8 px-2  pr-0">
+                        <FolderClosed className="h-4 w-4 text-muted-foreground flex-shrink-0 ml-0.5" />
+                        <Input
+                          value={editingSpaceName}
+                          onChange={(e) => setEditingSpaceName(e.target.value)}
+                          className="h-7 text-sm mx-2"
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter') handleSaveEdit()
+                            if (e.key === 'Escape') handleCancelEdit()
+                          }}
+                          autoFocus
+                        />
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="h-8 w-8 p-0 mr-1 text-green-600 hover:text-green-700"
+                          onClick={handleSaveEdit}
+                        >
+                          <Check className="h-3 w-3" />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="h-8 w-8 p-0 text-red-600 hover:text-red-700"
+                          onClick={handleCancelEdit}
+                        >
+                          <X className="h-3 w-3" />
+                        </Button>
+                      </div>
+                    ) : (
+                      <Button
+                        variant={"ghost"}
+                        className={cn(
+                          "w-full justify-start relative group",
+                          space.isActive 
+                            ? "bg-primary hover:bg-primary/90 text-primary-foreground" 
+                            : "hover:bg-secondary/20"
+                        )}
+                        size="sm"
+                        onClick={() => handleSpaceClick(space.id)}
+                      >
+                        <FolderClosed className={cn(
+                          "mr-2 h-4 w-4",
+                          space.isActive ? "text-primary-foreground" : "text-muted-foreground"
+                        )} />
+                        <span className={cn(
+                          "flex-1 text-left truncate group-hover:mr-4",
+                          space.isActive ? "text-primary-foreground font-medium" : ""
+                        )}>
+                          {space.name}
+                        </span>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className={cn(
+                            "h-6 w-6 p-0 opacity-0 group-hover:opacity-100 transition-opacity absolute right-8",
+                            space.isActive 
+                              ? "text-primary-foreground/60 hover:text-primary-foreground hover:bg-primary-foreground/10" 
+                              : "text-muted-foreground hover:text-foreground"
+                          )}
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            handleStartEdit(space)
+                          }}
+                        >
+                          <Edit2 className="h-3 w-3" />
+                        </Button>
+                        <span className={cn(
+                          "text-xs w-6 text-right",
+                          space.isActive ? "text-primary-foreground/80" : "text-muted-foreground"
+                        )}>
+                          {space.documentCount}
+                        </span>
+                      </Button>
+                    )}
+                  </div>
+                ))}
+                
+                {/* Create new space input */}
+                {isCreatingSpace && (
+                  <div className="flex items-center h-8 px-2 pr-0">
+                    <FolderClosed className="h-4 w-4 text-muted-foreground flex-shrink-0 ml-0.5" />
                     <Input
-                      value={editingSpaceName}
-                      onChange={(e) => setEditingSpaceName(e.target.value)}
-                      className="h-7 text-sm"
+                      value={newSpaceName}
+                      onChange={(e) => setNewSpaceName(e.target.value)}
+                      placeholder="Space name..."
+                      className="h-7 text-sm mx-2"
                       onKeyDown={(e) => {
-                        if (e.key === 'Enter') handleSaveEdit()
-                        if (e.key === 'Escape') handleCancelEdit()
+                        if (e.key === 'Enter') handleCreateSpace()
+                        if (e.key === 'Escape') handleCancelCreate()
                       }}
                       autoFocus
                     />
                     <Button
                       variant="ghost"
                       size="sm"
-                      className="h-6 w-6 p-0 text-green-600 hover:text-green-700"
-                      onClick={handleSaveEdit}
+                      className="h-8 w-8 p-0 mr-1 text-green-600 hover:text-green-700"
+                      onClick={handleCreateSpace}
                     >
                       <Check className="h-3 w-3" />
                     </Button>
                     <Button
                       variant="ghost"
                       size="sm"
-                      className="h-6 w-6 p-0 text-red-600 hover:text-red-700"
-                      onClick={handleCancelEdit}
+                      className="h-8 w-8 p-0 text-red-600 hover:text-red-700"
+                      onClick={handleCancelCreate}
                     >
                       <X className="h-3 w-3" />
                     </Button>
                   </div>
-                ) : (
-                  <Button
-                    variant={space.isActive ? "default" : "ghost"}
-                    className={cn(
-                      "w-full justify-start relative group",
-                      space.isActive 
-                        ? "bg-primary hover:bg-primary/90 text-primary-foreground border-l-4 border-secondary" 
-                        : "hover:bg-secondary/20"
-                    )}
-                    size="sm"
-                    onClick={() => handleSpaceClick(space.id)}
-                  >
-                    <Folder className={cn(
-                      "mr-2 h-4 w-4",
-                      space.isActive ? "text-primary-foreground" : "text-muted-foreground"
-                    )} />
-                    <span className={cn(
-                      "flex-1 text-left truncate",
-                      space.isActive ? "text-primary-foreground font-medium" : ""
-                    )}>
-                      {space.name}
-                    </span>
-                    <span className={cn(
-                      "text-xs ml-2",
-                      space.isActive ? "text-primary-foreground/80" : "text-muted-foreground"
-                    )}>
-                      {space.documentCount}
-                    </span>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      className={cn(
-                        "h-6 w-6 p-0 opacity-0 group-hover:opacity-100 transition-opacity ml-1",
-                        space.isActive 
-                          ? "text-primary-foreground/60 hover:text-primary-foreground" 
-                          : "text-muted-foreground hover:text-foreground"
-                      )}
-                      onClick={(e) => {
-                        e.stopPropagation()
-                        handleStartEdit(space)
-                      }}
-                    >
-                      <Edit2 className="h-3 w-3" />
-                    </Button>
-                  </Button>
                 )}
+                
+                <Button 
+                  variant="ghost" 
+                  className="w-full justify-start text-muted-foreground text-sm"
+                  size="sm"
+                >
+                  <Plus className="mr-2 h-3 w-3" />
+                  See all spaces
+                </Button>
               </div>
-            ))}
-            
-            {/* Create new space input */}
-            {isCreatingSpace && (
-              <div className="flex items-center gap-1 px-2">
-                <Folder className="h-4 w-4 text-muted-foreground flex-shrink-0" />
-                <Input
-                  value={newSpaceName}
-                  onChange={(e) => setNewSpaceName(e.target.value)}
-                  placeholder="Space name..."
-                  className="h-7 text-sm"
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter') handleCreateSpace()
-                    if (e.key === 'Escape') handleCancelCreate()
-                  }}
-                  autoFocus
+            </div>
+          </nav>
+
+          {/* User Profile & Logout */}
+          <div className="border-t border-border p-4">
+            {/* <div className="flex items-center gap-3 mb-3">
+              {user?.picture ? (
+                <img
+                  src={user.picture}
+                  alt={user.name}
+                  className="h-8 w-8 rounded-full"
                 />
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  className="h-6 w-6 p-0 text-green-600 hover:text-green-700"
-                  onClick={handleCreateSpace}
-                >
-                  <Check className="h-3 w-3" />
-                </Button>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  className="h-6 w-6 p-0 text-red-600 hover:text-red-700"
-                  onClick={handleCancelCreate}
-                >
-                  <X className="h-3 w-3" />
-                </Button>
+              ) : (
+                <div className="flex h-8 w-8 items-center justify-center rounded-full bg-muted">
+                  <User className="h-4 w-4" />
+                </div>
+              )}
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-medium truncate">
+                  {user?.name || 'User'}
+                </p>
+                <p className="text-xs text-muted-foreground truncate">
+                  {user?.email}
+                </p>
               </div>
-            )}
+            </div> */}
             
-            <Button 
-              variant="ghost" 
-              className="w-full justify-start text-muted-foreground text-sm"
+            <Button
+              variant="ghost"
               size="sm"
+              className="w-full justify-start text-muted-foreground hover:text-destructive"
+              onClick={() => logout()}
             >
-              <Plus className="mr-2 h-3 w-3" />
-              See all spaces
+              <LogOut className="mr-2 h-4 w-4" />
+              Sign Out
             </Button>
           </div>
-        </div>
-      </nav>
-
-      {/* User Profile & Logout */}
-      <div className="border-t border-border p-4">
-        {/* <div className="flex items-center gap-3 mb-3">
-          {user?.picture ? (
-            <img
-              src={user.picture}
-              alt={user.name}
-              className="h-8 w-8 rounded-full"
-            />
-          ) : (
-            <div className="flex h-8 w-8 items-center justify-center rounded-full bg-muted">
-              <User className="h-4 w-4" />
-            </div>
-          )}
-          <div className="flex-1 min-w-0">
-            <p className="text-sm font-medium truncate">
-              {user?.name || 'User'}
-            </p>
-            <p className="text-xs text-muted-foreground truncate">
-              {user?.email}
-            </p>
-          </div>
-        </div> */}
-        
-        <Button
-          variant="ghost"
-          size="sm"
-          className="w-full justify-start text-muted-foreground hover:text-destructive"
-          onClick={() => logout()}
-        >
-          <LogOut className="mr-2 h-4 w-4" />
-          Sign Out
-        </Button>
-      </div>
     </div>
   )
 }
