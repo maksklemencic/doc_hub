@@ -13,7 +13,10 @@ import {
   User,
   FileText,
   Sparkles,
-  MessageSquare
+  MessageSquare,
+  Minimize2,
+  Maximize2,
+  X
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
@@ -25,9 +28,13 @@ interface Message {
   sources?: string[]
 }
 
+type ChatState = 'visible' | 'hidden' | 'fullscreen'
+
 interface SpaceChatProps {
   spaceName: string
   className?: string
+  chatState?: ChatState
+  onChatStateChange?: (state: ChatState) => void
 }
 
 const MOCK_MESSAGES: Message[] = [
@@ -39,7 +46,7 @@ const MOCK_MESSAGES: Message[] = [
   }
 ]
 
-export function SpaceChat({ spaceName, className }: SpaceChatProps) {
+export function SpaceChat({ spaceName, className, chatState = 'visible', onChatStateChange }: SpaceChatProps) {
   const { user } = useAuth()
   const [messages, setMessages] = useState<Message[]>(MOCK_MESSAGES)
   const [inputValue, setInputValue] = useState('')
@@ -61,6 +68,40 @@ export function SpaceChat({ spaceName, className }: SpaceChatProps) {
   useEffect(() => {
     scrollToBottom()
   }, [messages])
+
+  // Auto-focus input when typing
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // Don't interfere with special keys, shortcuts, or if already focused on input
+      if (
+        e.metaKey || 
+        e.ctrlKey || 
+        e.altKey || 
+        e.key === 'Tab' ||
+        e.key === 'Enter' ||
+        e.key === 'Escape' ||
+        e.key.startsWith('Arrow') ||
+        e.key.startsWith('F') ||
+        document.activeElement === inputRef.current ||
+        (document.activeElement && document.activeElement.tagName === 'INPUT') ||
+        (document.activeElement && document.activeElement.tagName === 'TEXTAREA')
+      ) {
+        return
+      }
+
+      // If it's a printable character, focus the input and let the character through
+      if (e.key.length === 1 && inputRef.current && !isLoading) {
+        inputRef.current.focus()
+        // Don't prevent default - let the character be typed in the input
+      }
+    }
+
+    // Only add listener when chat is visible
+    if (chatState !== 'hidden') {
+      document.addEventListener('keydown', handleKeyDown)
+      return () => document.removeEventListener('keydown', handleKeyDown)
+    }
+  }, [chatState, isLoading])
 
   const handleSend = async () => {
     if (!inputValue.trim() || isLoading) return
@@ -101,12 +142,13 @@ export function SpaceChat({ spaceName, className }: SpaceChatProps) {
     const date = new Date(timestamp)
     return date.toLocaleTimeString('en-US', { 
       hour: '2-digit', 
-      minute: '2-digit' 
+      minute: '2-digit',
+      hour12: false
     })
   }
 
   return (
-    <div className={cn("flex flex-col h-full bg-background border-l", className)}>
+    <div className={cn("flex flex-col h-full bg-background", chatState !== 'fullscreen' && "border-l", className)}>
       {/* Header */}
       <div className="flex items-center gap-3 p-4 border-b bg-muted/20">
         <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center">
@@ -115,6 +157,38 @@ export function SpaceChat({ spaceName, className }: SpaceChatProps) {
         <div className="flex-1">
           <h3 className="font-semibold">Space Assistant</h3>
           <p className="text-xs text-muted-foreground">Ask about documents in {spaceName}</p>
+        </div>
+        
+        {/* Chat Controls */}
+        <div className="flex items-center gap-1">
+          {chatState === 'fullscreen' ? (
+            <Button 
+              variant="ghost" 
+              size="sm"
+              onClick={() => onChatStateChange?.('visible')}
+              className="h-8 w-8 p-0"
+            >
+              <Minimize2 className="h-4 w-4" />
+            </Button>
+          ) : (
+            <Button 
+              variant="ghost" 
+              size="sm"
+              onClick={() => onChatStateChange?.('fullscreen')}
+              className="h-8 w-8 p-0"
+            >
+              <Maximize2 className="h-4 w-4" />
+            </Button>
+          )}
+          
+          <Button 
+            variant="ghost" 
+            size="sm"
+            onClick={() => onChatStateChange?.('hidden')}
+            className="h-8 w-8 p-0"
+          >
+            <X className="h-4 w-4" />
+          </Button>
         </div>
       </div>
 
@@ -140,10 +214,10 @@ export function SpaceChat({ spaceName, className }: SpaceChatProps) {
               
               <div
                 className={cn(
-                  "rounded-lg px-3 py-2 max-w-[80%]",
+                  "rounded-lg px-3 py-2 max-w-[80%] bg-white border",
                   message.role === 'user' 
-                    ? "bg-primary text-primary-foreground ml-auto" 
-                    : "bg-muted"
+                    ? "ml-auto border-primary/20" 
+                    : "border-border"
                 )}
               >
                 <p className="text-sm">{message.content}</p>

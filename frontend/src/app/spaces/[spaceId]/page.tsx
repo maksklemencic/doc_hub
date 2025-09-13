@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Badge } from '@/components/ui/badge'
 import { ScrollArea } from '@/components/ui/scroll-area'
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { SpaceLayout } from '@/components/layout/space-layout'
 import { SpaceChat } from '@/components/chat/space-chat'
 import { 
@@ -20,7 +21,8 @@ import {
   MoreHorizontal,
   Download,
   Edit3,
-  Search
+  Search,
+  MessageSquare
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { DocumentUpload } from '@/components/shared/document-upload'
@@ -111,6 +113,7 @@ export default function SpacePage() {
   const [viewMode, setViewMode] = useState<ViewMode>('list')
   const [searchTerm, setSearchTerm] = useState('')
   const [isUploadOpen, setIsUploadOpen] = useState(false)
+  const [chatState, setChatState] = useState<'visible' | 'hidden' | 'fullscreen'>('visible')
   
   const filteredDocuments = MOCK_DOCUMENTS.filter(doc =>
     doc.name.toLowerCase().includes(searchTerm.toLowerCase())
@@ -171,7 +174,7 @@ export default function SpacePage() {
   }
 
   const documentsContent = (
-    <div className="p-6 h-full bg-background flex flex-col">
+    <div className="p-6 h-full bg-background flex flex-col relative">
       <div className="bg-white h-full rounded-lg flex flex-col">
         <div className="py-4 px-6 space-y-6 flex-shrink-0">
           {/* Header */}
@@ -182,10 +185,21 @@ export default function SpacePage() {
                 {filteredDocuments.length} documents
               </p>
             </div>
-            <Button onClick={() => setIsUploadOpen(true)}>
-              <Plus className="h-4 w-4 mr-2" />
-              Add Document
-            </Button>
+            <div className="flex items-center gap-3">
+              {chatState === 'hidden' && (
+                <Button 
+                  variant="outline" 
+                  onClick={() => setChatState('visible')}
+                >
+                  <MessageSquare className="h-4 w-4 mr-2" />
+                  Open Chat
+                </Button>
+              )}
+              <Button onClick={() => setIsUploadOpen(true)}>
+                <Plus className="h-4 w-4 mr-2" />
+                Add Documents
+              </Button>
+            </div>
           </div>
 
           {/* Search and View Toggle */}
@@ -223,75 +237,103 @@ export default function SpacePage() {
           <ScrollArea className="h-full px-6">
             <div className="pb-6">
               {viewMode === 'list' ? (
-                <div className="space-y-2">
-                  {filteredDocuments.map((document) => (
-                    <div
-                      key={document.id}
-                      className="flex items-center gap-4 p-4 rounded-lg border hover:bg-muted/50 hover:cursor-pointer transition-colors group"
-                    >
-                      <div className="flex-shrink-0 text-muted-foreground">
-                        {getFileIcon(document.type)}
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <p className="font-medium truncate">{document.name}</p>
-                        <p className="text-sm text-muted-foreground">
-                          Added {formatDate(document.dateAdded)}
-                        </p>
-                      </div>
-                      <Badge variant="secondary" className={cn("text-xs", getFileTypeColor(document.type))}>
-                        {document.type.toUpperCase()}
-                      </Badge>
-                      <div className="text-sm text-muted-foreground min-w-0 text-right">
-                        {formatFileSize(document.size)}
-                      </div>
-                      <div className="flex items-center gap-1">
-                        <Button variant="ghost" size="sm">
-                          <Download className="h-4 w-4" />
-                        </Button>
-                        <Button variant="ghost" size="sm">
-                          <Edit3 className="h-4 w-4" />
-                        </Button>
-                        <Button variant="ghost" size="sm">
-                          <MoreHorizontal className="h-4 w-4" />
-                        </Button>
-                      </div>
-                    </div>
-                  ))}
-                </div>
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead className="w-[50px]"></TableHead>
+                      <TableHead>Name</TableHead>
+                      <TableHead>Type</TableHead>
+                      <TableHead>Size</TableHead>
+                      <TableHead>Date Added</TableHead>
+                      <TableHead className="w-[120px]">Actions</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {filteredDocuments.map((document) => (
+                      <TableRow key={document.id} className="hover:bg-muted/50 cursor-pointer">
+                        <TableCell>
+                          <div className="text-muted-foreground">
+                            {getFileIcon(document.type)}
+                          </div>
+                        </TableCell>
+                        <TableCell className="font-medium">
+                          {document.name}
+                        </TableCell>
+                        <TableCell>
+                          <Badge variant="secondary" className={cn("text-xs", getFileTypeColor(document.type))}>
+                            {document.type.toUpperCase()}
+                          </Badge>
+                        </TableCell>
+                        <TableCell className="text-muted-foreground">
+                          {formatFileSize(document.size)}
+                        </TableCell>
+                        <TableCell className="text-muted-foreground">
+                          {formatDate(document.dateAdded)}
+                        </TableCell>
+                        <TableCell>
+                          <div className="flex items-center gap-1">
+                            <Button variant="ghost" size="sm">
+                              <Download className="h-4 w-4" />
+                            </Button>
+                            <Button variant="ghost" size="sm">
+                              <Edit3 className="h-4 w-4" />
+                            </Button>
+                            <Button variant="ghost" size="sm">
+                              <MoreHorizontal className="h-4 w-4" />
+                            </Button>
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
               ) : (
                 <div 
                 className="grid gap-4" 
-                style={{gridTemplateColumns:'repeat(auto-fit, minmax(200px, 1fr))'}}
-              >
+                style={{gridTemplateColumns:'repeat(auto-fit, minmax(240px, 1fr))'}}>
                   {filteredDocuments.map((document) => (
                     <div
                       key={document.id}
-                      className="group p-4 rounded-lg border hover:shadow-md transition-all cursor-pointer"
+                      className="group rounded-lg border hover:shadow-md transition-all cursor-pointer overflow-hidden bg-white"
                     >
-                      <div className="flex flex-col items-center gap-3">
-                        <div className="w-12 h-12 rounded-lg bg-muted flex items-center justify-center text-muted-foreground">
+                      {/* Preview Section - Top 2/3 */}
+                      <div className="aspect-[4/3] bg-muted/30 flex items-center justify-center border-b">
+                        <div className="w-16 h-16 rounded-lg bg-muted flex items-center justify-center text-muted-foreground">
                           {getFileIcon(document.type)}
                         </div>
-                        <div className="text-center space-y-1 w-full">
+                      </div>
+                      
+                      {/* Info Section - Bottom 1/3 */}
+                      <div className="p-3 space-y-3">
+                        <div className="space-y-1">
                           <p className="font-medium text-sm truncate" title={document.name}>
                             {document.name}
                           </p>
-                          <div className="flex flex-col gap-1">
+                          <div className="flex items-center justify-between">
                             <Badge variant="secondary" className={cn("text-xs", getFileTypeColor(document.type))}>
                               {document.type.toUpperCase()}
                             </Badge>
-                            <p className="text-xs text-muted-foreground">
+                            <span className="text-xs text-muted-foreground">
                               {formatFileSize(document.size)}
-                            </p>
+                            </span>
                           </div>
                         </div>
-                        <div className="flex items-center gap-1">
-                          <Button variant="ghost" size="sm">
-                            <Download className="h-3 w-3" />
-                          </Button>
-                          <Button variant="ghost" size="sm">
-                            <MoreHorizontal className="h-3 w-3" />
-                          </Button>
+                        
+                        <div className="flex items-center justify-between">
+                          <span className="text-xs text-muted-foreground">
+                            {formatDate(document.dateAdded)}
+                          </span>
+                          <div className="flex items-center gap-1">
+                            <Button variant="ghost" size="sm" className="h-7 w-7 p-0">
+                              <Download className="h-3 w-3" />
+                            </Button>
+                            <Button variant="ghost" size="sm" className="h-7 w-7 p-0">
+                              <Edit3 className="h-3 w-3" />
+                            </Button>
+                            <Button variant="ghost" size="sm" className="h-7 w-7 p-0">
+                              <MoreHorizontal className="h-3 w-3" />
+                            </Button>
+                          </div>
                         </div>
                       </div>
                     </div>
@@ -310,7 +352,7 @@ export default function SpacePage() {
                     <>
                     <Button onClick={() => setIsUploadOpen(true)}>
                       <Plus className="h-4 w-4 mr-2" />
-                      Add Document
+                      Add Documents
                     </Button>
                     </>
                   )}
@@ -320,16 +362,25 @@ export default function SpacePage() {
           </ScrollArea>
         </div>
       </div>
+      
     </div>
   )
 
   const chatContent = (
-    <SpaceChat spaceName={spaceName} />
+    <SpaceChat 
+      spaceName={spaceName} 
+      chatState={chatState}
+      onChatStateChange={setChatState}
+    />
   )
 
   return (
     <>
-      <SpaceLayout chat={chatContent}>
+      <SpaceLayout 
+        chat={chatState !== 'hidden' ? chatContent : null}
+        chatState={chatState}
+        onChatStateChange={setChatState}
+      >
         {documentsContent}
       </SpaceLayout>
       <DocumentUpload open={isUploadOpen} onOpenChange={setIsUploadOpen} />
