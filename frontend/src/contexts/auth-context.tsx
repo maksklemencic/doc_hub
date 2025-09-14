@@ -1,6 +1,8 @@
 'use client'
 
 import { createContext, useContext, useReducer, useEffect, ReactNode } from 'react'
+import toast from 'react-hot-toast'
+import { useRouter } from 'next/navigation'
 import { User, AuthTokenResponse } from '@/types'
 import { STORAGE_KEYS } from '@/constants'
 
@@ -83,6 +85,7 @@ interface AuthProviderProps {
 
 export function AuthProvider({ children }: AuthProviderProps) {
   const [state, dispatch] = useReducer(authReducer, initialState)
+  const router = useRouter()
 
   // Hydrate auth state from localStorage on client-side
   useEffect(() => {
@@ -142,11 +145,18 @@ export function AuthProvider({ children }: AuthProviderProps) {
     if (typeof window !== 'undefined') {
       localStorage.removeItem(STORAGE_KEYS.ACCESS_TOKEN)
       localStorage.removeItem(STORAGE_KEYS.USER)
-      
+
       // Remove cookie
       document.cookie = 'access_token=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT'
+
+      // Set a flag to show toast after redirect
+      sessionStorage.setItem('show_logout_toast', 'true')
     }
+
     dispatch({ type: 'LOGOUT' })
+
+    // Redirect to login page
+    router.push('/login')
   }
 
   const setUser = (user: User) => {

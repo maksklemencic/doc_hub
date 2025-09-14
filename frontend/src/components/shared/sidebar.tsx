@@ -21,6 +21,14 @@ import { cn } from '@/lib/utils'
 import { SpaceResponse } from '@/lib/api'
 import { Spinner } from '@/components/ui/spinner'
 import { useSpaces, useCreateSpace, useUpdateSpace, useDeleteSpace } from '@/hooks/use-spaces'
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog'
 
 interface SidebarProps {
   className?: string
@@ -47,6 +55,9 @@ export function Sidebar({ className }: SidebarProps) {
   const [newSpaceName, setNewSpaceName] = useState('')
   const [editingSpaceId, setEditingSpaceId] = useState<string | null>(null)
   const [editingSpaceName, setEditingSpaceName] = useState('')
+  const [isLoggingOut, setIsLoggingOut] = useState(false)
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
+  const [spaceToDelete, setSpaceToDelete] = useState<Space | null>(null)
 
   // Transform spaces data to include UI state
   const pathMatch = pathname.match(/^\/spaces\/(.+)$/)
@@ -67,8 +78,7 @@ export function Sidebar({ className }: SidebarProps) {
       setIsCreatingSpace(false)
     } catch (error) {
       console.error('Failed to create space:', error)
-      // Error is handled by the mutation hook, but we can show additional UI feedback here
-      alert('Failed to create space. Please try again.')
+      // Error is handled by the mutation hook with toast notifications
     }
   }
   
@@ -99,7 +109,7 @@ export function Sidebar({ className }: SidebarProps) {
       setEditingSpaceName('')
     } catch (error) {
       console.error('Failed to update space:', error)
-      alert('Failed to update space. Please try again.')
+      // Error is handled by the mutation hook with toast notifications
     }
   }
   
@@ -108,25 +118,36 @@ export function Sidebar({ className }: SidebarProps) {
     setEditingSpaceName('')
   }
 
-  const handleDeleteSpace = async (spaceId: string) => {
-    // Confirm deletion
-    if (!window.confirm('Are you sure you want to delete this space? This action cannot be undone.')) {
-      return
-    }
+  const handleDeleteSpaceClick = (space: Space) => {
+    setSpaceToDelete(space)
+    setDeleteDialogOpen(true)
+  }
+
+  const handleConfirmDelete = async () => {
+    if (!spaceToDelete) return
 
     try {
-      await deleteSpaceMutation.mutateAsync(spaceId)
+      await deleteSpaceMutation.mutateAsync(spaceToDelete.id)
 
       // If we're currently viewing the deleted space, redirect to home
       const pathMatch = pathname.match(/^\/spaces\/(.+)$/)
       const currentSpaceId = pathMatch ? pathMatch[1] : null
-      if (currentSpaceId === spaceId) {
+      if (currentSpaceId === spaceToDelete.id) {
         router.push('/')
       }
+
+      // Close dialog
+      setDeleteDialogOpen(false)
+      setSpaceToDelete(null)
     } catch (error) {
       console.error('Failed to delete space:', error)
-      alert('Failed to delete space. Please try again.')
+      // Error is handled by the mutation hook with toast notifications
     }
+  }
+
+  const handleCancelDelete = () => {
+    setDeleteDialogOpen(false)
+    setSpaceToDelete(null)
   }
   
   const handleSpaceClick = (spaceId: string) => {
@@ -135,9 +156,16 @@ export function Sidebar({ className }: SidebarProps) {
       setEditingSpaceId(null)
       setEditingSpaceName('')
     }
-    
+
     // Navigate to space page
     router.push(`/spaces/${spaceId}`)
+  }
+
+  const handleLogout = async () => {
+    setIsLoggingOut(true)
+    // Small delay to show spinner
+    await new Promise(resolve => setTimeout(resolve, 300))
+    logout()
   }
 
   return (
@@ -279,7 +307,7 @@ export function Sidebar({ className }: SidebarProps) {
                             onClick={(e) => {
                               e.stopPropagation()
                               if (!deleteSpaceMutation.isPending) {
-                                handleDeleteSpace(space.id)
+                                handleDeleteSpaceClick(space)
                               }
                             }}
                             title="Delete space"
@@ -359,12 +387,56 @@ export function Sidebar({ className }: SidebarProps) {
               variant="ghost"
               size="sm"
               className="w-full justify-start text-muted-foreground hover:text-destructive"
-              onClick={() => logout()}
+              onClick={handleLogout}
+              disabled={isLoggingOut}
             >
-              <LogOut className="mr-2 h-4 w-4" />
+              {isLoggingOut ? (
+                <Spinner size="sm" className="mr-2 h-4 w-4" />
+              ) : (
+                <LogOut className="mr-2 h-4 w-4" />
+              )}
               Sign Out
             </Button>
           </div>
+
+      {/* Delete Space Dialog */}
+      <Dialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Delete Space</DialogTitle>
+            <DialogDescription>
+              Are you sure you want to delete "<strong>{spaceToDelete?.name}</strong>"?
+              This action cannot be undone and will permanently remove the space and all its contents.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={handleCancelDelete}
+              disabled={deleteSpaceMutation.isPending}
+            >
+              Cancel
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={handleConfirmDelete}
+              disabled={deleteSpaceMutation.isPending}
+            >
+              {deleteSpaceMutation.isPending && deleteSpaceMutation.variables === spaceToDelete?.id ? (
+                <>
+                  <Spinner size="sm" className="mr-2" />
+                  Deleting...
+                </>
+              ) : (
+                <>
+                  <Trash2 className="mr-2 h-4 w-4" />
+                  Delete Space
+                </>
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }

@@ -120,3 +120,45 @@
     @apply bg-background text-foreground;
   }
 }
+
+/* React Hot Toast Custom Styles */
+[data-react-hot-toast] {
+  /* Toast container */
+  z-index: 9999;
+}
+
+[data-react-hot-toast] > div {
+  /* Individual toast */
+  box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1) !important;
+  backdrop-filter: blur(8px);
+}
+
+[data-react-hot-toast] [data-icon] {
+  /* Toast icon wrapper */
+  width: 24px !important;
+  height: 24px !important;
+  flex-shrink: 0 !important;
+}
+
+[data-react-hot-toast] [data-icon] > div {
+  /* Icon background circle */
+  width: 24px !important;
+  height: 24px !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  border-radius: 50% !important;
+}
+
+[data-react-hot-toast] [data-icon] svg {
+  /* Icon SVG */
+  width: 16px !important;
+  height: 16px !important;
+}
+
+/* Loading spinner specific styling */
+[data-react-hot-toast] [data-icon] [role="status"] {
+  width: 20px !important;
+  height: 20px !important;
+  border-width: 2px !important;
+}

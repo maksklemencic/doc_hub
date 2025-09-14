@@ -1,4 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import toast from 'react-hot-toast'
 import { spacesApi, SpaceResponse, CreateSpaceRequest, UpdateSpaceRequest } from '@/lib/api'
 import { useAuth } from './use-auth'
 
@@ -36,6 +37,9 @@ export function useCreateSpace() {
 
     // Optimistic update
     onMutate: async (newSpace) => {
+      // Show loading toast
+      const toastId = toast.loading(`Creating space "${newSpace.name}"...`)
+
       // Cancel any outgoing refetches
       await queryClient.cancelQueries({ queryKey: spacesKeys.lists() })
 
@@ -55,13 +59,20 @@ export function useCreateSpace() {
       )
 
       // Return context with previous and optimistic values
-      return { previousSpaces, optimisticSpace }
+      return { previousSpaces, optimisticSpace, toastId }
     },
 
     // If mutation fails, use the context to roll back
     onError: (err, variables, context) => {
       if (context?.previousSpaces) {
         queryClient.setQueryData(spacesKeys.lists(), context.previousSpaces)
+      }
+
+      // Show error toast
+      if (context?.toastId) {
+        toast.error(`Failed to create space "${variables.name}". Please try again.`, {
+          id: context.toastId,
+        })
       }
     },
 
@@ -80,6 +91,13 @@ export function useCreateSpace() {
           space.id === context.optimisticSpace.id ? data : space
         )
       })
+
+      // Show success toast
+      if (context?.toastId) {
+        toast.success(`Space "${data.name}" created successfully!`, {
+          id: context.toastId,
+        })
+      }
     },
   })
 }
@@ -94,6 +112,9 @@ export function useUpdateSpace() {
 
     // Optimistic update
     onMutate: async ({ spaceId, data }) => {
+      // Show loading toast
+      const toastId = toast.loading(`Updating space...`)
+
       await queryClient.cancelQueries({ queryKey: spacesKeys.lists() })
 
       const previousSpaces = queryClient.getQueryData<SpaceResponse[]>(spacesKeys.lists())
@@ -109,16 +130,23 @@ export function useUpdateSpace() {
         )
       })
 
-      return { previousSpaces }
+      return { previousSpaces, toastId, newName: data.name }
     },
 
     onError: (err, variables, context) => {
       if (context?.previousSpaces) {
         queryClient.setQueryData(spacesKeys.lists(), context.previousSpaces)
       }
+
+      // Show error toast
+      if (context?.toastId) {
+        toast.error(`Failed to update space. Please try again.`, {
+          id: context.toastId,
+        })
+      }
     },
 
-    onSuccess: (data) => {
+    onSuccess: (data, variables, context) => {
       // Update with real server data
       queryClient.setQueryData<SpaceResponse[]>(spacesKeys.lists(), (old) => {
         if (!old) return old
@@ -127,6 +155,13 @@ export function useUpdateSpace() {
           space.id === data.id ? data : space
         )
       })
+
+      // Show success toast
+      if (context?.toastId) {
+        toast.success(`Space renamed to "${data.name}"!`, {
+          id: context.toastId,
+        })
+      }
     },
 
     onSettled: () => {
@@ -144,9 +179,15 @@ export function useDeleteSpace() {
 
     // Optimistic update
     onMutate: async (spaceId) => {
+      // Show loading toast
+      const toastId = toast.loading(`Deleting space...`)
+
       await queryClient.cancelQueries({ queryKey: spacesKeys.lists() })
 
       const previousSpaces = queryClient.getQueryData<SpaceResponse[]>(spacesKeys.lists())
+
+      // Find the space being deleted for the toast
+      const deletedSpace = previousSpaces?.find(space => space.id === spaceId)
 
       // Optimistically remove from UI
       queryClient.setQueryData<SpaceResponse[]>(spacesKeys.lists(), (old) => {
@@ -154,12 +195,30 @@ export function useDeleteSpace() {
         return old.filter(space => space.id !== spaceId)
       })
 
-      return { previousSpaces, deletedSpaceId: spaceId }
+      return { previousSpaces, deletedSpaceId: spaceId, deletedSpace, toastId }
     },
 
     onError: (err, spaceId, context) => {
       if (context?.previousSpaces) {
         queryClient.setQueryData(spacesKeys.lists(), context.previousSpaces)
+      }
+
+      // Show error toast
+      if (context?.toastId) {
+        const spaceName = context?.deletedSpace?.name || 'space'
+        toast.error(`Failed to delete "${spaceName}". Please try again.`, {
+          id: context.toastId,
+        })
+      }
+    },
+
+    onSuccess: (data, spaceId, context) => {
+      // Show success toast
+      if (context?.toastId) {
+        const spaceName = context?.deletedSpace?.name || 'space'
+        toast.success(`"${spaceName}" deleted successfully!`, {
+          id: context.toastId,
+        })
       }
     },
 

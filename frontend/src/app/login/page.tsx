@@ -6,6 +6,7 @@ import { Spinner } from '@/components/ui/spinner'
 import { useAuth } from '@/hooks/use-auth'
 import { useRouter } from 'next/navigation'
 import { useEffect, useRef, useState } from 'react'
+import toast from 'react-hot-toast'
 import { ROUTES } from '@/constants'
 import type { GoogleOneTapCredentialResponse, GoogleOneTapNotification } from '@/types/google'
 
@@ -18,6 +19,18 @@ export default function LoginPage() {
   // Check if we're in dev mode with auth bypass (client-side only)
   useEffect(() => {
     setDevModeBypass(process.env.NEXT_PUBLIC_DEV_MODE_BYPASS_AUTH === 'true')
+
+    // Check if we should show logout toast
+    if (typeof window !== 'undefined') {
+      const shouldShowLogoutToast = sessionStorage.getItem('show_logout_toast')
+      if (shouldShowLogoutToast) {
+        // Small delay to ensure the page has rendered
+        setTimeout(() => {
+          toast.success('You have been signed out successfully')
+        }, 100)
+        sessionStorage.removeItem('show_logout_toast')
+      }
+    }
   }, [])
 
   // Redirect to dashboard if already authenticated
