@@ -157,8 +157,16 @@ export function Sidebar({ className }: SidebarProps) {
       setEditingSpaceName('')
     }
 
-    // Navigate to space page
-    router.push(`/spaces/${spaceId}`)
+    // Find the space to get its name
+    const space = spaces.find(s => s.id === spaceId)
+
+    // Navigate to space page with space info in URL params
+    const searchParams = new URLSearchParams()
+    if (space) {
+      searchParams.set('name', space.name)
+    }
+
+    router.push(`/spaces/${spaceId}?${searchParams.toString()}`)
   }
 
   const handleLogout = async () => {

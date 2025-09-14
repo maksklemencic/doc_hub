@@ -27,6 +27,23 @@ export interface UpdateSpaceRequest {
   name: string
 }
 
+// Documents API types
+export interface DocumentResponse {
+  id: string
+  filename: string
+  mime_type: string
+  file_size: number
+  space_id: string
+  url?: string
+  created_at: string
+  updated_at?: string
+}
+
+export interface GetDocumentsResponse {
+  documents: DocumentResponse[]
+  pagination: PaginationMetadata
+}
+
 class ApiError extends Error {
   constructor(
     message: string,
@@ -120,6 +137,21 @@ export const spacesApi = {
   // Delete a space
   deleteSpace: async (spaceId: string): Promise<void> => {
     return apiRequest<void>(`/spaces/${spaceId}`, {
+      method: 'DELETE',
+    })
+  },
+}
+
+// Documents API
+export const documentsApi = {
+  // Get documents for a specific space
+  getSpaceDocuments: async (spaceId: string, limit = 100, offset = 0): Promise<GetDocumentsResponse> => {
+    return apiRequest<GetDocumentsResponse>(`/spaces/${spaceId}/documents?limit=${limit}&offset=${offset}`)
+  },
+
+  // Delete a document
+  deleteDocument: async (documentId: string): Promise<void> => {
+    return apiRequest<void>(`/documents/${documentId}`, {
       method: 'DELETE',
     })
   },
