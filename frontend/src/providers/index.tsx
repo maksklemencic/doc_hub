@@ -1,6 +1,7 @@
 'use client'
 
-import { ReactNode } from 'react'
+import { ReactNode, useState } from 'react'
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { AuthProvider } from '@/contexts/auth-context'
 
 interface ProvidersProps {
@@ -8,9 +9,34 @@ interface ProvidersProps {
 }
 
 export function Providers({ children }: ProvidersProps) {
+  // Create QueryClient instance with optimized settings
+  const [queryClient] = useState(
+    () =>
+      new QueryClient({
+        defaultOptions: {
+          queries: {
+            // Cache data for 5 minutes
+            staleTime: 5 * 60 * 1000,
+            // Keep data in cache for 10 minutes
+            gcTime: 10 * 60 * 1000,
+            // Refetch on window focus
+            refetchOnWindowFocus: true,
+            // Retry failed requests 3 times
+            retry: 3,
+          },
+          mutations: {
+            // Retry failed mutations once
+            retry: 1,
+          },
+        },
+      })
+  )
+
   return (
-    <AuthProvider>
-      {children}
-    </AuthProvider>
+    <QueryClientProvider client={queryClient}>
+      <AuthProvider>
+        {children}
+      </AuthProvider>
+    </QueryClientProvider>
   )
 }

@@ -1,30 +1,32 @@
 'use client'
 
 import * as React from 'react'
-import { useState, useEffect } from 'react'
+import { useState } from 'react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { useAuth } from '@/hooks/use-auth'
 import { useRouter, usePathname } from 'next/navigation'
 import Image from 'next/image'
-import { 
-  FolderClosed, 
+import {
+  FolderClosed,
   LogOut,
   Plus,
   Check,
   X,
   Edit2,
-  PanelLeftClose
+  PanelLeftClose,
+  Trash2
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
+import { SpaceResponse } from '@/lib/api'
+import { Spinner } from '@/components/ui/spinner'
+import { useSpaces, useCreateSpace, useUpdateSpace, useDeleteSpace } from '@/hooks/use-spaces'
 
 interface SidebarProps {
   className?: string
 }
 
-interface Space {
-  id: string
-  name: string
+interface Space extends SpaceResponse {
   isActive: boolean
   documentCount: number
 }
@@ -33,50 +35,40 @@ export function Sidebar({ className }: SidebarProps) {
   const { user, logout } = useAuth()
   const router = useRouter()
   const pathname = usePathname()
-  
-  // Initialize with correct active state based on current URL
-  const initializeSpaces = () => {
-    const pathMatch = pathname.match(/^\/spaces\/(.+)$/)
-    const activeSpaceId = pathMatch ? pathMatch[1] : null
-    
-    return [
-      { id: '1', name: 'Work Projects', isActive: activeSpaceId === '1', documentCount: 12 },
-      { id: '2', name: 'Personal Documents', isActive: activeSpaceId === '2', documentCount: 8 },
-      { id: '3', name: 'Team Shared', isActive: activeSpaceId === '3', documentCount: 24 },
-    ]
-  }
-  
-  const [spaces, setSpaces] = useState<Space[]>(initializeSpaces)
-  
+
+  // TanStack Query hooks
+  const { data: spacesData = [], isLoading, error } = useSpaces()
+  const createSpaceMutation = useCreateSpace()
+  const updateSpaceMutation = useUpdateSpace()
+  const deleteSpaceMutation = useDeleteSpace()
+
+  // UI state
   const [isCreatingSpace, setIsCreatingSpace] = useState(false)
   const [newSpaceName, setNewSpaceName] = useState('')
   const [editingSpaceId, setEditingSpaceId] = useState<string | null>(null)
   const [editingSpaceName, setEditingSpaceName] = useState('')
 
-  // Update active space based on current URL
-  useEffect(() => {
-    const pathMatch = pathname.match(/^\/spaces\/(.+)$/)
-    const activeSpaceId = pathMatch ? pathMatch[1] : null
-    
-    setSpaces(prevSpaces => 
-      prevSpaces.map(space => ({
-        ...space,
-        isActive: space.id === activeSpaceId
-      }))
-    )
-  }, [pathname])
+  // Transform spaces data to include UI state
+  const pathMatch = pathname.match(/^\/spaces\/(.+)$/)
+  const activeSpaceId = pathMatch ? pathMatch[1] : null
+
+  const spaces: Space[] = spacesData.map(space => ({
+    ...space,
+    isActive: space.id === activeSpaceId,
+    documentCount: 0 // TODO: Add document count to API response
+  }))
   
-  const handleCreateSpace = () => {
-    if (newSpaceName.trim()) {
-      const newSpace: Space = {
-        id: Date.now().toString(), // In real app, this would come from API
-        name: newSpaceName.trim(),
-        isActive: false,
-        documentCount: 0
-      }
-      setSpaces([...spaces, newSpace])
+  const handleCreateSpace = async () => {
+    if (!newSpaceName.trim() || createSpaceMutation.isPending) return
+
+    try {
+      await createSpaceMutation.mutateAsync({ name: newSpaceName.trim() })
       setNewSpaceName('')
       setIsCreatingSpace(false)
+    } catch (error) {
+      console.error('Failed to create space:', error)
+      // Error is handled by the mutation hook, but we can show additional UI feedback here
+      alert('Failed to create space. Please try again.')
     }
   }
   
@@ -95,21 +87,46 @@ export function Sidebar({ className }: SidebarProps) {
     setEditingSpaceName(space.name)
   }
   
-  const handleSaveEdit = () => {
-    if (editingSpaceName.trim() && editingSpaceId) {
-      setSpaces(spaces.map(space => 
-        space.id === editingSpaceId 
-          ? { ...space, name: editingSpaceName.trim() }
-          : space
-      ))
+  const handleSaveEdit = async () => {
+    if (!editingSpaceName.trim() || !editingSpaceId || updateSpaceMutation.isPending) return
+
+    try {
+      await updateSpaceMutation.mutateAsync({
+        spaceId: editingSpaceId,
+        data: { name: editingSpaceName.trim() }
+      })
       setEditingSpaceId(null)
       setEditingSpaceName('')
+    } catch (error) {
+      console.error('Failed to update space:', error)
+      alert('Failed to update space. Please try again.')
     }
   }
   
   const handleCancelEdit = () => {
     setEditingSpaceId(null)
     setEditingSpaceName('')
+  }
+
+  const handleDeleteSpace = async (spaceId: string) => {
+    // Confirm deletion
+    if (!window.confirm('Are you sure you want to delete this space? This action cannot be undone.')) {
+      return
+    }
+
+    try {
+      await deleteSpaceMutation.mutateAsync(spaceId)
+
+      // If we're currently viewing the deleted space, redirect to home
+      const pathMatch = pathname.match(/^\/spaces\/(.+)$/)
+      const currentSpaceId = pathMatch ? pathMatch[1] : null
+      if (currentSpaceId === spaceId) {
+        router.push('/')
+      }
+    } catch (error) {
+      console.error('Failed to delete space:', error)
+      alert('Failed to delete space. Please try again.')
+    }
   }
   
   const handleSpaceClick = (spaceId: string) => {
@@ -173,8 +190,18 @@ export function Sidebar({ className }: SidebarProps) {
               </div>
               
               <div className="space-y-2">
-                {spaces.map((space) => (
-                  <div key={space.id} className="group h-8 relative">
+                {isLoading ? (
+                  <div className="flex items-center px-2 py-2">
+                    <Spinner size="sm" className="mr-2" />
+                    <span className="text-sm text-muted-foreground">Loading spaces...</span>
+                  </div>
+                ) : spaces.length === 0 ? (
+                  <div className="px-2 py-2 text-sm text-muted-foreground">
+                    No spaces yet
+                  </div>
+                ) : (
+                  spaces.map((space) => (
+                    <div key={space.id} className="group h-8 relative">
                     {editingSpaceId === space.id ? (
                       <div className="flex items-center h-8 px-2  pr-0">
                         <FolderClosed className="h-4 w-4 text-muted-foreground flex-shrink-0 ml-0.5" />
@@ -193,8 +220,9 @@ export function Sidebar({ className }: SidebarProps) {
                           size="sm"
                           className="h-8 w-8 p-0 mr-1 text-green-600 hover:text-green-700"
                           onClick={handleSaveEdit}
+                          disabled={updateSpaceMutation.isPending}
                         >
-                          <Check className="h-3 w-3" />
+                          {updateSpaceMutation.isPending ? <Spinner size="sm" className="h-3 w-3" /> : <Check className="h-3 w-3" />}
                         </Button>
                         <Button
                           variant="ghost"
@@ -207,7 +235,7 @@ export function Sidebar({ className }: SidebarProps) {
                       </div>
                     ) : (
                       <div className={cn(
-                        "w-full relative group flex items-center px-3 py-2 rounded-lg transition-colors cursor-pointer",
+                        "w-full h-8 relative group flex items-center px-3 py-2 rounded-lg transition-colors cursor-pointer",
                         space.isActive 
                           ? "bg-primary hover:bg-primary/90 text-primary-foreground" 
                           : "hover:bg-secondary/20"
@@ -224,22 +252,48 @@ export function Sidebar({ className }: SidebarProps) {
                         )}>
                           {space.name}
                         </span>
-                        <button
-                          className={cn(
-                            "h-6 w-6 p-0 opacity-0 group-hover:opacity-100 transition-opacity absolute right-8 flex-shrink-0 rounded hover:bg-black/10 flex items-center justify-center",
-                            space.isActive 
-                              ? "text-primary-foreground/60 hover:text-primary-foreground" 
-                              : "text-muted-foreground hover:text-foreground"
-                          )}
-                          onClick={(e) => {
-                            e.stopPropagation()
-                            handleStartEdit(space)
-                          }}
-                        >
-                          <Edit2 className="h-3 w-3" />
-                        </button>
+                        <div className="flex items-center opacity-0 group-hover:opacity-100 transition-opacity">
+                          <button
+                            className={cn(
+                              "h-6 w-6 p-0 flex-shrink-0 rounded hover:cursor-pointer hover:bg-black/10 flex items-center justify-center mr-1",
+                              space.isActive
+                                ? "text-primary-foreground/60 hover:text-primary-foreground"
+                                : "text-muted-foreground hover:text-foreground"
+                            )}
+                            onClick={(e) => {
+                              e.stopPropagation()
+                              handleStartEdit(space)
+                            }}
+                            title="Edit space"
+                          >
+                            <Edit2 className="h-3 w-3" />
+                          </button>
+                          <button
+                            className={cn(
+                              "h-6 w-6 p-0 flex-shrink-0 rounded hover:cursor-pointer hover:bg-red-100 dark:hover:bg-red-900/20 flex items-center justify-center",
+                              space.isActive
+                                ? "text-primary-foreground/60 hover:text-red-400"
+                                : "text-muted-foreground hover:text-red-600 dark:hover:text-red-400",
+                              deleteSpaceMutation.isPending && "opacity-50 cursor-not-allowed"
+                            )}
+                            onClick={(e) => {
+                              e.stopPropagation()
+                              if (!deleteSpaceMutation.isPending) {
+                                handleDeleteSpace(space.id)
+                              }
+                            }}
+                            title="Delete space"
+                            disabled={deleteSpaceMutation.isPending}
+                          >
+                            {deleteSpaceMutation.isPending && deleteSpaceMutation.variables === space.id ? (
+                              <Spinner size="sm" className="h-3 w-3" />
+                            ) : (
+                              <Trash2 className="h-3 w-3" />
+                            )}
+                          </button>
+                        </div>
                         <span className={cn(
-                          "text-xs w-6 text-right flex-shrink-0",
+                          "text-xs w-6 text-right flex-shrink-0 ml-1",
                           space.isActive ? "text-primary-foreground/80" : "text-muted-foreground"
                         )}>
                           {space.documentCount}
@@ -247,8 +301,9 @@ export function Sidebar({ className }: SidebarProps) {
                       </div>
                     )}
                   </div>
-                ))}
-                
+                  ))
+                )}
+
                 {/* Create new space input */}
                 {isCreatingSpace && (
                   <div className="flex items-center h-8 px-2 pr-0">
@@ -269,8 +324,9 @@ export function Sidebar({ className }: SidebarProps) {
                       size="sm"
                       className="h-8 w-8 p-0 mr-1 text-green-600 hover:text-green-700"
                       onClick={handleCreateSpace}
+                      disabled={createSpaceMutation.isPending}
                     >
-                      <Check className="h-3 w-3" />
+                      {createSpaceMutation.isPending ? <Spinner size="sm" className="h-3 w-3" /> : <Check className="h-3 w-3" />}
                     </Button>
                     <Button
                       variant="ghost"
@@ -282,15 +338,17 @@ export function Sidebar({ className }: SidebarProps) {
                     </Button>
                   </div>
                 )}
-                
-                <Button 
-                  variant="ghost" 
-                  className="w-full justify-start text-muted-foreground text-sm"
-                  size="sm"
-                >
-                  <Plus className="mr-2 h-3 w-3" />
-                  See all spaces
-                </Button>
+
+                {!isLoading && spaces.length > 0 && (
+                  <Button
+                    variant="ghost"
+                    className="w-full justify-start text-muted-foreground text-sm"
+                    size="sm"
+                  >
+                    <Plus className="mr-2 h-3 w-3" />
+                    See all spaces
+                  </Button>
+                )}
               </div>
             </div>
           </nav>
