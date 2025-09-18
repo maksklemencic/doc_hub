@@ -44,6 +44,21 @@ export interface GetDocumentsResponse {
   pagination: PaginationMetadata
 }
 
+// Upload API types
+export interface UploadResponse {
+  status: string
+  document_id: string
+  document_name: string
+  chunk_count: number
+  file_path?: string
+  url?: string
+}
+
+export interface WebDocumentUploadRequest {
+  url: string
+  space_id: string
+}
+
 class ApiError extends Error {
   constructor(
     message: string,
@@ -153,6 +168,52 @@ export const documentsApi = {
   deleteDocument: async (documentId: string): Promise<void> => {
     return apiRequest<void>(`/documents/${documentId}`, {
       method: 'DELETE',
+    })
+  },
+}
+
+// Upload API
+export const uploadApi = {
+  // Upload file via multipart form data
+  uploadFile: async (file: File, spaceId: string): Promise<UploadResponse> => {
+    const formData = new FormData()
+    formData.append('file', file)
+    formData.append('space_id', spaceId)
+
+    const token = typeof window !== 'undefined'
+      ? localStorage.getItem('access_token')
+      : null
+
+    const response = await fetch(`${API_BASE_URL}/upload/file`, {
+      method: 'POST',
+      headers: {
+        ...(token && { Authorization: `Bearer ${token}` }),
+      },
+      body: formData,
+    })
+
+    if (!response.ok) {
+      const errorText = await response.text()
+      let errorMessage = `Upload failed: ${response.status} ${response.statusText}`
+
+      try {
+        const errorJson = JSON.parse(errorText)
+        errorMessage = errorJson.detail || errorMessage
+      } catch {
+        errorMessage = errorText || errorMessage
+      }
+
+      throw new ApiError(errorMessage, response.status, errorText)
+    }
+
+    return response.json()
+  },
+
+  // Upload web document from URL
+  uploadWebDocument: async (request: WebDocumentUploadRequest): Promise<UploadResponse> => {
+    return apiRequest<UploadResponse>('/upload/web', {
+      method: 'POST',
+      body: JSON.stringify(request),
     })
   },
 }

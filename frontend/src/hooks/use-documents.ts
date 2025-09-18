@@ -129,3 +129,76 @@ export function useInvalidateSpaceDocuments() {
     queryClient.invalidateQueries({ queryKey: documentsKeys.space(spaceId) })
   }
 }
+
+// Custom hook to delete a document without toast notifications (for bulk operations)
+export function useDeleteDocumentSilent() {
+  const queryClient = useQueryClient()
+
+  return useMutation({
+    mutationFn: (documentId: string) => documentsApi.deleteDocument(documentId),
+
+    // Optimistic update without toasts
+    onMutate: async (documentId) => {
+      // Cancel any outgoing refetches for documents
+      await queryClient.cancelQueries({ queryKey: documentsKeys.all })
+
+      // Find the document being deleted across all cached space documents
+      let deletedDocument: DocumentResponse | undefined
+      let affectedSpaceId: string | undefined
+
+      // Check all space document caches to find the document
+      const queryCache = queryClient.getQueryCache()
+      const queries = queryCache.findAll({ queryKey: documentsKeys.spaces() })
+
+      queries.forEach((query) => {
+        const data = query.state.data as any
+        if (data?.documents) {
+          const foundDoc = data.documents.find((doc: DocumentResponse) => doc.id === documentId)
+          if (foundDoc) {
+            deletedDocument = foundDoc
+            // Extract spaceId from query key
+            const queryKey = query.queryKey as string[]
+            if (queryKey.length >= 3) {
+              affectedSpaceId = queryKey[2]
+            }
+          }
+        }
+      })
+
+      // Optimistically remove from the affected space's documents
+      if (affectedSpaceId) {
+        queryClient.setQueriesData(
+          { queryKey: documentsKeys.space(affectedSpaceId) },
+          (oldData: any) => {
+            if (!oldData?.documents) return oldData
+
+            return {
+              ...oldData,
+              documents: oldData.documents.filter((doc: DocumentResponse) => doc.id !== documentId),
+              pagination: {
+                ...oldData.pagination,
+                total_count: Math.max(0, oldData.pagination.total_count - 1)
+              }
+            }
+          }
+        )
+      }
+
+      return { deletedDocument, affectedSpaceId }
+    },
+
+    onError: (err, documentId, context) => {
+      // Rollback optimistic update
+      if (context?.affectedSpaceId) {
+        queryClient.invalidateQueries({ queryKey: documentsKeys.space(context.affectedSpaceId) })
+      }
+    },
+
+    onSettled: (data, error, documentId, context) => {
+      // Invalidate and refetch the affected space's documents
+      if (context?.affectedSpaceId) {
+        queryClient.invalidateQueries({ queryKey: documentsKeys.space(context.affectedSpaceId) })
+      }
+    },
+  })
+}

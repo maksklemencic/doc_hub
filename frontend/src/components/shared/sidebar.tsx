@@ -21,6 +21,7 @@ import { cn } from '@/lib/utils'
 import { SpaceResponse } from '@/lib/api'
 import { Spinner } from '@/components/ui/spinner'
 import { useSpaces, useCreateSpace, useUpdateSpace, useDeleteSpace } from '@/hooks/use-spaces'
+import { useSpaceDocumentCounts } from '@/hooks/use-space-document-counts'
 import {
   Dialog,
   DialogContent,
@@ -59,6 +60,10 @@ export function Sidebar({ className }: SidebarProps) {
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
   const [spaceToDelete, setSpaceToDelete] = useState<Space | null>(null)
 
+  // Get document counts for all spaces
+  const spaceIds = spacesData.map(space => space.id)
+  const { data: documentCounts = {} } = useSpaceDocumentCounts(spaceIds)
+
   // Transform spaces data to include UI state
   const pathMatch = pathname.match(/^\/spaces\/(.+)$/)
   const activeSpaceId = pathMatch ? pathMatch[1] : null
@@ -66,7 +71,7 @@ export function Sidebar({ className }: SidebarProps) {
   const spaces: Space[] = spacesData.map(space => ({
     ...space,
     isActive: space.id === activeSpaceId,
-    documentCount: 0 // TODO: Add document count to API response
+    documentCount: documentCounts[space.id] || 0
   }))
   
   const handleCreateSpace = async () => {
@@ -157,16 +162,8 @@ export function Sidebar({ className }: SidebarProps) {
       setEditingSpaceName('')
     }
 
-    // Find the space to get its name
-    const space = spaces.find(s => s.id === spaceId)
-
-    // Navigate to space page with space info in URL params
-    const searchParams = new URLSearchParams()
-    if (space) {
-      searchParams.set('name', space.name)
-    }
-
-    router.push(`/spaces/${spaceId}?${searchParams.toString()}`)
+    // Navigate to space page without space info in URL params
+    router.push(`/spaces/${spaceId}`)
   }
 
   const handleLogout = async () => {

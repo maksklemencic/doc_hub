@@ -1,13 +1,31 @@
 'use client'
 
-import { useState } from 'react'
-import { useParams, useSearchParams } from 'next/navigation'
+import { useState, useEffect } from 'react'
+import { useParams } from 'next/navigation'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Badge } from '@/components/ui/badge'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
+import { Checkbox } from '@/components/ui/checkbox'
 import { Spinner } from '@/components/ui/spinner'
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog'
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+  DropdownMenuCheckboxItem,
+} from '@/components/ui/dropdown-menu'
 import { SpaceLayout } from '@/components/layout/space-layout'
 import { SpaceChat } from '@/components/chat/space-chat'
 import {
@@ -24,65 +42,273 @@ import {
   Edit3,
   Search,
   MessageSquare,
-  Trash2
+  Trash2,
+  Filter,
+  ArrowUpDown,
+  ChevronDown,
+  Calendar,
+  HardDrive,
+  X,
+  ChevronUp,
+  ChevronDown as ChevronDownIcon
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { DocumentUpload } from '@/components/shared/document-upload'
-import { useSpaceDocuments, useDeleteDocument } from '@/hooks/use-documents'
+import { useSpaceDocuments, useDeleteDocument, useDeleteDocumentSilent } from '@/hooks/use-documents'
 import { DocumentResponse } from '@/lib/api'
+import { useSpacesContext } from '@/contexts/spaces-context'
+import toast from 'react-hot-toast'
 
-type DocumentType = 'word' | 'pdf' | 'image' | 'audio' | 'video' | 'webpage' | 'other'
+enum DocumentType {
+  word = 'word',
+  pdf = 'pdf',
+  image = 'image',
+  audio = 'audio',
+  video = 'video',
+  webpage = 'webpage',
+  other = 'other'
+}
 type ViewMode = 'list' | 'grid'
+type SortBy = 'date' | 'name' | 'size'
+type SortOrder = 'asc' | 'desc'
 
 // Helper function to determine document type from mime_type
 const getDocumentType = (mimeType: string): DocumentType => {
-  if (mimeType.includes('pdf')) return 'pdf'
-  if (mimeType.includes('word') || mimeType.includes('document')) return 'word'
-  if (mimeType.startsWith('image/')) return 'image'
-  if (mimeType.startsWith('audio/')) return 'audio'
-  if (mimeType.startsWith('video/')) return 'video'
-  if (mimeType.includes('html')) return 'webpage'
-  return 'other'
+  if (mimeType.includes('pdf')) return DocumentType.pdf
+  if (mimeType.includes('word') || mimeType.includes('document')) return DocumentType.word
+  if (mimeType.startsWith('image/')) return DocumentType.image
+  if (mimeType.startsWith('audio/')) return DocumentType.audio
+  if (mimeType.startsWith('video/')) return DocumentType.video
+  if (mimeType.includes('html')) return DocumentType.webpage
+  return DocumentType.other
 }
 
 export default function SpacePage() {
   const params = useParams()
-  const searchParams = useSearchParams()
+  const { getSpaceById } = useSpacesContext()
   const spaceId = params.spaceId as string
-  const spaceName = searchParams.get('name') || 'Space'
+  const space = getSpaceById(spaceId)
+  const spaceName = space?.name || 'Space'
 
   // Fetch documents for this space
   const { data: documentsData, isLoading, error } = useSpaceDocuments(spaceId)
   const deleteDocumentMutation = useDeleteDocument()
+  const deleteDocumentSilentMutation = useDeleteDocumentSilent()
 
   const [viewMode, setViewMode] = useState<ViewMode>('list')
   const [searchTerm, setSearchTerm] = useState('')
   const [isUploadOpen, setIsUploadOpen] = useState(false)
   const [chatState, setChatState] = useState<'visible' | 'hidden' | 'fullscreen'>('visible')
+  const [selectedDocuments, setSelectedDocuments] = useState<Set<string>>(new Set())
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
+  const [documentToDelete, setDocumentToDelete] = useState<string | null>(null)
+  const [isDeleting, setIsDeleting] = useState(false)
+  const [selectedTypes, setSelectedTypes] = useState<Set<DocumentType>>(new Set())
+  const [sortBy, setSortBy] = useState<SortBy>('date')
+  const [sortOrder, setSortOrder] = useState<SortOrder>('desc') // newest first by default
 
   // Get documents from API response
   const documents: DocumentResponse[] = documentsData?.documents || []
 
-  const filteredDocuments = documents.filter(doc =>
-    doc.filename.toLowerCase().includes(searchTerm.toLowerCase())
-  )
+  // Apply filtering and sorting
+  const filteredAndSortedDocuments = documents
+    .filter(doc => {
+      // Search filter
+      const matchesSearch = doc.filename.toLowerCase().includes(searchTerm.toLowerCase())
 
-  const handleDeleteDocument = async (documentId: string) => {
-    if (window.confirm('Are you sure you want to delete this document? This action cannot be undone.')) {
+      // Type filter
+      const docType = getDocumentType(doc.mime_type)
+      const matchesType = selectedTypes.size === 0 || selectedTypes.has(docType)
+
+      return matchesSearch && matchesType
+    })
+    .sort((a, b) => {
+      let comparison = 0
+
+      switch (sortBy) {
+        case 'date':
+          comparison = new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
+          break
+        case 'name':
+          comparison = a.filename.toLowerCase().localeCompare(b.filename.toLowerCase())
+          break
+        case 'size':
+          comparison = (a.file_size || 0) - (b.file_size || 0)
+          break
+      }
+
+      return sortOrder === 'asc' ? comparison : -comparison
+    })
+
+  // For backward compatibility, keep filteredDocuments
+  const filteredDocuments = filteredAndSortedDocuments
+
+
+  // Clear selections when filtering changes, but keep selections for still-visible documents
+  useEffect(() => {
+    if (selectedDocuments.size > 0) {
+      const visibleDocumentIds = new Set(filteredDocuments.map(doc => doc.id))
+      const updatedSelections = new Set(
+        Array.from(selectedDocuments).filter(id => visibleDocumentIds.has(id))
+      )
+
+      // Only update if selections actually changed
+      if (updatedSelections.size !== selectedDocuments.size) {
+        setSelectedDocuments(updatedSelections)
+      }
+    }
+  }, [searchTerm, selectedTypes, sortBy, sortOrder]) // Re-run when any filter changes
+
+  const handleDeleteDocument = (documentId: string) => {
+    setDocumentToDelete(documentId)
+    setDeleteDialogOpen(true)
+  }
+
+  const handleConfirmDelete = async () => {
+    if (!documentToDelete && selectedDocuments.size === 0) return
+
+    if (documentToDelete) {
+      // Single document delete
+      setIsDeleting(true)
       try {
-        await deleteDocumentMutation.mutateAsync(documentId)
+        await deleteDocumentMutation.mutateAsync(documentToDelete)
       } catch (error) {
         console.error('Failed to delete document:', error)
+        toast.error('Failed to delete document. Please try again.')
+      } finally {
+        setIsDeleting(false)
+        setDeleteDialogOpen(false)
+        setDocumentToDelete(null)
       }
+    } else {
+      // Bulk delete - close dialog immediately and show promise toast
+      const count = selectedDocuments.size
+      const selectedIds = Array.from(selectedDocuments)
+
+      setDeleteDialogOpen(false)
+      setDocumentToDelete(null)
+      setSelectedDocuments(new Set())
+
+      // Use promise toast for bulk operations
+      toast.promise(
+        Promise.all(
+          selectedIds.map(docId =>
+            deleteDocumentSilentMutation.mutateAsync(docId)
+          )
+        ),
+        {
+          loading: `Deleting ${count} document${count > 1 ? 's' : ''}...`,
+          success: `${count} document${count > 1 ? 's' : ''} deleted successfully`,
+          error: 'Failed to delete documents. Please try again.',
+        }
+      )
     }
   }
 
-  const formatFileSize = (bytes: number): string => {
-    if (bytes === 0) return 'Link'
+  const handleCancelDelete = () => {
+    setDeleteDialogOpen(false)
+    setDocumentToDelete(null)
+  }
+
+  const handleSelectDocument = (documentId: string) => {
+    setSelectedDocuments(prev => {
+      const newSet = new Set(prev)
+      if (newSet.has(documentId)) {
+        newSet.delete(documentId)
+      } else {
+        newSet.add(documentId)
+      }
+      return newSet
+    })
+  }
+
+  const handleSelectAll = () => {
+    if (selectedDocuments.size === filteredDocuments.length) {
+      setSelectedDocuments(new Set())
+    } else {
+      setSelectedDocuments(new Set(filteredDocuments.map(doc => doc.id)))
+    }
+  }
+
+  const handleBulkDelete = () => {
+    if (selectedDocuments.size === 0) return
+    setDeleteDialogOpen(true)
+  }
+
+  const handleTypeFilter = (type: DocumentType) => {
+    setSelectedTypes(prev => {
+      const newSet = new Set(prev)
+      if (newSet.has(type)) {
+        newSet.delete(type)
+      } else {
+        newSet.add(type)
+      }
+      return newSet
+    })
+  }
+
+  const clearAllFilters = () => {
+    setSelectedTypes(new Set())
+    setSearchTerm('')
+  }
+
+  const handleSort = (newSortBy: SortBy) => {
+    if (sortBy === newSortBy) {
+      // Toggle sort order if same field
+      setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc')
+    } else {
+      // Set new sort field with appropriate default order
+      setSortBy(newSortBy)
+      setSortOrder(newSortBy === 'date' ? 'desc' : 'asc') // Date defaults to newest first
+    }
+  }
+
+  // Get available document types from current documents
+  const availableTypes = Array.from(new Set(documents.map(doc => getDocumentType(doc.mime_type))))
+
+  const getTypeIcon = (type: DocumentType) => {
+    switch (type) {
+      case DocumentType.pdf: return <FileText className="h-4 w-4 text-red-600" />
+      case DocumentType.word: return <FileText className="h-4 w-4 text-blue-600" />
+      case DocumentType.image: return <ImageIcon className="h-4 w-4 text-green-600" />
+      case DocumentType.audio: return <Volume2 className="h-4 w-4 text-yellow-600" />
+      case DocumentType.video: return <FileVideo className="h-4 w-4 text-purple-600" />
+      case DocumentType.webpage: return <Globe className="h-4 w-4 text-indigo-600" />
+      default: return <FileText className="h-4 w-4 text-gray-600" />
+    }
+  }
+
+  const getTypeName = (type: DocumentType) => {
+    switch (type) {
+      case DocumentType.pdf: return 'PDF'
+      case DocumentType.word: return 'Word'
+      case DocumentType.image: return 'Image'
+      case DocumentType.audio: return 'Audio'
+      case DocumentType.video: return 'Video'
+      case DocumentType.webpage: return 'Webpage'
+      default: return 'Other'
+    }
+  }
+
+  const formatFileSize = (bytes: number | null | undefined, docType?: DocumentType): string => {
+    // For web documents, show "Link" instead of size
+    if (docType === DocumentType.webpage) return 'Link'
+
+    // Handle invalid or missing file sizes
+    if (bytes === null || bytes === undefined) return 'Unknown'
+
+    // Convert to number if it's a string
+    const numBytes = typeof bytes === 'string' ? parseFloat(bytes) : bytes
+
+    if (isNaN(numBytes)) return 'Unknown'
+
+    // Handle zero bytes
+    if (numBytes === 0) return '0 Bytes'
+
     const k = 1024
     const sizes = ['Bytes', 'KB', 'MB', 'GB']
-    const i = Math.floor(Math.log(bytes) / Math.log(k))
-    return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + ' ' + sizes[i]
+    const i = Math.floor(Math.log(numBytes) / Math.log(k))
+    return parseFloat((numBytes / Math.pow(k, i)).toFixed(1)) + ' ' + sizes[i]
   }
 
   const formatDate = (dateString: string): string => {
@@ -96,16 +322,16 @@ export default function SpacePage() {
 
   const getFileIcon = (type: DocumentType) => {
     switch (type) {
-      case 'pdf':
-      case 'word':
+      case DocumentType.pdf:
+      case DocumentType.word:
         return <FileText className="h-5 w-5" />
-      case 'image':
+      case DocumentType.image:
         return <ImageIcon className="h-5 w-5" />
-      case 'audio':
+      case DocumentType.audio:
         return <Volume2 className="h-5 w-5" />
-      case 'video':
+      case DocumentType.video:
         return <FileVideo className="h-5 w-5" />
-      case 'webpage':
+      case DocumentType.webpage:
         return <Globe className="h-5 w-5" />
       default:
         return <FileText className="h-5 w-5" />
@@ -114,17 +340,17 @@ export default function SpacePage() {
 
   const getFileTypeColor = (type: DocumentType) => {
     switch (type) {
-      case 'pdf':
+      case DocumentType.pdf:
         return 'bg-red-100 text-red-800'
-      case 'word':
+      case DocumentType.word:
         return 'bg-blue-100 text-blue-800'
-      case 'image':
+      case DocumentType.image:
         return 'bg-green-100 text-green-800'
-      case 'audio':
+      case DocumentType.audio:
         return 'bg-yellow-100 text-yellow-800'
-      case 'video':
+      case DocumentType.video:
         return 'bg-purple-100 text-purple-800'
-      case 'webpage':
+      case DocumentType.webpage:
         return 'bg-indigo-100 text-indigo-800'
       default:
         return 'bg-gray-100 text-gray-800'
@@ -140,13 +366,23 @@ export default function SpacePage() {
             <div>
               <h1 className="text-3xl font-bold tracking-tight">{spaceName}</h1>
               <p className="text-muted-foreground">
-                {filteredDocuments.length} documents
+                {documents.length} documents
               </p>
             </div>
             <div className="flex items-center gap-3">
+              {selectedDocuments.size > 0 && (
+                <Button
+                  variant="destructive"
+                  size="sm"
+                  onClick={handleBulkDelete}
+                >
+                  <Trash2 className="h-4 w-4 mr-2" />
+                  Delete {selectedDocuments.size} document{selectedDocuments.size > 1 ? 's' : ''}
+                </Button>
+              )}
               {chatState === 'hidden' && (
-                <Button 
-                  variant="outline" 
+                <Button
+                  variant="outline"
                   onClick={() => setChatState('visible')}
                 >
                   <MessageSquare className="h-4 w-4 mr-2" />
@@ -160,40 +396,183 @@ export default function SpacePage() {
             </div>
           </div>
 
-          {/* Search and View Toggle */}
-          <div className="flex items-center justify-between gap-4">
-            <div className="relative flex-1 max-w-md">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-              <Input
-                placeholder="Search documents..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                className="pl-10"
-              />
+          {/* Search and View Toggle - Only show if there are documents */}
+          {documents.length > 0 && (
+            <div className="flex items-center justify-between gap-4">
+              <div className="relative flex-1 max-w-md">
+                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                <Input
+                  placeholder="Search documents..."
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  className="pl-10"
+                />
+              </div>
+              <div className="flex items-center gap-2">
+                {/* Filter by Type */}
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button variant={selectedTypes.size > 0 ? "default" : "outline"} size="sm">
+                      <Filter className="h-4 w-4 mr-2" />
+                      {selectedTypes.size > 0 ? (
+                        <>
+                          {selectedTypes.size === 1
+                            ? Array.from(selectedTypes)[0].charAt(0).toUpperCase() + Array.from(selectedTypes)[0].slice(1)
+                            : `${selectedTypes.size} Types`
+                          }
+                          <X className="h-3 w-3 ml-1 hover:text-red-600 cursor-pointer" onClick={(e) => {
+                            e.stopPropagation()
+                            e.preventDefault()
+                            clearAllFilters()
+                          }} />
+                        </>
+                      ) : (
+                        'Type'
+                      )}
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end" className="w-56 p-2">
+                    <DropdownMenuLabel className="text-sm font-medium text-gray-900 px-2 py-1">
+                      Filter by Type
+                    </DropdownMenuLabel>
+                    <DropdownMenuSeparator className="my-2" />
+                    <div className="space-y-1">
+                      {Object.values(DocumentType).map((type) => (
+                        <DropdownMenuCheckboxItem
+                          key={type}
+                          checked={selectedTypes.has(type as DocumentType)}
+                          onCheckedChange={() => handleTypeFilter(type as DocumentType)}
+                          className="cursor-pointer px-2 py-2 rounded-md hover:bg-gray-100 transition-colors duration-150 flex items-center"
+                        >
+                          <div className="flex items-center gap-3">
+                            <div className={cn("w-2 h-2 rounded-full", getFileTypeColor(type as DocumentType))} />
+                            <span className="text-sm">{type.charAt(0).toUpperCase() + type.slice(1)}</span>
+                          </div>
+                        </DropdownMenuCheckboxItem>
+                      ))}
+                    </div>
+                    {selectedTypes.size > 0 && (
+                      <>
+                        <DropdownMenuSeparator className="my-2" />
+                        <DropdownMenuItem
+                          onClick={clearAllFilters}
+                          className="cursor-pointer px-2 py-2 rounded-md hover:bg-red-50 hover:text-red-600 transition-colors duration-150"
+                        >
+                          <X className="h-4 w-4 mr-2" />
+                          Clear All Filters
+                        </DropdownMenuItem>
+                      </>
+                    )}
+                  </DropdownMenuContent>
+                </DropdownMenu>
+
+                {/* Sort Options */}
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button variant="outline" size="sm">
+                      <ArrowUpDown className="h-4 w-4 mr-2" />
+                      Sort
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end" className="w-52 p-2">
+                    <DropdownMenuLabel className="text-sm font-medium text-gray-900 px-2 py-1">
+                      Sort by
+                    </DropdownMenuLabel>
+                    <DropdownMenuSeparator className="my-2" />
+                    <div className="space-y-1">
+                      <DropdownMenuItem
+                        onClick={() => handleSort('date')}
+                        className="cursor-pointer px-2 py-2 rounded-md hover:bg-gray-100 transition-colors duration-150"
+                      >
+                        <div className="flex items-center justify-between w-full">
+                          <div className="flex items-center">
+                            <Calendar className="h-4 w-4 mr-3 text-gray-500" />
+                            <span className="text-sm">Date Added</span>
+                          </div>
+                          {sortBy === 'date' && (
+                            sortOrder === 'desc' ? (
+                              <ChevronDownIcon className="h-4 w-4 text-blue-600" />
+                            ) : (
+                              <ChevronUp className="h-4 w-4 text-blue-600" />
+                            )
+                          )}
+                        </div>
+                      </DropdownMenuItem>
+                      <DropdownMenuItem
+                        onClick={() => handleSort('name')}
+                        className="cursor-pointer px-2 py-2 rounded-md hover:bg-gray-100 transition-colors duration-150"
+                      >
+                        <div className="flex items-center justify-between w-full">
+                          <div className="flex items-center">
+                            <FileText className="h-4 w-4 mr-3 text-gray-500" />
+                            <span className="text-sm">Name</span>
+                          </div>
+                          {sortBy === 'name' && (
+                            sortOrder === 'desc' ? (
+                              <ChevronDownIcon className="h-4 w-4 text-blue-600" />
+                            ) : (
+                              <ChevronUp className="h-4 w-4 text-blue-600" />
+                            )
+                          )}
+                        </div>
+                      </DropdownMenuItem>
+                      <DropdownMenuItem
+                        onClick={() => handleSort('size')}
+                        className="cursor-pointer px-2 py-2 rounded-md hover:bg-gray-100 transition-colors duration-150"
+                      >
+                        <div className="flex items-center justify-between w-full">
+                          <div className="flex items-center">
+                            <HardDrive className="h-4 w-4 mr-3 text-gray-500" />
+                            <span className="text-sm">File Size</span>
+                          </div>
+                          {sortBy === 'size' && (
+                            sortOrder === 'desc' ? (
+                              <ChevronDownIcon className="h-4 w-4 text-blue-600" />
+                            ) : (
+                              <ChevronUp className="h-4 w-4 text-blue-600" />
+                            )
+                          )}
+                        </div>
+                      </DropdownMenuItem>
+                    </div>
+                  </DropdownMenuContent>
+                </DropdownMenu>
+
+                <Button
+                  variant={viewMode === 'list' ? 'default' : 'outline'}
+                  size="sm"
+                  onClick={() => setViewMode('list')}
+                >
+                  <List className="h-4 w-4" />
+                </Button>
+                <Button
+                  variant={viewMode === 'grid' ? 'default' : 'outline'}
+                  size="sm"
+                  onClick={() => setViewMode('grid')}
+                >
+                  <Grid3X3 className="h-4 w-4" />
+                </Button>
+              </div>
             </div>
-            <div className="flex items-center gap-2">
-              <Button
-                variant={viewMode === 'list' ? 'default' : 'outline'}
-                size="sm"
-                onClick={() => setViewMode('list')}
-              >
-                <List className="h-4 w-4" />
-              </Button>
-              <Button
-                variant={viewMode === 'grid' ? 'default' : 'outline'}
-                size="sm"
-                onClick={() => setViewMode('grid')}
-              >
-                <Grid3X3 className="h-4 w-4" />
-              </Button>
-            </div>
-          </div>
+          )}
         </div>
 
         {/* Scrollable Documents Display */}
         <div className="flex-1 overflow-hidden">
-          <ScrollArea className="h-full px-6">
-            <div className="pb-6">
+          {documents.length === 0 && !isLoading && !error ? (
+            // Centered no documents message when no documents exist
+            <div className="h-full flex items-center justify-center">
+              <div className="text-center">
+                <FileText className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
+                <h3 className="text-lg font-medium mb-2">No documents found</h3>
+                <p className="text-muted-foreground">
+                  Get started by adding your first document
+                </p>
+              </div>
+            </div>
+          ) : (
+            <ScrollArea className="h-full px-6">
+              <div className="pb-6">
               {isLoading ? (
                 <div className="flex items-center justify-center py-12">
                   <Spinner className="mr-2" />
@@ -211,6 +590,12 @@ export default function SpacePage() {
                 <Table>
                   <TableHeader>
                     <TableRow>
+                      <TableHead className="w-[50px]">
+                        <Checkbox
+                          checked={selectedDocuments.size === filteredDocuments.length && filteredDocuments.length > 0}
+                          onCheckedChange={handleSelectAll}
+                        />
+                      </TableHead>
                       <TableHead className="w-[50px]"></TableHead>
                       <TableHead>Name</TableHead>
                       <TableHead>Type</TableHead>
@@ -223,7 +608,13 @@ export default function SpacePage() {
                     {filteredDocuments.map((document) => {
                       const docType = getDocumentType(document.mime_type)
                       return (
-                        <TableRow key={document.id} className="hover:bg-muted/50 cursor-pointer">
+                        <TableRow key={document.id} className="hover:bg-muted/50">
+                          <TableCell>
+                            <Checkbox
+                              checked={selectedDocuments.has(document.id)}
+                              onCheckedChange={() => handleSelectDocument(document.id)}
+                            />
+                          </TableCell>
                           <TableCell>
                             <div className="text-muted-foreground">
                               {getFileIcon(docType)}
@@ -238,7 +629,7 @@ export default function SpacePage() {
                             </Badge>
                           </TableCell>
                           <TableCell className="text-muted-foreground">
-                            {formatFileSize(document.file_size)}
+                            {formatFileSize(document.file_size, docType)}
                           </TableCell>
                           <TableCell className="text-muted-foreground">
                             {formatDate(document.created_at)}
@@ -274,10 +665,25 @@ export default function SpacePage() {
                     return (
                       <div
                         key={document.id}
-                        className="group rounded-lg border hover:shadow-md transition-all cursor-pointer overflow-hidden bg-white"
+                        className={cn(
+                          "group rounded-lg border hover:shadow-md transition-all overflow-hidden bg-white relative",
+                          selectedDocuments.has(document.id) ? "ring-2 ring-primary" : ""
+                        )}
                       >
+                        {/* Checkbox overlay */}
+                        <div className="absolute top-2 left-2 z-10">
+                          <Checkbox
+                            checked={selectedDocuments.has(document.id)}
+                            onCheckedChange={() => handleSelectDocument(document.id)}
+                            className="bg-white shadow-md"
+                          />
+                        </div>
+
                         {/* Preview Section - Top 2/3 */}
-                        <div className="aspect-[4/3] bg-muted/30 flex items-center justify-center border-b">
+                        <div
+                          className="aspect-[4/3] bg-muted/30 flex items-center justify-center border-b cursor-pointer"
+                          onClick={() => handleSelectDocument(document.id)}
+                        >
                           <div className="w-16 h-16 rounded-lg bg-muted flex items-center justify-center text-muted-foreground">
                             {getFileIcon(docType)}
                           </div>
@@ -294,7 +700,7 @@ export default function SpacePage() {
                                 {docType.toUpperCase()}
                               </Badge>
                               <span className="text-xs text-muted-foreground">
-                                {formatFileSize(document.file_size)}
+                                {formatFileSize(document.file_size, docType)}
                               </span>
                             </div>
                           </div>
@@ -327,25 +733,18 @@ export default function SpacePage() {
                 </div>
               )}
 
-              {filteredDocuments.length === 0 && !isLoading && !error && (
+              {filteredDocuments.length === 0 && !isLoading && !error && searchTerm && (
                 <div className="text-center py-12">
                   <FileText className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
                   <h3 className="text-lg font-medium mb-2">No documents found</h3>
-                  <p className="text-muted-foreground mb-4">
-                    {searchTerm ? 'Try adjusting your search terms' : 'Get started by adding your first document'}
+                  <p className="text-muted-foreground">
+                    Try adjusting your search terms
                   </p>
-                  {!searchTerm && (
-                    <>
-                    <Button onClick={() => setIsUploadOpen(true)}>
-                      <Plus className="h-4 w-4 mr-2" />
-                      Add Documents
-                    </Button>
-                    </>
-                  )}
                 </div>
               )}
             </div>
           </ScrollArea>
+          )}
         </div>
       </div>
       
@@ -369,7 +768,55 @@ export default function SpacePage() {
       >
         {documentsContent}
       </SpaceLayout>
-      <DocumentUpload open={isUploadOpen} onOpenChange={setIsUploadOpen} />
+      <DocumentUpload open={isUploadOpen} onOpenChange={setIsUploadOpen} spaceId={spaceId} />
+
+      {/* Delete Confirmation Dialog */}
+      <Dialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Delete Document{selectedDocuments.size > 1 || (!documentToDelete && selectedDocuments.size > 0) ? 's' : ''}</DialogTitle>
+            <DialogDescription>
+              {documentToDelete ? (
+                <>
+                  Are you sure you want to delete "<strong>{documents.find(d => d.id === documentToDelete)?.filename}</strong>"?
+                  This action cannot be undone.
+                </>
+              ) : (
+                <>
+                  Are you sure you want to delete <strong>{selectedDocuments.size} document{selectedDocuments.size > 1 ? 's' : ''}</strong>?
+                  This action cannot be undone and will permanently remove {selectedDocuments.size > 1 ? 'these documents' : 'this document'}.
+                </>
+              )}
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={handleCancelDelete}
+              disabled={isDeleting}
+            >
+              Cancel
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={handleConfirmDelete}
+              disabled={isDeleting}
+            >
+              {isDeleting ? (
+                <>
+                  <Spinner size="sm" className="mr-2" />
+                  Deleting...
+                </>
+              ) : (
+                <>
+                  <Trash2 className="mr-2 h-4 w-4" />
+                  Delete {documentToDelete ? 'Document' : `${selectedDocuments.size} Document${selectedDocuments.size > 1 ? 's' : ''}`}
+                </>
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </>
   )
 }

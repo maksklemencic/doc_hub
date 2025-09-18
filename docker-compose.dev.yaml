@@ -106,27 +106,27 @@ services:
         condition: service_completed_successfully
 
 
-  frontend:
-    build:
-      context: ./frontend
-      dockerfile: ../docker/frontend/Dockerfile
-    ports:
-      - "3000:3000"
-    env_file:
-      - .env.dev
-    environment:
-      - CHOKIDAR_USEPOLLING=true
-      - WATCHPACK_POLLING=true
-      - NEXT_TELEMETRY_DISABLED=1
-    volumes:
-      - ./frontend:/app
-      - /app/node_modules
-      - /app/.next
-    depends_on:
-      - backend
-    restart: unless-stopped
-    stdin_open: true
-    tty: true
+  # frontend:
+  #   build:
+  #     context: ./frontend
+  #     dockerfile: ../docker/frontend/Dockerfile
+  #   ports:
+  #     - "3000:3000"
+  #   env_file:
+  #     - .env.dev
+  #   environment:
+  #     - CHOKIDAR_USEPOLLING=true
+  #     - WATCHPACK_POLLING=true
+  #     - NEXT_TELEMETRY_DISABLED=1
+  #   volumes:
+  #     - ./frontend:/app
+  #     - /app/node_modules
+  #     - /app/.next
+  #   depends_on:
+  #     - backend
+  #   restart: unless-stopped
+  #   stdin_open: true
+  #   tty: true
 
 volumes:
   ollama_data:

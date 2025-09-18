@@ -2,7 +2,7 @@
 
 import type React from "react";
 
-import { useState, useRef, useCallback } from "react";
+import { useState, useRef, useCallback, useEffect } from "react";
 import {
     Dialog,
     DialogContent,
@@ -12,48 +12,56 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Progress } from "@/components/ui/progress";
-import { Cloud, Upload, X, FileText, Trash2, Check, Link } from "lucide-react";
+import { Spinner } from "@/components/ui/spinner";
+import { Cloud, Upload, X, FileText, Trash2, Check, Link, AlertCircle } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { useUploadFile, useUploadWebDocument } from "@/hooks/use-upload";
+import { useDeleteDocument } from "@/hooks/use-documents";
+import { useSpaceDocuments } from "@/hooks/use-documents";
 
-interface FileUpload {
+interface UploadItem {
     id: string;
+    type: "file" | "url";
+    file?: File;
+    url?: string;
     name: string;
-    size: number;
-    totalSize: number;
-    status: "uploading" | "completed" | "error";
+    status: "pending" | "uploading" | "completed" | "error";
     progress: number;
-    type: string;
+    error?: string;
+    documentId?: string; // Added to track the document ID after successful upload
 }
 
 interface DocumentUploadProps {
     open: boolean;
     onOpenChange: (open: boolean) => void;
+    spaceId: string;
 }
 
-export function DocumentUpload({ open, onOpenChange }: DocumentUploadProps) {
-    const [files, setFiles] = useState<FileUpload[]>([
-        {
-            id: "1",
-            name: "my-cv.pdf",
-            size: 0,
-            totalSize: 120 * 1024, // 120 KB
-            status: "uploading",
-            progress: 25,
-            type: "pdf",
-        },
-        {
-            id: "2",
-            name: "google-certificate.pdf",
-            size: 94 * 1024, // 94 KB
-            totalSize: 94 * 1024,
-            status: "completed",
-            progress: 100,
-            type: "pdf",
-        },
-    ]);
+export function DocumentUpload({ open, onOpenChange, spaceId }: DocumentUploadProps) {
+    const [uploadItems, setUploadItems] = useState<UploadItem[]>([]);
     const [isDragOver, setIsDragOver] = useState(false);
     const [urlInput, setUrlInput] = useState("");
     const fileInputRef = useRef<HTMLInputElement>(null);
+
+    const uploadFileMutation = useUploadFile();
+    const uploadWebDocumentMutation = useUploadWebDocument();
+    const deleteDocumentMutation = useDeleteDocument();
+
+    // Get space documents to check if uploaded documents still exist
+    const { data: documentsData } = useSpaceDocuments(spaceId);
+
+    // Remove completed upload items if their documents no longer exist in the space
+    useEffect(() => {
+        if (!documentsData?.documents) return;
+
+        const existingDocumentIds = new Set(documentsData.documents.map(doc => doc.id));
+
+        setUploadItems(prev =>
+            prev.filter(item =>
+                item.status !== "completed" || !item.documentId || existingDocumentIds.has(item.documentId)
+            )
+        );
+    }, [documentsData?.documents]);
 
     const formatFileSize = (bytes: number) => {
         if (bytes === 0) return "0 KB";
@@ -84,55 +92,60 @@ export function DocumentUpload({ open, onOpenChange }: DocumentUploadProps) {
     }, []);
 
     const handleFiles = (fileList: File[]) => {
-        const newFiles: FileUpload[] = fileList.map((file, index) => ({
+        const newFiles: UploadItem[] = fileList.map((file, index) => ({
             id: Date.now().toString() + index,
+            type: "file",
+            file,
             name: file.name,
-            size: 0,
-            totalSize: file.size,
-            status: "uploading" as const,
+            status: "pending" as const,
             progress: 0,
-            type: file.type.includes("pdf") ? "pdf" : "file",
         }));
 
-        setFiles((prev) => [...prev, ...newFiles]);
+        setUploadItems((prev) => [...newFiles, ...prev]);
 
-        // Simulate upload progress
-        newFiles.forEach((file) => {
-            simulateUpload(file.id);
+        // Start uploading files
+        newFiles.forEach((uploadItem) => {
+            uploadFile(uploadItem);
         });
     };
 
-    const simulateUpload = (fileId: string) => {
-        const interval = setInterval(() => {
-            setFiles((prev) =>
-                prev.map((file) => {
-                    if (file.id === fileId && file.status === "uploading") {
-                        const newProgress = Math.min(
-                            file.progress + Math.random() * 20,
-                            100
-                        );
-                        const newSize = Math.floor((newProgress / 100) * file.totalSize);
+    const uploadFile = async (uploadItem: UploadItem) => {
+        if (!uploadItem.file) return;
 
-                        if (newProgress >= 100) {
-                            clearInterval(interval);
-                            return {
-                                ...file,
-                                progress: 100,
-                                size: file.totalSize,
-                                status: "completed" as const,
-                            };
-                        }
+        setUploadItems((prev) =>
+            prev.map((f) =>
+                f.id === uploadItem.id
+                    ? { ...f, status: "uploading", progress: 0 }
+                    : f
+            )
+        );
 
-                        return {
-                            ...file,
-                            progress: newProgress,
-                            size: newSize,
-                        };
-                    }
-                    return file;
-                })
+        try {
+            const response = await uploadFileMutation.mutateAsync({
+                file: uploadItem.file,
+                spaceId,
+            });
+
+            setUploadItems((prev) =>
+                prev.map((f) =>
+                    f.id === uploadItem.id
+                        ? { ...f, status: "completed", progress: 100, documentId: response.document_id }
+                        : f
+                )
             );
-        }, 500);
+        } catch (error) {
+            setUploadItems((prev) =>
+                prev.map((f) =>
+                    f.id === uploadItem.id
+                        ? {
+                              ...f,
+                              status: "error",
+                              error: error instanceof Error ? error.message : "Upload failed",
+                          }
+                        : f
+                )
+            );
+        }
     };
 
     const handleBrowseClick = () => {
@@ -145,15 +158,109 @@ export function DocumentUpload({ open, onOpenChange }: DocumentUploadProps) {
         }
     };
 
-    const removeFile = (fileId: string) => {
-        setFiles((prev) => prev.filter((file) => file.id !== fileId));
+    const removeUploadItem = (itemId: string) => {
+        setUploadItems((prev) => prev.filter((item) => item.id !== itemId));
     };
 
-    const getFileIcon = (type: string) => {
-        if (type === "pdf") {
+    const handleDeleteUploadedDocument = async (uploadItem: UploadItem) => {
+        if (!uploadItem.documentId) {
+            // If no document ID, just remove from the list
+            removeUploadItem(uploadItem.id);
+            return;
+        }
+
+        try {
+            await deleteDocumentMutation.mutateAsync(uploadItem.documentId);
+            // Remove from upload list after successful deletion
+            removeUploadItem(uploadItem.id);
+        } catch (error) {
+            // Error is handled by the mutation hook with toast
+            console.error('Failed to delete document:', error);
+        }
+    };
+
+    // Remove the URL shortening function and just use the full URL
+
+    const handleUrlUpload = async () => {
+        if (!urlInput.trim()) return;
+
+        const urlItem: UploadItem = {
+            id: Date.now().toString(),
+            type: "url",
+            url: urlInput.trim(),
+            name: urlInput.trim(), // Use full URL as display name
+            status: "uploading",
+            progress: 0,
+        };
+
+        setUploadItems((prev) => [urlItem, ...prev]);
+        setUrlInput("");
+
+        try {
+            const response = await uploadWebDocumentMutation.mutateAsync({
+                url: urlItem.url!,
+                space_id: spaceId,
+            });
+
+            setUploadItems((prev) =>
+                prev.map((f) =>
+                    f.id === urlItem.id
+                        ? { ...f, status: "completed", progress: 100, documentId: response.document_id }
+                        : f
+                )
+            );
+        } catch (error) {
+            setUploadItems((prev) =>
+                prev.map((f) =>
+                    f.id === urlItem.id
+                        ? {
+                              ...f,
+                              status: "error",
+                              error: error instanceof Error ? error.message : "Upload failed",
+                          }
+                        : f
+                )
+            );
+        }
+    };
+
+    const handleKeyDown = (e: React.KeyboardEvent) => {
+        if (e.key === "Enter" && urlInput.trim()) {
+            handleUrlUpload();
+        }
+    };
+
+    const getUploadIcon = (uploadItem: UploadItem) => {
+        if (uploadItem.type === "url") {
+            return (
+                <div className="w-8 h-8 bg-indigo-100 rounded flex items-center justify-center">
+                    <span className="text-indigo-600 text-xs font-semibold">URL</span>
+                </div>
+            );
+        }
+
+        if (!uploadItem.file) return <FileText className="w-8 h-8 text-gray-400" />;
+
+        const file = uploadItem.file;
+        const type = file.type;
+        if (type.includes("pdf")) {
             return (
                 <div className="w-8 h-8 bg-red-100 rounded flex items-center justify-center">
                     <span className="text-red-600 text-xs font-semibold">PDF</span>
+                </div>
+            );
+        }
+        if (type.startsWith("image/")) {
+            return (
+                <div className="w-8 h-8 bg-green-100 rounded flex items-center justify-center">
+                    <span className="text-green-600 text-xs font-semibold">IMG</span>
+                </div>
+            );
+        }
+        if (type.includes("word") || type.includes("document")) {
+            return (
+                <div className="w-8 h-8 bg-blue-100 rounded flex items-center justify-center">
+                    <span className="text-blue-600 text-xs font-semibold">DOC</span>
                 </div>
             );
         }
@@ -181,7 +288,7 @@ export function DocumentUpload({ open, onOpenChange }: DocumentUploadProps) {
                     </div>
                 </DialogHeader>
 
-                <div className="px-6 pb-6 space-y-6">
+                <div className="px-6 pb-6 space-y-6 min-w-0">
                     {/* Drop Zone */}
                     <div
                         className={cn(
@@ -199,7 +306,7 @@ export function DocumentUpload({ open, onOpenChange }: DocumentUploadProps) {
                             Choose a file or drag & drop it here.
                         </h3>
                         <p className="text-sm text-muted-foreground mb-6">
-                            JPEG, PNG, PDF, and MP4 formats, up to 50 MB.
+                            PDF, Word documents, and images up to 50 MB.
                         </p>
                         <Button
                             variant="outline"
@@ -213,30 +320,31 @@ export function DocumentUpload({ open, onOpenChange }: DocumentUploadProps) {
                             type="file"
                             className="hidden"
                             multiple
-                            accept=".jpg,.jpeg,.png,.pdf,.mp4"
+                            accept=".pdf,.docx,.jpg,.jpeg,.png,.gif,.bmp,.tiff"
                             onChange={handleFileInputChange}
                         />
                     </div>
 
-                    {/* File List */}
-                    {files.length > 0 && (
-                        <div className="space-y-3">
-                            {files.map((file) => (
+                    {/* Upload Items List */}
+                    {uploadItems.length > 0 && (
+                        <div className="space-y-3 max-h-[320px] overflow-y-auto overflow-x-hidden pr-1">
+                            {uploadItems.map((uploadItem) => (
                                 <div
-                                    key={file.id}
-                                    className="flex items-center gap-3 p-3 border rounded-lg"
+                                    key={uploadItem.id}
+                                    className="flex items-center gap-3 p-3 border rounded-lg min-w-0"
                                 >
-                                    {getFileIcon(file.type)}
+                                    {getUploadIcon(uploadItem)}
                                     <div className="flex-1 min-w-0">
-                                        <div className="flex items-center justify-between mb-1">
-                                            <p className="text-sm font-medium truncate">
-                                                {file.name}
+                                        <div className="flex items-center justify-between mb-1 min-w-0">
+                                            <p className="text-sm font-medium truncate min-w-0 flex-1" title={uploadItem.type === "url" ? uploadItem.url : uploadItem.name}>
+                                                {uploadItem.name}
                                             </p>
                                             <button
-                                                onClick={() => removeFile(file.id)}
-                                                className="text-gray-400 hover:text-gray-600"
+                                                onClick={() => uploadItem.status === "completed" && uploadItem.documentId ? handleDeleteUploadedDocument(uploadItem) : removeUploadItem(uploadItem.id)}
+                                                className="text-gray-400 hover:text-gray-600 flex-shrink-0 ml-2"
+                                                disabled={uploadItem.status === "uploading"}
                                             >
-                                                {file.status === "completed" ? (
+                                                {uploadItem.status === "completed" ? (
                                                     <Trash2 className="w-4 h-4" />
                                                 ) : (
                                                     <X className="w-4 h-4" />
@@ -244,26 +352,49 @@ export function DocumentUpload({ open, onOpenChange }: DocumentUploadProps) {
                                             </button>
                                         </div>
                                         <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                                            <span>
-                                                {formatFileSize(file.size)} of{" "}
-                                                {formatFileSize(file.totalSize)}
-                                            </span>
-                                            <span>•</span>
-                                            {file.status === "uploading" && (
+                                            {uploadItem.type === "file" && uploadItem.file && (
+                                                <>
+                                                    <span>
+                                                        {formatFileSize(uploadItem.file.size)}
+                                                    </span>
+                                                    <span>•</span>
+                                                </>
+                                            )}
+                                            {uploadItem.type === "url" && (
+                                                <>
+                                                    <span>Web Document</span>
+                                                    <span>•</span>
+                                                </>
+                                            )}
+                                            {uploadItem.status === "pending" && (
+                                                <span>Pending...</span>
+                                            )}
+                                            {uploadItem.status === "uploading" && (
                                                 <div className="flex items-center gap-1">
-                                                    <div className="w-3 h-3 border-2 border-blue-500 border-t-transparent rounded-full animate-spin" />
+                                                    <Spinner size="sm" className="w-3 h-3" />
                                                     <span>Uploading...</span>
                                                 </div>
                                             )}
-                                            {file.status === "completed" && (
+                                            {uploadItem.status === "completed" && (
                                                 <div className="flex items-center gap-1 text-green-600">
                                                     <Check className="w-3 h-3" />
                                                     <span>Completed</span>
                                                 </div>
                                             )}
+                                            {uploadItem.status === "error" && (
+                                                <div className="flex items-center gap-1 text-red-600">
+                                                    <AlertCircle className="w-3 h-3" />
+                                                    <span>Failed</span>
+                                                </div>
+                                            )}
                                         </div>
-                                        {file.status === "uploading" && (
-                                            <Progress value={file.progress} className="mt-2 h-1" />
+                                        {uploadItem.status === "uploading" && (
+                                            <Progress value={undefined} className="mt-2 h-1" />
+                                        )}
+                                        {uploadItem.status === "error" && uploadItem.error && (
+                                            <p className="text-xs text-red-600 mt-1">
+                                                {uploadItem.error}
+                                            </p>
                                         )}
                                     </div>
                                 </div>
@@ -280,19 +411,31 @@ export function DocumentUpload({ open, onOpenChange }: DocumentUploadProps) {
 
                     {/* URL Import */}
                     <div>
-                        <div className="flex items-center gap-2 mb-3">
-                            <h3 className="text-sm font-medium">Import from URL Link</h3>
-                            <div className="w-4 h-4 bg-gray-200 rounded-full flex items-center justify-center">
-                                <span className="text-xs text-gray-500">?</span>
+                        <div className="flex items-center justify-between mb-3">
+                            <div className="flex items-center gap-2">
+                                <h3 className="text-sm font-medium">Import from URL Link</h3>
+                                <div className="w-4 h-4 bg-gray-200 rounded-full flex items-center justify-center">
+                                    <span className="text-xs text-gray-500">?</span>
+                                </div>
                             </div>
+                            <Button
+                                onClick={handleUrlUpload}
+                                disabled={!urlInput.trim()}
+                                size="sm"
+                                variant="outline"
+                            >
+                                Import URL
+                            </Button>
                         </div>
                         <div className="relative">
-                            <Link className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
+                            <Link className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-muted-foreground" />
                             <Input
                                 placeholder="Paste file URL"
                                 value={urlInput}
                                 onChange={(e) => setUrlInput(e.target.value)}
+                                onKeyDown={handleKeyDown}
                                 className="pl-10"
+                                disabled={false}
                             />
                         </div>
                     </div>
