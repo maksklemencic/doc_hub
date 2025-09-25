@@ -65,7 +65,7 @@ enum DocumentType {
   image = 'image',
   audio = 'audio',
   video = 'video',
-  webpage = 'webpage',
+  web = 'web',
   other = 'other'
 }
 type ViewMode = 'list' | 'grid'
@@ -79,7 +79,7 @@ const getDocumentType = (mimeType: string): DocumentType => {
   if (mimeType.startsWith('image/')) return DocumentType.image
   if (mimeType.startsWith('audio/')) return DocumentType.audio
   if (mimeType.startsWith('video/')) return DocumentType.video
-  if (mimeType.includes('html')) return DocumentType.webpage
+  if (mimeType.includes('html')) return DocumentType.web
   return DocumentType.other
 }
 
@@ -110,6 +110,16 @@ export default function SpacePage() {
   // Get documents from API response
   const documents: DocumentResponse[] = documentsData?.documents || []
 
+  // Helper function to get file size from backend
+  const getFileSize = (document: DocumentResponse): number => {
+    return document.file_size || 0
+  }
+
+  // Calculate total size of all documents
+  const getTotalSize = (): number => {
+    return documents.reduce((total, doc) => total + getFileSize(doc), 0)
+  }
+
   // Apply filtering and sorting
   const filteredAndSortedDocuments = documents
     .filter(doc => {
@@ -133,16 +143,16 @@ export default function SpacePage() {
           comparison = a.filename.toLowerCase().localeCompare(b.filename.toLowerCase())
           break
         case 'size':
-          comparison = (a.file_size || 0) - (b.file_size || 0)
+          comparison = getFileSize(a) - getFileSize(b)
           break
       }
 
       return sortOrder === 'asc' ? comparison : -comparison
     })
 
+
   // For backward compatibility, keep filteredDocuments
   const filteredDocuments = filteredAndSortedDocuments
-
 
   // Clear selections when filtering changes, but keep selections for still-visible documents
   useEffect(() => {
@@ -230,6 +240,10 @@ export default function SpacePage() {
     }
   }
 
+  const handleDeselectAll = () => {
+    setSelectedDocuments(new Set())
+  }
+
   const handleBulkDelete = () => {
     if (selectedDocuments.size === 0) return
     setDeleteDialogOpen(true)
@@ -273,7 +287,7 @@ export default function SpacePage() {
       case DocumentType.image: return <ImageIcon className="h-4 w-4 text-green-600" />
       case DocumentType.audio: return <Volume2 className="h-4 w-4 text-yellow-600" />
       case DocumentType.video: return <FileVideo className="h-4 w-4 text-purple-600" />
-      case DocumentType.webpage: return <Globe className="h-4 w-4 text-indigo-600" />
+      case DocumentType.web: return <Globe className="h-4 w-4 text-indigo-600" />
       default: return <FileText className="h-4 w-4 text-gray-600" />
     }
   }
@@ -285,14 +299,14 @@ export default function SpacePage() {
       case DocumentType.image: return 'Image'
       case DocumentType.audio: return 'Audio'
       case DocumentType.video: return 'Video'
-      case DocumentType.webpage: return 'Webpage'
+      case DocumentType.web: return 'web'
       default: return 'Other'
     }
   }
 
   const formatFileSize = (bytes: number | null | undefined, docType?: DocumentType): string => {
     // For web documents, show "Link" instead of size
-    if (docType === DocumentType.webpage) return 'Link'
+    if (docType === DocumentType.web) return 'Link'
 
     // Handle invalid or missing file sizes
     if (bytes === null || bytes === undefined) return 'Unknown'
@@ -331,7 +345,7 @@ export default function SpacePage() {
         return <Volume2 className="h-5 w-5" />
       case DocumentType.video:
         return <FileVideo className="h-5 w-5" />
-      case DocumentType.webpage:
+      case DocumentType.web:
         return <Globe className="h-5 w-5" />
       default:
         return <FileText className="h-5 w-5" />
@@ -350,7 +364,7 @@ export default function SpacePage() {
         return 'bg-yellow-100 text-yellow-800'
       case DocumentType.video:
         return 'bg-purple-100 text-purple-800'
-      case DocumentType.webpage:
+      case DocumentType.web:
         return 'bg-indigo-100 text-indigo-800'
       default:
         return 'bg-gray-100 text-gray-800'
@@ -358,18 +372,18 @@ export default function SpacePage() {
   }
 
   const documentsContent = (
-    <div className="p-6 h-full bg-background flex flex-col relative">
-      <div className="bg-white h-full rounded-lg flex flex-col">
-        <div className="py-4 px-6 space-y-6 flex-shrink-0">
+    <div className="p-6 h-full bg-background flex flex-col relative min-w-0">
+      <div className="bg-white h-full rounded-lg flex flex-col min-w-0">
+        <div className="py-3 px-6 space-y-4 flex-shrink-0 min-w-0">
           {/* Header */}
-          <div className="flex items-center justify-between">
-            <div>
-              <h1 className="text-3xl font-bold tracking-tight">{spaceName}</h1>
+          <div className="flex items-start justify-between gap-4 min-w-0 w-full">
+            <div className="min-w-0 flex-1 overflow-hidden">
+              <h1 className="text-2xl font-bold tracking-tight truncate" title={spaceName}>{spaceName}</h1>
               <p className="text-muted-foreground">
-                {documents.length} documents
+                {documents.length} documents • {formatFileSize(getTotalSize())}
               </p>
             </div>
-            <div className="flex items-center gap-3">
+            <div className="flex items-center gap-3 flex-shrink-0">
               {selectedDocuments.size > 0 && (
                 <Button
                   variant="destructive"
@@ -587,23 +601,24 @@ export default function SpacePage() {
                   </p>
                 </div>
               ) : viewMode === 'list' ? (
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead className="w-[50px]">
-                        <Checkbox
-                          checked={selectedDocuments.size === filteredDocuments.length && filteredDocuments.length > 0}
-                          onCheckedChange={handleSelectAll}
-                        />
-                      </TableHead>
-                      <TableHead className="w-[50px]"></TableHead>
-                      <TableHead>Name</TableHead>
-                      <TableHead>Type</TableHead>
-                      <TableHead>Size</TableHead>
-                      <TableHead>Date Added</TableHead>
-                      <TableHead className="w-[120px]">Actions</TableHead>
-                    </TableRow>
-                  </TableHeader>
+                <div className="overflow-x-auto">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead className="w-[50px]">
+                          <Checkbox
+                            checked={selectedDocuments.size === filteredDocuments.length && filteredDocuments.length > 0}
+                            onCheckedChange={handleSelectAll}
+                          />
+                        </TableHead>
+                        <TableHead className="w-[50px]"></TableHead>
+                        <TableHead className="min-w-[200px]">Name</TableHead>
+                        <TableHead className="w-[80px]">Type</TableHead>
+                        <TableHead className="w-[100px]">Size</TableHead>
+                        <TableHead className="w-[120px]">Date Added</TableHead>
+                        <TableHead className="w-[120px]">Actions</TableHead>
+                      </TableRow>
+                    </TableHeader>
                   <TableBody>
                     {filteredDocuments.map((document) => {
                       const docType = getDocumentType(document.mime_type)
@@ -620,8 +635,10 @@ export default function SpacePage() {
                               {getFileIcon(docType)}
                             </div>
                           </TableCell>
-                          <TableCell className="font-medium">
-                            {document.filename}
+                          <TableCell className="font-medium max-w-0">
+                            <div className="truncate" title={document.filename}>
+                              {document.filename}
+                            </div>
                           </TableCell>
                           <TableCell>
                             <Badge variant="secondary" className={cn("text-xs", getFileTypeColor(docType))}>
@@ -629,7 +646,7 @@ export default function SpacePage() {
                             </Badge>
                           </TableCell>
                           <TableCell className="text-muted-foreground">
-                            {formatFileSize(document.file_size, docType)}
+                            {formatFileSize(getFileSize(document), docType)}
                           </TableCell>
                           <TableCell className="text-muted-foreground">
                             {formatDate(document.created_at)}
@@ -654,21 +671,27 @@ export default function SpacePage() {
                         </TableRow>
                       )
                     })}
-                  </TableBody>
-                </Table>
+                    </TableBody>
+                  </Table>
+                </div>
               ) : (
-                <div 
-                className="grid gap-4" 
-                style={{gridTemplateColumns:'repeat(auto-fit, minmax(240px, 1fr))'}}>
+                <div
+                className="grid gap-4"
+                style={{
+                  gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))',
+                  maxWidth: '100%'
+                }}
+                onClick={handleDeselectAll}>
                   {filteredDocuments.map((document) => {
                     const docType = getDocumentType(document.mime_type)
                     return (
                       <div
                         key={document.id}
                         className={cn(
-                          "group rounded-lg border hover:shadow-md transition-all overflow-hidden bg-white relative",
-                          selectedDocuments.has(document.id) ? "ring-2 ring-primary" : ""
+                          "group rounded-lg hover:shadow-md transition-all overflow-hidden bg-white relative",
+                          selectedDocuments.has(document.id) ? "border-2 border-primary" : "border border-border"
                         )}
+                        onClick={(e) => e.stopPropagation()}
                       >
                         {/* Checkbox overlay */}
                         <div className="absolute top-2 left-2 z-10">
@@ -700,7 +723,7 @@ export default function SpacePage() {
                                 {docType.toUpperCase()}
                               </Badge>
                               <span className="text-xs text-muted-foreground">
-                                {formatFileSize(document.file_size, docType)}
+                                {formatFileSize(getFileSize(document), docType)}
                               </span>
                             </div>
                           </div>

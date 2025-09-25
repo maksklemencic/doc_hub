@@ -42,11 +42,12 @@ class DocumentResponse(BaseModel):
     filename: str = Field(..., min_length=1, max_length=255, description="Name of the document file.")
     file_path: str = Field(..., description="Path where the document is stored.")
     mime_type: str = Field(..., description="MIME type of the document.")
+    file_size: Optional[int] = Field(None, description="Size of the document file in bytes.")
     uploaded_by: uuid.UUID = Field(..., description="Unique identifier of the user who uploaded the document.")
     space_id: uuid.UUID = Field(..., description="Unique identifier of the space the document belongs to.")
     created_at: Optional[datetime] = Field(None, description="Timestamp when the document was uploaded, in ISO 8601 format.")
     updated_at: Optional[datetime] = Field(None, description="Timestamp when the document was last updated, in ISO 8601 format.")
-    
+
     model_config = ConfigDict(from_attributes=True)
         
 class DocumentWithChunksResponse(BaseModel):

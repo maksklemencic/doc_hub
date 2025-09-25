@@ -175,11 +175,11 @@ export function Sidebar({ className }: SidebarProps) {
 
   return (
     <div className={cn(
-      'flex h-full flex-col border-r border-border bg-background',
+      'flex h-full flex-col text-white',
       className
     )}>
           {/* Header */}
-          <div className="flex h-16 items-center justify-between border-border px-4">
+          <div className="flex h-16 items-center justify-between border-b border-slate-600 px-4">
             <div className="flex items-center gap-2">
               {/* <Image 
                 src="/doc-hub-180.png" 
@@ -200,15 +200,15 @@ export function Sidebar({ className }: SidebarProps) {
           </div>
 
           {/* Navigation */}
-          <nav className="flex-1 p-4">
+          <nav className="flex-1 p-4 overflow-hidden flex flex-col">
             {/* Spaces Section */}
-            <div className="space-y-2">
+            <div className="space-y-2 flex-1 overflow-hidden flex flex-col">
               <div className="flex items-center justify-between">
-                <h3 className="text-sm font-medium text-muted-foreground px-2">Spaces</h3>
+                <h3 className="text-sm font-medium text-slate-300 px-2">Spaces</h3>
                 <Button
                   variant="ghost"
                   size="sm"
-                  className="h-8 w-8 p-0 text-muted-foreground hover:text-foreground"
+                  className="h-8 w-8 p-0 text-slate-400 hover:text-slate-800"
                   onClick={() => {
                     // Cancel any ongoing edit
                     if (editingSpaceId) {
@@ -221,15 +221,15 @@ export function Sidebar({ className }: SidebarProps) {
                   <Plus className="h-3 w-3" />
                 </Button>
               </div>
-              
-              <div className="space-y-2">
+
+              <div className="space-y-2 flex-1 overflow-y-auto">
                 {isLoading ? (
                   <div className="flex items-center px-2 py-2">
                     <Spinner size="sm" className="mr-2" />
-                    <span className="text-sm text-muted-foreground">Loading spaces...</span>
+                    <span className="text-sm text-slate-300">Loading spaces...</span>
                   </div>
                 ) : spaces.length === 0 ? (
-                  <div className="px-2 py-2 text-sm text-muted-foreground">
+                  <div className="px-2 py-2 text-sm text-slate-300">
                     No spaces yet
                   </div>
                 ) : (
@@ -237,7 +237,7 @@ export function Sidebar({ className }: SidebarProps) {
                     <div key={space.id} className="group h-8 relative">
                     {editingSpaceId === space.id ? (
                       <div className="flex items-center h-8 px-2  pr-0">
-                        <FolderClosed className="h-4 w-4 text-muted-foreground flex-shrink-0 ml-0.5" />
+                        <FolderClosed className="h-4 w-4 text-slate-400 flex-shrink-0 ml-0.5" />
                         <Input
                           value={editingSpaceName}
                           onChange={(e) => setEditingSpaceName(e.target.value)}
@@ -269,15 +269,15 @@ export function Sidebar({ className }: SidebarProps) {
                     ) : (
                       <div className={cn(
                         "w-full h-8 relative group flex items-center px-3 py-2 rounded-lg transition-colors cursor-pointer",
-                        space.isActive 
-                          ? "bg-primary hover:bg-primary/90 text-primary-foreground" 
-                          : "hover:bg-secondary/20"
+                        space.isActive
+                          ? "bg-primary hover:bg-primary/90 text-primary-foreground"
+                          : "hover:bg-slate-700/50"
                       )}
                       onClick={() => handleSpaceClick(space.id)}
                       >
                         <FolderClosed className={cn(
                           "mr-2 h-4 w-4 flex-shrink-0",
-                          space.isActive ? "text-primary-foreground" : "text-muted-foreground"
+                          space.isActive ? "text-primary-foreground" : "text-slate-400"
                         )} />
                         <span className={cn(
                           "flex-1 text-left truncate text-sm",
@@ -288,10 +288,10 @@ export function Sidebar({ className }: SidebarProps) {
                         <div className="flex items-center opacity-0 group-hover:opacity-100 transition-opacity">
                           <button
                             className={cn(
-                              "h-6 w-6 p-0 flex-shrink-0 rounded hover:cursor-pointer hover:bg-black/10 flex items-center justify-center mr-1",
+                              "h-6 w-6 p-0 flex-shrink-0 rounded hover:cursor-pointer hover:bg-slate-600/50 flex items-center justify-center mr-1",
                               space.isActive
                                 ? "text-primary-foreground/60 hover:text-primary-foreground"
-                                : "text-muted-foreground hover:text-foreground"
+                                : "text-slate-400 hover:text-white"
                             )}
                             onClick={(e) => {
                               e.stopPropagation()
@@ -303,10 +303,10 @@ export function Sidebar({ className }: SidebarProps) {
                           </button>
                           <button
                             className={cn(
-                              "h-6 w-6 p-0 flex-shrink-0 rounded hover:cursor-pointer hover:bg-red-100 dark:hover:bg-red-900/20 flex items-center justify-center",
+                              "h-6 w-6 p-0 flex-shrink-0 rounded hover:cursor-pointer hover:bg-red-800/50 flex items-center justify-center",
                               space.isActive
                                 ? "text-primary-foreground/60 hover:text-red-400"
-                                : "text-muted-foreground hover:text-red-600 dark:hover:text-red-400",
+                                : "text-slate-400 hover:text-red-400",
                               deleteSpaceMutation.isPending && "opacity-50 cursor-not-allowed"
                             )}
                             onClick={(e) => {
@@ -327,7 +327,7 @@ export function Sidebar({ className }: SidebarProps) {
                         </div>
                         <span className={cn(
                           "text-xs w-6 text-right flex-shrink-0 ml-1",
-                          space.isActive ? "text-primary-foreground/80" : "text-muted-foreground"
+                          space.isActive ? "text-primary-foreground/80" : "text-slate-400"
                         )}>
                           {space.documentCount}
                         </span>
@@ -340,7 +340,7 @@ export function Sidebar({ className }: SidebarProps) {
                 {/* Create new space input */}
                 {isCreatingSpace && (
                   <div className="flex items-center h-8 px-2 pr-0">
-                    <FolderClosed className="h-4 w-4 text-muted-foreground flex-shrink-0 ml-0.5" />
+                    <FolderClosed className="h-4 w-4 text-slate-400 flex-shrink-0 ml-0.5" />
                     <Input
                       value={newSpaceName}
                       onChange={(e) => setNewSpaceName(e.target.value)}
@@ -372,26 +372,16 @@ export function Sidebar({ className }: SidebarProps) {
                   </div>
                 )}
 
-                {!isLoading && spaces.length > 0 && (
-                  <Button
-                    variant="ghost"
-                    className="w-full justify-start text-muted-foreground text-sm"
-                    size="sm"
-                  >
-                    <Plus className="mr-2 h-3 w-3" />
-                    See all spaces
-                  </Button>
-                )}
               </div>
             </div>
           </nav>
 
           {/* Logout */}
-          <div className="border-t border-border p-4">
+          <div className="border-t border-slate-600 p-4">
             <Button
               variant="ghost"
               size="sm"
-              className="w-full justify-start text-muted-foreground hover:text-destructive"
+              className="w-full justify-start text-white hover:text-red-400"
               onClick={handleLogout}
               disabled={isLoggingOut}
             >

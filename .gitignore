@@ -8,5 +8,5 @@ uploads
 github
 .vscode/
 OAUTH_SETUP.md
-client_secret*
+google_secrets*
 IMPROVEMENTS.md

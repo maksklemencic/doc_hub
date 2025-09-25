@@ -67,10 +67,14 @@ def upload_base64(
         
         logger.debug(f"Saving file to filesystem")
         saved_file_path = file_service.save_base64_file(
-            request.content_base64, 
-            request.filename, 
+            request.content_base64,
+            request.filename,
             current_user_id
         )
+
+        # Calculate file size from saved file
+        import os
+        file_size = os.path.getsize(saved_file_path) if saved_file_path else None
 
         logger.debug(f"Adding document to database")
         doc_id = db_handler.add_document(
@@ -78,7 +82,8 @@ def upload_base64(
             file_path=saved_file_path,
             mime_type=request.mime_type,
             uploaded_by=current_user_id,
-            space_id=request.space_id
+            space_id=request.space_id,
+            file_size=file_size
         )
         
         metadata = {
@@ -204,14 +209,18 @@ async def upload_file_multipart(
         file.file.seek(0)
         logger.debug(f"Saving file to filesystem")
         saved_file_path = file_service.save_file(file, current_user_id)
-        
+
+        # Get file size from the uploaded file
+        file_size = len(contents)
+
         logger.debug(f"Adding document to database")
         doc_id = db_handler.add_document(
             filename=file.filename,
             file_path=saved_file_path,
             mime_type=file.content_type,
             uploaded_by=current_user_id,
-            space_id=space_id
+            space_id=space_id,
+            file_size=file_size
         )
         
         metadata = {
@@ -353,7 +362,8 @@ def upload_web_document(
             file_path="",  # Empty path for web documents
             mime_type="text/html",
             uploaded_by=current_user_id,
-            space_id=request.space_id
+            space_id=request.space_id,
+            file_size=None  # Web documents don't have file sizes
         )
         
         metadata = {

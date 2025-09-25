@@ -25,7 +25,7 @@ interface UploadItem {
     file?: File;
     url?: string;
     name: string;
-    status: "pending" | "uploading" | "completed" | "error";
+    status: "pending" | "uploading" | "completed" | "error" | "waiting";
     progress: number;
     error?: string;
     documentId?: string; // Added to track the document ID after successful upload
@@ -42,10 +42,44 @@ export function DocumentUpload({ open, onOpenChange, spaceId }: DocumentUploadPr
     const [isDragOver, setIsDragOver] = useState(false);
     const [urlInput, setUrlInput] = useState("");
     const fileInputRef = useRef<HTMLInputElement>(null);
+    const isProcessingQueue = useRef(false);
+    const uploadingIds = useRef(new Set<string>());
 
     const uploadFileMutation = useUploadFile();
     const uploadWebDocumentMutation = useUploadWebDocument();
     const deleteDocumentMutation = useDeleteDocument();
+
+    // Queue processing function
+    const processQueue = () => {
+        if (isProcessingQueue.current) return;
+
+        setUploadItems(prev => {
+            const nextWaiting = prev.find(item => item.status === "waiting");
+            const hasUploading = prev.some(item => item.status === "uploading" || item.status === "pending");
+
+            if (nextWaiting && !hasUploading) {
+                isProcessingQueue.current = true;
+
+                // Start the next upload
+                setTimeout(() => {
+                    if (nextWaiting.type === "file") {
+                        uploadFile(nextWaiting);
+                    } else {
+                        uploadUrl(nextWaiting);
+                    }
+                    isProcessingQueue.current = false;
+                }, 100);
+
+                return prev.map(f =>
+                    f.id === nextWaiting.id
+                        ? { ...f, status: "pending" }
+                        : f
+                );
+            }
+
+            return prev;
+        });
+    };
 
     // Get space documents to check if uploaded documents still exist
     const { data: documentsData } = useSpaceDocuments(spaceId);
@@ -97,35 +131,52 @@ export function DocumentUpload({ open, onOpenChange, spaceId }: DocumentUploadPr
             type: "file",
             file,
             name: file.name,
-            status: "pending" as const,
+            status: "waiting" as const,
             progress: 0,
         }));
 
         setUploadItems((prev) => [...newFiles, ...prev]);
 
-        // Start uploading files
-        newFiles.forEach((uploadItem) => {
-            uploadFile(uploadItem);
-        });
+        // Start processing the queue
+        setTimeout(processQueue, 100);
     };
 
     const uploadFile = async (uploadItem: UploadItem) => {
         if (!uploadItem.file) return;
 
-        setUploadItems((prev) =>
-            prev.map((f) =>
+        console.log(`uploadFile called for ${uploadItem.name} (ID: ${uploadItem.id})`);
+
+        // Global duplicate prevention
+        if (uploadingIds.current.has(uploadItem.id)) {
+            console.log(`GLOBAL BLOCK: ${uploadItem.name} is already uploading`);
+            return;
+        }
+
+        uploadingIds.current.add(uploadItem.id);
+        console.log(`Added ${uploadItem.id} to uploading set`);
+
+        // Check current state
+        setUploadItems((prev) => {
+            const currentItem = prev.find(item => item.id === uploadItem.id);
+            console.log(`Current status for ${uploadItem.name}: ${currentItem?.status}`);
+
+            console.log(`Setting ${uploadItem.name} to uploading status`);
+            return prev.map((f) =>
                 f.id === uploadItem.id
                     ? { ...f, status: "uploading", progress: 0 }
                     : f
-            )
-        );
+            );
+        });
 
         try {
+            console.log(`Making API call for ${uploadItem.name}`);
             const response = await uploadFileMutation.mutateAsync({
                 file: uploadItem.file,
                 spaceId,
             });
+            console.log(`API call completed for ${uploadItem.name}`);
 
+            console.log(`Setting ${uploadItem.name} to completed`);
             setUploadItems((prev) =>
                 prev.map((f) =>
                     f.id === uploadItem.id
@@ -133,7 +184,15 @@ export function DocumentUpload({ open, onOpenChange, spaceId }: DocumentUploadPr
                         : f
                 )
             );
+
+            // Remove from uploading set
+            uploadingIds.current.delete(uploadItem.id);
+            console.log(`Removed ${uploadItem.id} from uploading set`);
+
+            // Process next item in queue
+            setTimeout(processQueue, 200);
         } catch (error) {
+            console.log(`Upload failed for ${uploadItem.name}:`, error);
             setUploadItems((prev) =>
                 prev.map((f) =>
                     f.id === uploadItem.id
@@ -145,6 +204,13 @@ export function DocumentUpload({ open, onOpenChange, spaceId }: DocumentUploadPr
                         : f
                 )
             );
+
+            // Remove from uploading set
+            uploadingIds.current.delete(uploadItem.id);
+            console.log(`Removed ${uploadItem.id} from uploading set (error)`);
+
+            // Process next item in queue even if this one failed
+            setTimeout(processQueue, 200);
         }
     };
 
@@ -189,30 +255,56 @@ export function DocumentUpload({ open, onOpenChange, spaceId }: DocumentUploadPr
             type: "url",
             url: urlInput.trim(),
             name: urlInput.trim(), // Use full URL as display name
-            status: "uploading",
+            status: "waiting",
             progress: 0,
         };
 
         setUploadItems((prev) => [urlItem, ...prev]);
         setUrlInput("");
 
+        // Start processing the queue
+        setTimeout(processQueue, 100);
+    };
+
+    const uploadUrl = async (uploadItem: UploadItem) => {
+        if (!uploadItem.url) return;
+
+        // Check if this item is already uploading to prevent duplicates
+        const currentItem = uploadItems.find(item => item.id === uploadItem.id);
+        if (currentItem && (currentItem.status === "uploading" || currentItem.status === "completed")) {
+            console.log(`Skipping duplicate upload for URL ${uploadItem.name}`);
+            return;
+        }
+
+        console.log(`Starting upload for URL ${uploadItem.name}`);
+        setUploadItems((prev) =>
+            prev.map((f) =>
+                f.id === uploadItem.id
+                    ? { ...f, status: "uploading", progress: 0 }
+                    : f
+            )
+        );
+
         try {
             const response = await uploadWebDocumentMutation.mutateAsync({
-                url: urlItem.url!,
+                url: uploadItem.url,
                 space_id: spaceId,
             });
 
             setUploadItems((prev) =>
                 prev.map((f) =>
-                    f.id === urlItem.id
+                    f.id === uploadItem.id
                         ? { ...f, status: "completed", progress: 100, documentId: response.document_id }
                         : f
                 )
             );
+
+            // Process next item in queue
+            setTimeout(processQueue, 200);
         } catch (error) {
             setUploadItems((prev) =>
                 prev.map((f) =>
-                    f.id === urlItem.id
+                    f.id === uploadItem.id
                         ? {
                               ...f,
                               status: "error",
@@ -221,6 +313,9 @@ export function DocumentUpload({ open, onOpenChange, spaceId }: DocumentUploadPr
                         : f
                 )
             );
+
+            // Process next item in queue even if this one failed
+            setTimeout(processQueue, 200);
         }
     };
 
@@ -369,6 +464,9 @@ export function DocumentUpload({ open, onOpenChange, spaceId }: DocumentUploadPr
                                             {uploadItem.status === "pending" && (
                                                 <span>Pending...</span>
                                             )}
+                                            {uploadItem.status === "waiting" && (
+                                                <span className="text-gray-500">Waiting...</span>
+                                            )}
                                             {uploadItem.status === "uploading" && (
                                                 <div className="flex items-center gap-1">
                                                     <Spinner size="sm" className="w-3 h-3" />
@@ -388,9 +486,6 @@ export function DocumentUpload({ open, onOpenChange, spaceId }: DocumentUploadPr
                                                 </div>
                                             )}
                                         </div>
-                                        {uploadItem.status === "uploading" && (
-                                            <Progress value={undefined} className="mt-2 h-1" />
-                                        )}
                                         {uploadItem.status === "error" && uploadItem.error && (
                                             <p className="text-xs text-red-600 mt-1">
                                                 {uploadItem.error}

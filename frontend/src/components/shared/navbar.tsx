@@ -36,9 +36,9 @@ export function Navbar({ title }: NavbarProps) {
 
   return (
     <nav className="bg-background h-16 flex items-center px-2">
-      <div className="bg-gradient-to-r from-gray-300 to-primary h-12 w-full rounded-lg flex items-center justify-between px-6">
+      <div className="bg-gradient-to-r from-slate-700 to-primary h-12 w-full rounded-lg flex items-center justify-between px-6">
         {/* Page Title */}
-        <h1 className="text-xl font-semibold text-secondary-foreground">
+        <h1 className="text-xl font-semibold text-primary-foreground">
           Documents
         </h1>
         

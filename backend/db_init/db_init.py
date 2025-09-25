@@ -1,6 +1,6 @@
 import os
 import uuid
-from sqlalchemy import UniqueConstraint, create_engine, Column, String, TIMESTAMP, ForeignKey, inspect, text
+from sqlalchemy import UniqueConstraint, create_engine, Column, String, Integer, TIMESTAMP, ForeignKey, inspect, text
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import declarative_base
 from sqlalchemy.orm import sessionmaker
@@ -37,6 +37,7 @@ class Document(Base):
     filename = Column(String, nullable=False)
     file_path = Column(String, nullable=False)
     mime_type = Column(String, nullable=False)
+    file_size = Column(Integer, nullable=True)
     uploaded_by = Column(UUID(as_uuid=True), ForeignKey("users.id"))
     created_at = Column(TIMESTAMP, server_default=text("NOW()"))
     updated_at = Column(TIMESTAMP, server_default=text("NOW()"), onupdate=text("NOW()"))

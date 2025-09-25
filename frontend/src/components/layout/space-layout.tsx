@@ -42,7 +42,7 @@ export function SpaceLayout({ children, chat, chatState = 'visible', onChatState
   // Hidden state - show only documents
   if (chatState === 'hidden' || !chat) {
     return (
-      <div className="h-full">
+      <div className="h-full min-w-0 overflow-hidden">
         {children}
       </div>
     )
@@ -50,16 +50,17 @@ export function SpaceLayout({ children, chat, chatState = 'visible', onChatState
 
   // Normal resizable layout
   return (
-    <div className="h-full">
-      <ResizablePanelGroup 
-        direction="horizontal" 
+    <div className="h-full min-w-0">
+      <ResizablePanelGroup
+        direction="horizontal"
         className="h-full"
         onLayout={handleResize}
       >
-        <ResizablePanel 
+        <ResizablePanel
           defaultSize={DEFAULT_DOCUMENTS_SIZE}
           minSize={MIN_DOCUMENTS_SIZE}
           maxSize={MAX_DOCUMENTS_SIZE}
+          className="min-w-0 overflow-hidden"
         >
           {children}
         </ResizablePanel>
@@ -67,11 +68,12 @@ export function SpaceLayout({ children, chat, chatState = 'visible', onChatState
         {chat && <ResizableHandle withHandle />}
         
         {chat && (
-          <ResizablePanel 
+          <ResizablePanel
             ref={chatPanelRef}
             defaultSize={100 - DEFAULT_DOCUMENTS_SIZE}
             minSize={100 - MAX_DOCUMENTS_SIZE}
             maxSize={100 - MIN_DOCUMENTS_SIZE}
+            className="min-w-0 overflow-hidden"
           >
             {chat}
           </ResizablePanel>

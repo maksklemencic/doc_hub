@@ -82,11 +82,12 @@ def get_paginated_documents(user_id: uuid.UUID, space_id: uuid.UUID, limit: int,
         
 
 def add_document(
-    filename: str, 
-    file_path: str, 
-    mime_type: str, 
-    uploaded_by: uuid.UUID, 
-    space_id: uuid.UUID) -> uuid.UUID:
+    filename: str,
+    file_path: str,
+    mime_type: str,
+    uploaded_by: uuid.UUID,
+    space_id: uuid.UUID,
+    file_size: Optional[int] = None) -> uuid.UUID:
     
     logger.info(f"Adding document {filename} to space {space_id} for user {uploaded_by}")
     with SessionLocal() as session:
@@ -95,6 +96,7 @@ def add_document(
                 filename=filename,
                 file_path=file_path,
                 mime_type=mime_type,
+                file_size=file_size,
                 uploaded_by=uploaded_by,
                 space_id=space_id
             )
