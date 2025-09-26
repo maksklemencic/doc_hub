@@ -3,54 +3,88 @@
 import { useState, useRef, useEffect } from 'react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
-import { Badge } from '@/components/ui/badge'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
+import { Spinner } from '@/components/ui/spinner'
 import { useAuth } from '@/hooks/use-auth'
-import { 
+import { useMessages, useCreateMessage } from '@/hooks/use-messages'
+import { MessageResponse } from '@/lib/api'
+import {
   Send,
-  Bot,
-  User,
-  FileText,
   Sparkles,
-  MessageSquare,
   Minimize2,
   Maximize2,
   X
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
-interface Message {
+interface ChatMessage {
   id: string
   content: string
   role: 'user' | 'assistant'
   timestamp: string
-  sources?: string[]
+  context?: string
 }
 
 type ChatState = 'visible' | 'hidden' | 'fullscreen'
 
 interface SpaceChatProps {
+  spaceId: string
   spaceName: string
   className?: string
   chatState?: ChatState
   onChatStateChange?: (state: ChatState) => void
 }
 
-const MOCK_MESSAGES: Message[] = [
-  {
-    id: '1',
-    content: 'Hello! I can help you find information from your documents in this space. What would you like to know?',
-    role: 'assistant',
-    timestamp: '2024-01-15T10:30:00Z'
-  }
-]
+// Transform backend MessageResponse to ChatMessage format
+const transformMessage = (msg: MessageResponse, role: 'user' | 'assistant' = 'user'): ChatMessage => ({
+  id: msg.id,
+  content: role === 'user' ? msg.content : (msg.response || msg.content),
+  role,
+  timestamp: msg.created_at
+})
 
-export function SpaceChat({ spaceName, className, chatState = 'visible', onChatStateChange }: SpaceChatProps) {
+export function SpaceChat({ spaceId, spaceName, className, chatState = 'visible', onChatStateChange }: SpaceChatProps) {
   const { user } = useAuth()
-  const [messages, setMessages] = useState<Message[]>(MOCK_MESSAGES)
   const [inputValue, setInputValue] = useState('')
-  const [isLoading, setIsLoading] = useState(false)
+  const [messageContexts, setMessageContexts] = useState<Record<string, string>>({})
+
+  // Fetch messages and mutation hooks
+  const { data: messagesData, isLoading: isLoadingMessages, error } = useMessages(spaceId)
+  const createMessageMutation = useCreateMessage(spaceId)
+
+
+  // Transform backend messages to chat format
+  const messages: ChatMessage[] = messagesData?.messages ?
+    messagesData.messages.flatMap(msg => {
+      const chatMessages: ChatMessage[] = []
+
+      // Add user message
+      chatMessages.push(transformMessage(msg, 'user'))
+
+      // Add assistant response if exists
+      if (msg.response) {
+        const responseId = `${msg.id}-response`
+        chatMessages.push({
+          id: responseId,
+          content: msg.response,
+          role: 'assistant',
+          timestamp: msg.created_at,
+          context: messageContexts[msg.id]
+        })
+      }
+
+      return chatMessages
+    }) : [
+      {
+        id: 'welcome',
+        content: 'Hello! I can help you find information from your documents in this space. What would you like to know?',
+        role: 'assistant',
+        timestamp: new Date().toISOString()
+      }
+    ]
+
+  const isLoading = createMessageMutation.isPending
   const scrollAreaRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLInputElement>(null)
 
@@ -106,29 +140,32 @@ export function SpaceChat({ spaceName, className, chatState = 'visible', onChatS
   const handleSend = async () => {
     if (!inputValue.trim() || isLoading) return
 
-    const userMessage: Message = {
-      id: Date.now().toString(),
-      content: inputValue.trim(),
-      role: 'user',
-      timestamp: new Date().toISOString()
-    }
-
-    setMessages(prev => [...prev, userMessage])
+    const messageContent = inputValue.trim()
     setInputValue('')
-    setIsLoading(true)
 
-    // Simulate API call
-    setTimeout(() => {
-      const assistantMessage: Message = {
-        id: (Date.now() + 1).toString(),
-        content: `Based on the documents in "${spaceName}", here's what I found: This is a mock response that would normally come from your RAG system analyzing the documents in this space.`,
-        role: 'assistant',
-        timestamp: new Date().toISOString(),
-        sources: ['Project Requirements.pdf', 'Meeting Notes Q1.docx']
+    try {
+      const response = await createMessageMutation.mutateAsync({
+        content: messageContent,
+        use_context: true,
+        only_space_documents: true,
+        top_k: 5
+      })
+
+      console.log('✅ Message sent successfully:', response)
+      console.log('📥 Received response data:', response.data)
+      console.log('💬 Message object:', response.message)
+
+      // Store context for displaying with the response
+      if (response?.data?.context && response?.message?.id) {
+        setMessageContexts(prev => ({
+          ...prev,
+          [response.message.id]: response.data.context
+        }))
       }
-      setMessages(prev => [...prev, assistantMessage])
-      setIsLoading(false)
-    }, 1500)
+    } catch (error) {
+      console.error('Failed to send message:', error)
+      // Error handling is done in the mutation
+    }
   }
 
   const handleKeyPress = (e: React.KeyboardEvent) => {
@@ -196,79 +233,71 @@ export function SpaceChat({ spaceName, className, chatState = 'visible', onChatS
       <div className="flex-1 overflow-hidden">
         <ScrollArea ref={scrollAreaRef} className="h-full p-4">
           <div className="space-y-4">
-          {messages.map((message) => (
-            <div
-              key={message.id}
-              className={cn(
-                "flex gap-3 max-w-full",
-                message.role === 'user' ? "justify-end" : "justify-start"
-              )}
-            >
-              {message.role === 'assistant' && (
-                <Avatar className="w-8 h-8 flex-shrink-0">
-                  <AvatarFallback className="bg-primary/10">
-                    <Bot className="w-4 h-4 text-primary" />
-                  </AvatarFallback>
-                </Avatar>
-              )}
-              
-              <div
-                className={cn(
-                  "rounded-lg px-3 py-2 max-w-[80%] bg-white border",
-                  message.role === 'user' 
-                    ? "ml-auto border-primary/20" 
-                    : "border-border"
-                )}
-              >
-                <p className="text-sm">{message.content}</p>
-                
-                {message.sources && message.sources.length > 0 && (
-                  <div className="mt-2 pt-2 border-t border-border/50">
-                    <p className="text-xs text-muted-foreground mb-1">Sources:</p>
-                    <div className="flex flex-wrap gap-1">
-                      {message.sources.map((source, index) => (
-                        <Badge 
-                          key={index} 
-                          variant="secondary" 
-                          className="text-xs px-2 py-0.5 h-auto"
-                        >
-                          <FileText className="w-3 h-3 mr-1" />
-                          {source}
-                        </Badge>
-                      ))}
-                    </div>
+          {messages.map((message: ChatMessage) => {
+            if (message.role === 'user') {
+              // Keep user messages as chat bubbles
+              return (
+                <div key={message.id} className="flex gap-3 max-w-full justify-end">
+                  <div className="rounded-lg px-3 py-2 max-w-[80%] bg-white border border-primary/20 ml-auto">
+                    <p className="text-sm">{message.content}</p>
+                    <p className="text-xs opacity-70 mt-1">
+                      {formatTime(message.timestamp)}
+                    </p>
                   </div>
-                )}
-                
-                <p className="text-xs opacity-70 mt-1">
-                  {formatTime(message.timestamp)}
-                </p>
-              </div>
+                  <Avatar className="w-8 h-8 flex-shrink-0">
+                    <AvatarImage src={user?.picture} alt={user?.name || 'User'} />
+                    <AvatarFallback className="bg-primary/10 text-primary text-sm font-medium">
+                      {user?.name?.charAt(0) || user?.email?.charAt(0) || 'U'}
+                    </AvatarFallback>
+                  </Avatar>
+                </div>
+              )
+            } else {
+              // AI messages: clean full-width layout
+              return (
+                <div key={message.id} className="w-full space-y-4">
+                  {/* AI Response */}
+                  <div className="w-full">
+                    <p className="text-sm whitespace-pre-wrap">
+                      {message.content}
+                    </p>
+                    <p className="text-xs opacity-70 mt-1">
+                      {formatTime(message.timestamp)}
+                    </p>
+                  </div>
 
-              {message.role === 'user' && (
-                <Avatar className="w-8 h-8 flex-shrink-0">
-                  <AvatarImage src={user?.picture} alt={user?.name || 'User'} />
-                  <AvatarFallback className="bg-primary/10 text-primary text-sm font-medium">
-                    {user?.name?.charAt(0) || user?.email?.charAt(0) || 'U'}
-                  </AvatarFallback>
-                </Avatar>
-              )}
-            </div>
-          ))}
+                  {/* Context Section */}
+                  {message.context && (
+                    <div className="w-full">
+                      <div className="mb-2">
+                        <h4 className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
+                          Context Used
+                        </h4>
+                      </div>
+                      <div className="bg-amber-50 rounded-lg p-3 border border-amber-200">
+                        <details className="group">
+                          <summary className="cursor-pointer text-xs text-amber-700 hover:text-amber-800 font-medium">
+                            Click to view context ({message.context.length} characters)
+                          </summary>
+                          <div className="mt-2 pt-2 border-t border-amber-200">
+                            <pre className="text-xs text-amber-800 whitespace-pre-wrap font-mono bg-amber-100 p-2 rounded max-h-40 overflow-y-auto">
+                              {message.context}
+                            </pre>
+                          </div>
+                        </details>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )
+            }
+          })}
           
           {isLoading && (
-            <div className="flex gap-3 justify-start">
-              <Avatar className="w-8 h-8 flex-shrink-0">
-                <AvatarFallback className="bg-primary/10">
-                  <Bot className="w-4 h-4 text-primary" />
-                </AvatarFallback>
-              </Avatar>
-              <div className="bg-muted rounded-lg px-3 py-2">
-                <div className="flex items-center gap-1">
-                  <div className="w-2 h-2 bg-muted-foreground rounded-full animate-bounce [animation-delay:-0.3s]"></div>
-                  <div className="w-2 h-2 bg-muted-foreground rounded-full animate-bounce [animation-delay:-0.15s]"></div>
-                  <div className="w-2 h-2 bg-muted-foreground rounded-full animate-bounce"></div>
-                </div>
+            <div className="w-full">
+              <div className="flex items-center gap-2">
+                <Spinner size="sm" />
+                <span className="text-sm text-muted-foreground">Analyzing your documents...</span>
               </div>
             </div>
           )}

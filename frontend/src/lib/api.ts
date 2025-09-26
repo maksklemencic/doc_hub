@@ -59,6 +59,61 @@ export interface WebDocumentUploadRequest {
   space_id: string
 }
 
+// Messages API types
+export interface MessageResponse {
+  id: string
+  space_id: string
+  user_id: string
+  content: string
+  response?: string
+  created_at: string
+}
+
+export interface CreateMessageRequest {
+  content: string
+  stream?: boolean
+  top_k?: number
+  use_context?: boolean
+  only_space_documents?: boolean
+  async_processing?: boolean
+}
+
+export interface MessageResponseWrapper {
+  data: {
+    query: string
+    response: string
+    context: string
+  }
+  message: MessageResponse
+}
+
+export interface GetMessagesResponse {
+  messages: MessageResponse[]
+  pagination: PaginationMetadata
+}
+
+export interface UpdateMessageRequest {
+  content: string
+  response?: string
+}
+
+export interface AsyncMessageResponse {
+  task_id: string
+  status: string
+  message: string
+}
+
+export interface TaskStatusResponse {
+  task_id: string
+  status: string
+  progress: number
+  result?: object
+  error?: string
+  created_at?: string
+  started_at?: string
+  completed_at?: string
+}
+
 class ApiError extends Error {
   constructor(
     message: string,
@@ -215,6 +270,42 @@ export const uploadApi = {
       method: 'POST',
       body: JSON.stringify(request),
     })
+  },
+}
+
+// Messages API
+export const messagesApi = {
+  // Create message (send chat)
+  createMessage: async (spaceId: string, request: CreateMessageRequest): Promise<MessageResponseWrapper> => {
+    return apiRequest<MessageResponseWrapper>(`/spaces/${spaceId}/messages`, {
+      method: 'POST',
+      body: JSON.stringify(request),
+    })
+  },
+
+  // Get chat history
+  getMessages: async (spaceId: string, limit = 10, offset = 0): Promise<GetMessagesResponse> => {
+    return apiRequest<GetMessagesResponse>(`/spaces/${spaceId}/messages?limit=${limit}&offset=${offset}`)
+  },
+
+  // Update message
+  updateMessage: async (spaceId: string, messageId: string, request: UpdateMessageRequest): Promise<MessageResponse> => {
+    return apiRequest<MessageResponse>(`/spaces/${spaceId}/messages/${messageId}`, {
+      method: 'PATCH',
+      body: JSON.stringify(request),
+    })
+  },
+
+  // Delete message
+  deleteMessage: async (spaceId: string, messageId: string): Promise<void> => {
+    return apiRequest<void>(`/spaces/${spaceId}/messages/${messageId}`, {
+      method: 'DELETE',
+    })
+  },
+
+  // Get task status (for async processing)
+  getTaskStatus: async (taskId: string): Promise<TaskStatusResponse> => {
+    return apiRequest<TaskStatusResponse>(`/tasks/${taskId}`)
   },
 }
 

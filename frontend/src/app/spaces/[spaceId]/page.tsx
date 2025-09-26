@@ -775,8 +775,9 @@ export default function SpacePage() {
   )
 
   const chatContent = (
-    <SpaceChat 
-      spaceName={spaceName} 
+    <SpaceChat
+      spaceId={spaceId}
+      spaceName={spaceName}
       chatState={chatState}
       onChatStateChange={setChatState}
     />
