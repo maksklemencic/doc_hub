@@ -1,7 +1,10 @@
+import json
 import logging
 import uuid
+from typing import AsyncGenerator
 
 from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi.responses import StreamingResponse
 
 from ..dependencies.auth import get_current_user
 from ..errors.database_errors import DatabaseError, NotFoundError, PermissionError
@@ -25,6 +28,78 @@ router = APIRouter()
 
 logger = logging.getLogger(__name__)
 
+
+async def stream_message_response(
+    space_id: uuid.UUID,
+    user_id: uuid.UUID,
+    content: str,
+    context: str
+) -> AsyncGenerator[str, None]:
+    """
+    Stream message response using Server-Sent Events format.
+    """
+    try:
+        # Create message record in database
+        db_message = db_handler.create_message(content, None, space_id, user_id)
+        message_id = db_message.id
+
+        # Send initial SSE event with message metadata
+        event_data = {
+            'type': 'message_start',
+            'message_id': str(message_id),
+            'content': content
+        }
+        yield f"data: {json.dumps(event_data)}\n\n"
+
+        # Get streaming response from Ollama
+        full_response = ""
+        chunk_count = 0
+
+        async for chunk in ollama_client.generate_response_stream(content, context):
+            chunk_count += 1
+            full_response += chunk
+
+            # Send chunk as SSE event
+            chunk_data = {
+                'type': 'chunk',
+                'content': chunk,
+                'chunk_number': chunk_count
+            }
+            yield f"data: {json.dumps(chunk_data)}\n\n"
+
+        # Update database with final response
+        db_handler.update_message(message_id, space_id, user_id, content, full_response)
+
+        # Send final SSE event
+        final_data = {
+            'type': 'message_complete',
+            'message_id': str(message_id),
+            'final_response': full_response,
+            'context': context,
+            'total_chunks': chunk_count
+        }
+        yield f"data: {json.dumps(final_data)}\n\n"
+
+    except Exception as e:
+        logger.error(f"Error in streaming response: {str(e)}")
+
+        # Save partial response if we have any content
+        if full_response.strip():
+            logger.info(f"Saving partial response due to interruption: {len(full_response)} characters")
+            try:
+                db_handler.update_message(message_id, space_id, user_id, content, full_response)
+            except Exception as save_error:
+                logger.error(f"Failed to save partial response: {str(save_error)}")
+
+        # Send error event
+        error_data = {
+            'type': 'error',
+            'error': str(e),
+            'partial_response': full_response if full_response.strip() else None
+        }
+        yield f"data: {json.dumps(error_data)}\n\n"
+
+
 tags_metadata = [
     {
         "name": "messages",
@@ -35,14 +110,13 @@ tags_metadata = [
 
 @router.post(
     "/{space_id}/messages",
-    response_model=MessageResponseWrapper,
     tags=["messages"],
-    summary="Create a new message",
-    description="Creates a new message in the specified space.",
-    response_description="The created message object.",
-    status_code=status.HTTP_201_CREATED,
+    summary="Create a new message with streaming response",
+    description="Creates a new message in the specified space and returns a streaming AI response using Server-Sent Events.",
+    response_description="Streaming response with AI-generated content.",
+    status_code=status.HTTP_200_OK,
     responses={
-        201: {"description": "Message successfully created"},
+        200: {"description": "Streaming response started", "content": {"text/event-stream": {"schema": {"type": "string"}}}},
         401: {"description": "Authentication required"},
         404: {"description": "Space not found"},
         422: {"description": "Validation error"},
@@ -50,7 +124,7 @@ tags_metadata = [
         503: {"description": "Database unavailable"}
     }
 )
-def create_message(
+async def create_message(
     space_id: uuid.UUID,
     request: CreateMessageRequest,
     current_user_id: uuid.UUID = Depends(get_current_user)
@@ -69,58 +143,43 @@ def create_message(
                 "content": request.content,
                 "use_context": request.use_context,
                 "only_space_documents": request.only_space_documents,
-                "top_k": request.top_k,
-                "stream": request.stream
+                "top_k": request.top_k
             }
-            
+
             task_id = task_manager.create_task("generate_llm_response", task_data)
-            
+
             return AsyncMessageResponse(
                 task_id=task_id,
                 status="pending",
                 message=f"Message processing started. Use task ID {task_id} to check status."
             )
-        
-        # Synchronous processing (existing logic)
+
+        # Get context for RAG
         if request.use_context is True:
             query_embedding = embedding.get_embeddings([request.content])[0]
 
             top_k_chunks = qdrant_client.query_top_k(
-                query_embedding, 
-                user_id=current_user_id, 
+                query_embedding,
+                user_id=current_user_id,
                 k=request.top_k,
                 space_id=space_id if request.only_space_documents else None
             )
-            
+
             context = "\n".join([res.payload["text"] for res in top_k_chunks])
-        
         else:
             context = "/"
-        
-        response, context = ollama_client.generate_response(
-            query=request.content, 
-            context=context, 
-            stream=request.stream
-        )
 
-        
-        db_message = db_handler.create_message(request.content, response, space_id, current_user_id)
-        
-        return {
-            "data": {
-                "query": request.content,
-                "response": response,
-                "context": context
-            },
-            "message": {
-                "id": db_message.id,
-                "space_id": db_message.space_id,
-                "user_id": db_message.user_id,
-                "content": db_message.content,
-                "response": db_message.response,
-                "created_at": db_message.created_at
+        # Always return streaming response
+        return StreamingResponse(
+            stream_message_response(space_id, current_user_id, request.content, context),
+            media_type="text/event-stream",
+            headers={
+                "Cache-Control": "no-cache",
+                "Connection": "keep-alive",
+                "Access-Control-Allow-Origin": "*",
+                "Access-Control-Allow-Headers": "*",
             }
-        }
+        )
     
     except PermissionError as e:
         logger.warning(f"Permission denied for user {current_user_id} to create message in space {space_id}")

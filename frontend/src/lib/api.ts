@@ -71,7 +71,6 @@ export interface MessageResponse {
 
 export interface CreateMessageRequest {
   content: string
-  stream?: boolean
   top_k?: number
   use_context?: boolean
   only_space_documents?: boolean
@@ -112,6 +111,36 @@ export interface TaskStatusResponse {
   created_at?: string
   started_at?: string
   completed_at?: string
+}
+
+// Streaming event types
+export interface StreamingEvent {
+  type: 'message_start' | 'chunk' | 'message_complete' | 'error'
+}
+
+export interface MessageStartEvent extends StreamingEvent {
+  type: 'message_start'
+  message_id: string
+  content: string
+}
+
+export interface ChunkEvent extends StreamingEvent {
+  type: 'chunk'
+  content: string
+  chunk_number: number
+}
+
+export interface MessageCompleteEvent extends StreamingEvent {
+  type: 'message_complete'
+  message_id: string
+  final_response: string
+  context: string
+  total_chunks: number
+}
+
+export interface ErrorEvent extends StreamingEvent {
+  type: 'error'
+  error: string
 }
 
 class ApiError extends Error {
@@ -275,8 +304,100 @@ export const uploadApi = {
 
 // Messages API
 export const messagesApi = {
-  // Create message (send chat)
-  createMessage: async (spaceId: string, request: CreateMessageRequest): Promise<MessageResponseWrapper> => {
+  // Create message with streaming (now the default)
+  createMessage: (
+    spaceId: string,
+    request: CreateMessageRequest,
+    onEvent: (event: StreamingEvent) => void,
+    abortController?: AbortController
+  ): Promise<void> => {
+    return new Promise(async (resolve, reject) => {
+      const token = typeof window !== 'undefined'
+        ? localStorage.getItem('access_token')
+        : null
+
+      try {
+        const response = await fetch(`${API_BASE_URL}/spaces/${spaceId}/messages`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            ...(token && { Authorization: `Bearer ${token}` }),
+          },
+          body: JSON.stringify(request),
+          signal: abortController?.signal,
+        })
+
+        if (!response.ok) {
+          throw new Error(`HTTP ${response.status}: ${response.statusText}`)
+        }
+
+        if (!response.body) {
+          throw new Error('No response body')
+        }
+
+        const reader = response.body.getReader()
+        const decoder = new TextDecoder()
+
+        // Handle abortion
+        const abortHandler = () => {
+          reader.cancel()
+          reject(new Error('Streaming aborted by user'))
+        }
+
+        if (abortController) {
+          abortController.signal.addEventListener('abort', abortHandler)
+        }
+
+        try {
+          while (true) {
+            // Check if aborted before each read
+            if (abortController?.signal.aborted) {
+              throw new Error('Streaming aborted by user')
+            }
+
+            const { done, value } = await reader.read()
+
+            if (done) {
+              resolve()
+              break
+            }
+
+            const chunk = decoder.decode(value, { stream: true })
+            const lines = chunk.split('\n')
+
+            for (const line of lines) {
+              if (line.startsWith('data: ')) {
+                try {
+                  const eventData = line.slice(6) // Remove 'data: ' prefix
+                  if (eventData.trim()) {
+                    const data = JSON.parse(eventData)
+                    onEvent(data)
+
+                    if (data.type === 'message_complete' || data.type === 'error') {
+                      resolve()
+                      return
+                    }
+                  }
+                } catch (error) {
+                  console.warn('Failed to parse SSE data:', line, error)
+                }
+              }
+            }
+          }
+        } finally {
+          // Cleanup abort listener
+          if (abortController) {
+            abortController.signal.removeEventListener('abort', abortHandler)
+          }
+        }
+      } catch (error) {
+        reject(error)
+      }
+    })
+  },
+
+  // Legacy create message (kept for backward compatibility, but now also streams)
+  createMessageLegacy: async (spaceId: string, request: CreateMessageRequest): Promise<MessageResponseWrapper> => {
     return apiRequest<MessageResponseWrapper>(`/spaces/${spaceId}/messages`, {
       method: 'POST',
       body: JSON.stringify(request),

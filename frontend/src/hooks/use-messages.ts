@@ -1,4 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { useRef } from 'react'
 import toast from 'react-hot-toast'
 import {
   messagesApi,
@@ -6,7 +7,12 @@ import {
   CreateMessageRequest,
   UpdateMessageRequest,
   MessageResponseWrapper,
-  GetMessagesResponse
+  GetMessagesResponse,
+  StreamingEvent,
+  MessageStartEvent,
+  ChunkEvent,
+  MessageCompleteEvent,
+  ErrorEvent
 } from '@/lib/api'
 import { useAuth } from './use-auth'
 
@@ -35,36 +41,200 @@ export function useMessages(spaceId: string, limit = 50, offset = 0) {
   })
 }
 
-// Custom hook to create a message (send chat)
+// Custom hook to create a message with streaming
 export function useCreateMessage(spaceId: string) {
   const queryClient = useQueryClient()
+  const abortControllerRef = useRef<AbortController | null>(null)
 
-  // Define the context type for this mutation
   type MutationContext = {
     previousMessages: GetMessagesResponse | undefined
     optimisticUserMessage: MessageResponse
+    streamingAssistantMessage: MessageResponse | null
   }
 
-  return useMutation<MessageResponseWrapper, Error, CreateMessageRequest, MutationContext>({
+  const mutation = useMutation<void, Error, CreateMessageRequest, MutationContext>({
     mutationFn: async (data: CreateMessageRequest) => {
-      console.log('🚀 Sending message to API:', { spaceId, data })
-      const response = await messagesApi.createMessage(spaceId, data)
-      console.log('📥 Raw API response:', response)
-      return response
+      console.log('🚀 Starting streaming message:', { spaceId, data })
+
+      // Stop any existing streaming operation first
+      if (abortControllerRef.current) {
+        console.log('🛑 Stopping previous streaming operation...')
+        abortControllerRef.current.abort()
+        abortControllerRef.current = null
+      }
+
+      return new Promise((resolve, reject) => {
+        let tempAssistantId: string | null = null
+        let streamingContent = ''
+
+        // Create abort controller for this request
+        const abortController = new AbortController()
+        abortControllerRef.current = abortController
+
+        console.log('✅ New abort controller set:', !!abortControllerRef.current)
+
+        messagesApi.createMessage(spaceId, data, (event: StreamingEvent) => {
+          console.log('📡 Received streaming event:', event)
+
+          switch (event.type) {
+            case 'message_start': {
+              const startEvent = event as MessageStartEvent
+              console.log('🎬 Message started:', startEvent)
+
+              // Replace the optimistic user message with the real one from backend
+              // This message will hold both the user query AND the streaming AI response
+              queryClient.setQueryData<GetMessagesResponse>(messagesKeys.list(spaceId), (old) => {
+                if (!old) return old
+
+                // Find and replace the temp user message with real one
+                const updatedMessages = old.messages.map(msg =>
+                  msg.id.startsWith('temp-user-')
+                    ? {
+                        id: startEvent.message_id,
+                        space_id: spaceId,
+                        user_id: msg.user_id,
+                        content: startEvent.content,
+                        response: '', // Will be updated as chunks arrive
+                        created_at: new Date().toISOString()
+                      }
+                    : msg
+                )
+
+                // Set the temp assistant ID to the real message ID for updates
+                tempAssistantId = startEvent.message_id
+                console.log('✨ Updated user message for streaming:', startEvent.message_id)
+
+                return {
+                  ...old,
+                  messages: updatedMessages
+                  // Don't change pagination count - we're just replacing, not adding
+                }
+              })
+              break
+            }
+
+            case 'chunk': {
+              const chunkEvent = event as ChunkEvent
+              streamingContent += chunkEvent.content
+              console.log('📝 Received chunk:', chunkEvent.content)
+
+              // Update the message's response field in real-time
+              if (tempAssistantId) {
+                queryClient.setQueryData<GetMessagesResponse>(messagesKeys.list(spaceId), (old) => {
+                  if (!old) return old
+
+                  return {
+                    ...old,
+                    messages: old.messages.map(msg =>
+                      msg.id === tempAssistantId
+                        ? { ...msg, response: streamingContent }
+                        : msg
+                    )
+                  }
+                })
+              }
+              break
+            }
+
+            case 'message_complete': {
+              const completeEvent = event as MessageCompleteEvent
+              console.log('✅ Message completed:', completeEvent)
+
+              // Final update with complete response
+              if (tempAssistantId) {
+                queryClient.setQueryData<GetMessagesResponse>(messagesKeys.list(spaceId), (old) => {
+                  if (!old) return old
+
+                  return {
+                    ...old,
+                    messages: old.messages.map(msg =>
+                      msg.id === tempAssistantId
+                        ? {
+                            ...msg,
+                            response: completeEvent.final_response
+                          }
+                        : msg
+                    )
+                  }
+                })
+
+                console.log('🎯 Final message update completed')
+              }
+
+              resolve()
+              break
+            }
+
+            case 'error': {
+              const errorEvent = event as ErrorEvent & { partial_response?: string }
+              console.error('❌ Streaming error:', errorEvent.error)
+
+              // If we have a partial response, save it before rejecting
+              if (errorEvent.partial_response && tempAssistantId) {
+                console.log('💾 Saving partial response before error:', errorEvent.partial_response.length, 'characters')
+                queryClient.setQueryData<GetMessagesResponse>(messagesKeys.list(spaceId), (old) => {
+                  if (!old) return old
+
+                  return {
+                    ...old,
+                    messages: old.messages.map(msg =>
+                      msg.id === tempAssistantId
+                        ? {
+                            ...msg,
+                            response: errorEvent.partial_response
+                          }
+                        : msg
+                    )
+                  }
+                })
+              }
+
+              reject(new Error(errorEvent.error))
+              break
+            }
+          }
+        }, abortController).catch((error) => {
+          if (error.message.includes('aborted')) {
+            console.log('🛑 Streaming was aborted by user')
+
+            // Save partial response if we have any streaming content
+            if (streamingContent && tempAssistantId) {
+              console.log('💾 Saving partial response after abort:', streamingContent.length, 'characters')
+              queryClient.setQueryData<GetMessagesResponse>(messagesKeys.list(spaceId), (old) => {
+                if (!old) return old
+
+                return {
+                  ...old,
+                  messages: old.messages.map(msg =>
+                    msg.id === tempAssistantId
+                      ? {
+                          ...msg,
+                          response: streamingContent
+                        }
+                      : msg
+                  )
+                }
+              })
+            }
+
+            // Don't treat abort as an error - just resolve
+            resolve()
+          } else {
+            reject(error)
+          }
+        })
+      })
     },
 
-    // Optimistic update
+    // Optimistic update - only add user message (backend creates the real one)
     onMutate: async (newMessage) => {
-      console.log('⚡ Starting optimistic update for:', newMessage.content)
+      console.log('⚡ Starting optimistic update for streaming:', newMessage.content)
 
-      // Cancel any outgoing refetches
       await queryClient.cancelQueries({ queryKey: messagesKeys.list(spaceId) })
 
-      // Snapshot the previous value
       const previousMessages = queryClient.getQueryData<GetMessagesResponse>(messagesKeys.list(spaceId))
-      console.log('📋 Previous messages in cache:', previousMessages)
 
-      // Create optimistic user message
+      // Create optimistic user message (will be replaced by real one from backend)
       const optimisticUserMessage: MessageResponse = {
         id: `temp-user-${Date.now()}`,
         space_id: spaceId,
@@ -72,11 +242,17 @@ export function useCreateMessage(spaceId: string) {
         content: newMessage.content,
         created_at: new Date().toISOString(),
       }
-      console.log('💫 Created optimistic message:', optimisticUserMessage)
 
-      // Optimistically update to include the user message
+      // DON'T create assistant message yet - backend will tell us when to create it
+      console.log('💫 Created optimistic user message:', optimisticUserMessage)
+
+      // Add only user message to cache
       queryClient.setQueryData<GetMessagesResponse>(messagesKeys.list(spaceId), (old) => {
-        if (!old) return { messages: [optimisticUserMessage], pagination: { limit: 50, offset: 0, total_count: 1 } }
+        if (!old) return {
+          messages: [optimisticUserMessage],
+          pagination: { limit: 50, offset: 0, total_count: 1 }
+        }
+
         const updated = {
           ...old,
           messages: [...old.messages, optimisticUserMessage],
@@ -85,76 +261,86 @@ export function useCreateMessage(spaceId: string) {
             total_count: old.pagination.total_count + 1
           }
         }
-        console.log('✨ Updated cache with optimistic message:', updated)
+        console.log('✨ Updated cache with user message:', updated)
         return updated
       })
 
-      return { previousMessages, optimisticUserMessage }
+      return { previousMessages, optimisticUserMessage, streamingAssistantMessage: null }
     },
 
-    // On success, replace optimistic update with real data
-    onSuccess: (data, variables, context) => {
-      console.log('🎉 Mutation successful! Processing response...')
-      console.log('📦 Full response data:', data)
-      console.log('💬 Message data:', data.message)
-      console.log('🤖 Assistant response:', data.data?.response)
-
-      // Update with real server data
-      queryClient.setQueryData<GetMessagesResponse>(messagesKeys.list(spaceId), (old) => {
-        if (!old || !context?.optimisticUserMessage) {
-          console.log('❌ No old data or optimistic message found')
-          return old
-        }
-
-        console.log('🔄 Replacing optimistic message with real data...')
-        console.log('🗑️  Removing optimistic message with ID:', context.optimisticUserMessage.id)
-
-        // Remove optimistic message and add real message with response
-        const filteredMessages = old.messages.filter(msg => msg.id !== context.optimisticUserMessage.id)
-        console.log('📝 Filtered messages (without optimistic):', filteredMessages)
-
-        // Add the real message with response from server
-        const realMessage = {
-          ...data.message,
-          response: data.data?.response || data.message.response
-        }
-        console.log('✅ Final real message to add:', realMessage)
-
-        const finalResult = {
-          ...old,
-          messages: [...filteredMessages, realMessage],
-          pagination: {
-            ...old.pagination,
-            total_count: filteredMessages.length + 1
-          }
-        }
-        console.log('🏁 Final messages cache result:', finalResult)
-        return finalResult
-      })
+    // On success, the streaming has completed successfully
+    onSuccess: () => {
+      console.log('🎉 Streaming completed successfully!')
     },
 
-    // If mutation fails, use the context to roll back
+    // If mutation fails, roll back
     onError: (err, variables, context) => {
-      console.log('❌ Mutation failed:', err)
-      console.log('🔙 Rolling back optimistic update...')
+      console.log('❌ Streaming failed:', err)
 
       if (context?.previousMessages) {
         queryClient.setQueryData(messagesKeys.list(spaceId), context.previousMessages)
-        console.log('↩️  Restored previous messages:', context.previousMessages)
+        console.log('↩️  Restored previous messages')
       }
 
       toast.error('Failed to send message. Please try again.')
     },
 
-    // Always refetch after error or success (but avoid double refetch on success since we already updated)
     onSettled: (data, error) => {
+      // Clear abort controller when done
+      abortControllerRef.current = null
+
       if (error) {
-        // Only invalidate on error to ensure we have fresh data
         console.log('🔄 Invalidating cache due to error...')
         queryClient.invalidateQueries({ queryKey: messagesKeys.list(spaceId) })
       }
     },
   })
+
+  // Add stop streaming function
+  const stopStreaming = () => {
+    console.log('🛑 Stopping streaming...')
+    console.log('🔍 Abort controller exists:', !!abortControllerRef.current)
+    console.log('🔍 Mutation is pending:', mutation.isPending)
+    console.log('🔍 Mutation status:', mutation.status)
+
+    let stopped = false
+
+    // Try both abort methods for reliability
+    if (abortControllerRef.current) {
+      console.log('✅ Aborting via abort controller')
+      try {
+        abortControllerRef.current.abort()
+        abortControllerRef.current = null
+        stopped = true
+        console.log('✅ Abort controller successfully triggered')
+      } catch (error) {
+        console.error('❌ Error aborting controller:', error)
+      }
+    }
+
+    // Also use React Query's built-in reset method as backup
+    if (mutation.isPending) {
+      console.log('✅ Resetting mutation via React Query')
+      try {
+        mutation.reset()
+        stopped = true
+        console.log('✅ Mutation successfully reset')
+      } catch (error) {
+        console.error('❌ Error resetting mutation:', error)
+      }
+    }
+
+    if (!stopped) {
+      console.log('❌ No active stream found to stop or both methods failed')
+    } else {
+      console.log('🎯 Stream stopping initiated successfully')
+    }
+  }
+
+  return {
+    ...mutation,
+    stopStreaming
+  }
 }
 
 // Custom hook to update a message

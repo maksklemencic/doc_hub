@@ -14,7 +14,11 @@ import {
   Sparkles,
   Minimize2,
   Maximize2,
-  X
+  X,
+  Square,
+  Edit3,
+  Check,
+  X as XIcon
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
@@ -48,6 +52,8 @@ export function SpaceChat({ spaceId, spaceName, className, chatState = 'visible'
   const { user } = useAuth()
   const [inputValue, setInputValue] = useState('')
   const [messageContexts, setMessageContexts] = useState<Record<string, string>>({})
+  const [editingMessageId, setEditingMessageId] = useState<string | null>(null)
+  const [editValue, setEditValue] = useState('')
 
   // Fetch messages and mutation hooks
   const { data: messagesData, isLoading: isLoadingMessages, error } = useMessages(spaceId)
@@ -59,10 +65,10 @@ export function SpaceChat({ spaceId, spaceName, className, chatState = 'visible'
     messagesData.messages.flatMap(msg => {
       const chatMessages: ChatMessage[] = []
 
-      // Add user message
+      // Add user message (from content field)
       chatMessages.push(transformMessage(msg, 'user'))
 
-      // Add assistant response if exists
+      // Add assistant response if exists (from response field)
       if (msg.response) {
         const responseId = `${msg.id}-response`
         chatMessages.push({
@@ -144,24 +150,14 @@ export function SpaceChat({ spaceId, spaceName, className, chatState = 'visible'
     setInputValue('')
 
     try {
-      const response = await createMessageMutation.mutateAsync({
+      await createMessageMutation.mutateAsync({
         content: messageContent,
         use_context: true,
         only_space_documents: true,
         top_k: 5
       })
 
-      console.log('✅ Message sent successfully:', response)
-      console.log('📥 Received response data:', response.data)
-      console.log('💬 Message object:', response.message)
-
-      // Store context for displaying with the response
-      if (response?.data?.context && response?.message?.id) {
-        setMessageContexts(prev => ({
-          ...prev,
-          [response.message.id]: response.data.context
-        }))
-      }
+      console.log('✅ Streaming message completed successfully!')
     } catch (error) {
       console.error('Failed to send message:', error)
       // Error handling is done in the mutation
@@ -177,11 +173,58 @@ export function SpaceChat({ spaceId, spaceName, className, chatState = 'visible'
 
   const formatTime = (timestamp: string) => {
     const date = new Date(timestamp)
-    return date.toLocaleTimeString('en-US', { 
-      hour: '2-digit', 
+    return date.toLocaleTimeString('en-US', {
+      hour: '2-digit',
       minute: '2-digit',
       hour12: false
     })
+  }
+
+  // Edit message handlers
+  const handleStartEdit = (messageId: string, currentContent: string) => {
+    setEditingMessageId(messageId)
+    setEditValue(currentContent)
+  }
+
+  const handleCancelEdit = () => {
+    setEditingMessageId(null)
+    setEditValue('')
+  }
+
+  const handleSaveEdit = async (messageId: string) => {
+    if (!editValue.trim() || editValue === editingMessageId) return
+
+    try {
+      console.log('💾 Saving edited message and re-generating response...')
+      console.log('🔍 Pre-edit mutation state:', {
+        isPending: createMessageMutation.isPending,
+        status: createMessageMutation.status
+      })
+
+      // Store current edit values in case of error
+      const currentEditValue = editValue.trim()
+
+      // Cancel any current editing state before starting new stream
+      setEditingMessageId(null)
+      setEditValue('')
+
+      console.log('🚀 Starting edit-triggered stream...')
+
+      // Send the edited message to get a new AI response
+      await createMessageMutation.mutateAsync({
+        content: currentEditValue,
+        use_context: true,
+        only_space_documents: true,
+        top_k: 5
+      })
+
+      console.log('✅ Message edited and new response generated!')
+    } catch (error) {
+      console.error('Failed to save edited message:', error)
+      // Re-open edit mode on error with original values
+      setEditingMessageId(messageId)
+      setEditValue(editValue)
+    }
   }
 
   return (
@@ -235,14 +278,62 @@ export function SpaceChat({ spaceId, spaceName, className, chatState = 'visible'
           <div className="space-y-4">
           {messages.map((message: ChatMessage) => {
             if (message.role === 'user') {
-              // Keep user messages as chat bubbles
+              // User messages with edit functionality
+              const isEditing = editingMessageId === message.id
+
               return (
                 <div key={message.id} className="flex gap-3 max-w-full justify-end">
-                  <div className="rounded-lg px-3 py-2 max-w-[80%] bg-white border border-primary/20 ml-auto">
-                    <p className="text-sm">{message.content}</p>
-                    <p className="text-xs opacity-70 mt-1">
-                      {formatTime(message.timestamp)}
-                    </p>
+                  <div className="rounded-lg px-3 py-2 max-w-[80%] bg-white border border-primary/20 ml-auto group relative">
+                    {isEditing ? (
+                      // Edit mode
+                      <div className="space-y-3">
+                        <textarea
+                          value={editValue}
+                          onChange={(e) => setEditValue(e.target.value)}
+                          className="w-full text-sm resize-none border border-gray-300 rounded-md p-2 focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent min-w-[300px]"
+                          rows={3}
+                          autoFocus
+                        />
+                        <div className="flex items-center gap-2">
+                          <Button
+                            size="sm"
+                            onClick={() => handleSaveEdit(message.id)}
+                            disabled={!editValue.trim() || editValue === message.content}
+                            className="h-7 px-3 text-xs"
+                          >
+                            <Check className="w-3 h-3 mr-1" />
+                            Save & Re-generate
+                          </Button>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => handleCancelEdit()}
+                            className="h-7 px-3 text-xs"
+                          >
+                            <XIcon className="w-3 h-3 mr-1" />
+                            Cancel
+                          </Button>
+                        </div>
+                      </div>
+                    ) : (
+                      // Display mode
+                      <>
+                        <p className="text-sm">{message.content}</p>
+                        <p className="text-xs opacity-70 mt-1">
+                          {formatTime(message.timestamp)}
+                        </p>
+
+                        {/* Edit button - only visible on hover */}
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => handleStartEdit(message.id, message.content)}
+                          className="absolute top-1 right-1 h-7 w-7 p-0 opacity-0 group-hover:opacity-100 transition-opacity duration-200"
+                        >
+                          <Edit3 className="w-3 h-3" />
+                        </Button>
+                      </>
+                    )}
                   </div>
                   <Avatar className="w-8 h-8 flex-shrink-0">
                     <AvatarImage src={user?.picture} alt={user?.name || 'User'} />
@@ -253,16 +344,13 @@ export function SpaceChat({ spaceId, spaceName, className, chatState = 'visible'
                 </div>
               )
             } else {
-              // AI messages: clean full-width layout
+              // AI messages: clean full-width layout with padding
               return (
                 <div key={message.id} className="w-full space-y-4">
                   {/* AI Response */}
-                  <div className="w-full">
+                  <div className="w-full px-4">
                     <p className="text-sm whitespace-pre-wrap">
                       {message.content}
-                    </p>
-                    <p className="text-xs opacity-70 mt-1">
-                      {formatTime(message.timestamp)}
                     </p>
                   </div>
 
@@ -295,9 +383,31 @@ export function SpaceChat({ spaceId, spaceName, className, chatState = 'visible'
           
           {isLoading && (
             <div className="w-full">
-              <div className="flex items-center gap-2">
-                <Spinner size="sm" />
-                <span className="text-sm text-muted-foreground">Analyzing your documents...</span>
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <Spinner size="sm" />
+                  <span className="text-sm text-muted-foreground">
+                    {createMessageMutation.isPending
+                      ? "Streaming response..."
+                      : "Analyzing your documents..."
+                    }
+                  </span>
+                </div>
+
+                {createMessageMutation.isPending && (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => {
+                      console.log('🛑 Stop button clicked!')
+                      createMessageMutation.stopStreaming()
+                    }}
+                    className="h-8 px-3 text-xs"
+                  >
+                    <Square className="w-3 h-3 mr-1" />
+                    Stop
+                  </Button>
+                )}
               </div>
             </div>
           )}

@@ -27,7 +27,6 @@ class MessageResponseWrapper(BaseModel):
 
 class CreateMessageRequest(BaseModel):
     content: str = Field(..., description="The content of the message to create.")
-    stream: bool = Field(False, description="Whether to stream the response or not.")
     top_k: int = Field(5, ge=1, le=100, description="Number of top results to return when using context.")
     use_context: bool = Field(True, description="Whether to use context from the RAG system.")
     only_space_documents: bool = Field(True, description="Whether to restrict context to documents within the same space.")
