@@ -3,8 +3,12 @@ uvicorn[standard]
 httpx
 qdrant-client>=1.6.0
 requests
-sentence_transformers
+sentence-transformers
 langchain
+langgraph
+langchain-community
+langchain-groq
+groq
 pymupdf
 pytesseract
 pillow
@@ -26,3 +30,7 @@ pydantic-settings
 pytest
 pytest-asyncio
 httpx
+markdown
+python-markdown
+redis
+asyncio-throttle
