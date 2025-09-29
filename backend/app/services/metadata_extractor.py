@@ -3,6 +3,7 @@ import uuid
 from typing import Dict
 
 from functools import lru_cache
+
 from keybert import KeyBERT
 from langdetect import detect
 

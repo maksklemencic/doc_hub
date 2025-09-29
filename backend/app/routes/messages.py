@@ -9,20 +9,18 @@ from fastapi.responses import StreamingResponse
 from ..dependencies.auth import get_current_user
 from ..errors.database_errors import DatabaseError, NotFoundError, PermissionError
 from ..errors.embedding_errors import EmbeddingError, InvalidInputError
-from ..errors.ollama_errors import LLMError
 from ..errors.qdrant_errors import VectorStoreError
+from ..errors.llm_errors import LLMError
 from ..models.messages import (
-    AsyncMessageResponse, 
-    CreateMessageRequest, 
-    GetMessagesRequest, 
-    GetMessagesResponseWrapper, 
-    MessageResponse, 
-    TaskStatusResponse,
-    UpdateMessageRequest, 
+    CreateMessageRequest,
+    GetMessagesRequest,
+    GetMessagesResponseWrapper,
+    MessageResponse,
+    UpdateMessageRequest,
     MessageResponseWrapper
 )
-from ..services import db_handler, embedding, ollama_client, qdrant_client
-from ..services.background_tasks import task_manager, TaskStatus
+from ..services import db_handler, embedding, qdrant_client
+from ..agents import RAGQueryAgent
 
 router = APIRouter()
 
@@ -38,6 +36,9 @@ async def stream_message_response(
     """
     Stream message response using Server-Sent Events format.
     """
+    full_response = ""
+    message_id = None
+
     try:
         # Create message record in database
         db_message = db_handler.create_message(content, None, space_id, user_id)
@@ -51,11 +52,29 @@ async def stream_message_response(
         }
         yield f"data: {json.dumps(event_data)}\n\n"
 
-        # Get streaming response from Ollama
-        full_response = ""
+        # Get streaming response using Groq
         chunk_count = 0
 
-        async for chunk in ollama_client.generate_response_stream(content, context):
+        # Use RAG Query Agent for streaming response
+        rag_agent = RAGQueryAgent()
+
+        # Prepare agent input
+        agent_input = {
+            "query": content,
+            "user_id": str(user_id),
+            "space_id": str(space_id) if space_id else None,
+            "stream_response": True
+        }
+
+        # Execute RAG query
+        result = await rag_agent.execute(agent_input)
+        response_stream = result.get("response_stream")
+
+        # Check if response_stream exists and is not None
+        if not response_stream:
+            raise Exception("No response stream available")
+
+        async for chunk in response_stream:
             chunk_count += 1
             full_response += chunk
 
@@ -83,8 +102,8 @@ async def stream_message_response(
     except Exception as e:
         logger.error(f"Error in streaming response: {str(e)}")
 
-        # Save partial response if we have any content
-        if full_response.strip():
+        # Save partial response if we have any content and a valid message_id
+        if message_id and full_response.strip():
             logger.info(f"Saving partial response due to interruption: {len(full_response)} characters")
             try:
                 db_handler.update_message(message_id, space_id, user_id, content, full_response)
@@ -134,26 +153,6 @@ async def create_message(
         logger.debug(f"Validating space {space_id} ownership for user {current_user_id}")
         db_handler.validate_space_ownership(space_id, current_user_id)
         
-        # Handle async processing
-        if request.async_processing:
-            # Create background task for async processing
-            task_data = {
-                "space_id": str(space_id),
-                "user_id": str(current_user_id),
-                "content": request.content,
-                "use_context": request.use_context,
-                "only_space_documents": request.only_space_documents,
-                "top_k": request.top_k
-            }
-
-            task_id = task_manager.create_task("generate_llm_response", task_data)
-
-            return AsyncMessageResponse(
-                task_id=task_id,
-                status="pending",
-                message=f"Message processing started. Use task ID {task_id} to check status."
-            )
-
         # Get context for RAG
         if request.use_context is True:
             query_embedding = embedding.get_embeddings([request.content])[0]
@@ -206,55 +205,6 @@ async def create_message(
         logger.error(f"Unexpected error creating message in space {space_id} for user {current_user_id}: {str(e)}")
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="An unexpected error occurred.")
 
-
-@router.get(
-    "/tasks/{task_id}",
-    response_model=TaskStatusResponse,
-    tags=["messages"],
-    summary="Get task status",
-    description="Get the status of a background task (e.g., async message processing).",
-    response_description="Current status and progress of the background task.",
-    status_code=status.HTTP_200_OK,
-    responses={
-        200: {"description": "Task status retrieved successfully"},
-        401: {"description": "Authentication required"},
-        404: {"description": "Task not found"},
-        500: {"description": "Internal server error"}
-    }
-)
-def get_task_status(
-    task_id: str,
-    current_user_id: uuid.UUID = Depends(get_current_user)
-):
-    try:
-        task = task_manager.get_task_status(task_id)
-        if not task:
-            logger.warning(f"Task {task_id} not found")
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Task not found")
-        
-        # Basic authorization check - ensure task belongs to user
-        # (In a real implementation, you'd store user_id with the task)
-        task_user_id = task.metadata.get("user_id")
-        if task_user_id and task_user_id != str(current_user_id):
-            logger.warning(f"Permission denied for user {current_user_id} to access task {task_id}")
-            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Access denied")
-        
-        return TaskStatusResponse(
-            task_id=task.task_id,
-            status=task.status.value,
-            progress=task.progress,
-            result=task.result,
-            error=task.error,
-            created_at=task.created_at,
-            started_at=task.started_at,
-            completed_at=task.completed_at
-        )
-    
-    except HTTPException:
-        raise
-    except Exception as e:
-        logger.error(f"Unexpected error retrieving task status {task_id}: {str(e)}")
-        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="An unexpected error occurred.")
 
 
 @router.get(

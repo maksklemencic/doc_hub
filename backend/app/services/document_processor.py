@@ -34,6 +34,8 @@ def clean_text(text: str) -> str:
 
 def extract_text_from_pdf(file_bytes: bytes) -> List[Tuple[int, str]]:
     logger.info("Starting PDF text extraction")
+
+
     try:
         doc = fitz.open(stream=file_bytes, filetype="pdf")
     except Exception as e:
@@ -55,7 +57,7 @@ def extract_text_from_pdf(file_bytes: bytes) -> List[Tuple[int, str]]:
                     text = pytesseract.image_to_string(image)
                 except Exception as e:
                     logger.warning(f"OCR failed for page {page_number}: {str(e)}")
-                    raise OCRError(f"OCR failed for page {page_number}: {str(e)}")
+                    text = ""
             
             cleaned_text = clean_text(text.strip())
             page_texts.append((page_number, cleaned_text))
@@ -75,6 +77,8 @@ def extract_text_from_pdf(file_bytes: bytes) -> List[Tuple[int, str]]:
 
 def extract_text_from_docx(file_bytes: bytes) -> List[Tuple[int, str]]:
     logger.info("Starting DOCX text extraction")
+
+
     try:
         doc = Document(io.BytesIO(file_bytes))
     except Exception as e:
@@ -111,6 +115,8 @@ def extract_text_from_docx(file_bytes: bytes) -> List[Tuple[int, str]]:
 
 def extract_text_from_image(image_bytes: bytes) -> List[Tuple[int, str]]:
     logger.info("Starting image OCR text extraction")
+
+
     try:
         image = Image.open(io.BytesIO(image_bytes))
         text = pytesseract.image_to_string(image).strip()

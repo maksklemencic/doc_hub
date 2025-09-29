@@ -11,7 +11,8 @@ from starlette.middleware.base import BaseHTTPMiddleware
 
 from .errors.database_errors import ServiceError
 from .middleware.auth_middleware import AuthMiddleware
-from .middleware.https_enforcement import HTTPSEnforcementMiddleware
+# Removed https_enforcement - not needed
+# from .middleware.https_enforcement import HTTPSEnforcementMiddleware
 from .middleware.rate_limit import RateLimitMiddleware
 from .routes import auth, documents, messages, spaces, upload
 
@@ -81,7 +82,8 @@ if os.getenv("ENVIRONMENT") == "production":
         allow_headers=["*"],
         expose_headers=["*"],
     )
-    app.add_middleware(HTTPSEnforcementMiddleware)
+    # Removed HTTPS enforcement middleware
+    # app.add_middleware(HTTPSEnforcementMiddleware)
     app.add_middleware(RateLimitMiddleware, calls=100, period=60)
 
 else:

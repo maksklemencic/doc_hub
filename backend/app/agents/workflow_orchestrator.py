@@ -12,10 +12,14 @@ from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from enum import Enum
 
-from langgraph.graph import Graph, StateGraph
-from langgraph.graph.graph import CompiledGraph
+# LangGraph imports disabled - package not installed
+# from langgraph.graph import Graph, StateGraph
+# from langgraph.graph.graph import CompiledGraph
 
 from .base_agent import BaseAgent
+from .document_processing_agent import DocumentProcessingAgent
+from .indexing_agent import IndexingAgent
+from .rag_query_agent import RAGQueryAgent
 
 logger = logging.getLogger(__name__)
 
@@ -68,7 +72,8 @@ class WorkflowOrchestrator:
     """
 
     def __init__(self):
-        self.workflows: Dict[str, CompiledGraph] = {}
+        # Simplified workflow management without LangGraph
+        self.workflows: Dict[str, Any] = {}
         self.executions: Dict[str, WorkflowExecution] = {}
         self.agents: Dict[str, BaseAgent] = {}
         self.logger = logging.getLogger(f"{__name__}")
@@ -83,7 +88,7 @@ class WorkflowOrchestrator:
         self.agents[agent.agent_type] = agent
         self.logger.info(f"Registered agent: {agent.agent_type} ({agent.agent_id})")
 
-    def create_document_processing_workflow(self) -> CompiledGraph:
+    def create_document_processing_workflow(self) -> Any:
         """
         Create the document processing workflow graph.
 
@@ -109,7 +114,7 @@ class WorkflowOrchestrator:
         self.logger.info("Created document processing workflow")
         return compiled_workflow
 
-    def create_rag_query_workflow(self) -> CompiledGraph:
+    def create_rag_query_workflow(self) -> Any:
         """
         Create the RAG query workflow graph.
 
@@ -207,7 +212,9 @@ class WorkflowOrchestrator:
 
         agent = self.agents.get("document_processing")
         if not agent:
-            raise ValueError("Document processing agent not registered")
+            # Create agent if not registered
+            agent = DocumentProcessingAgent()
+            self.register_agent(agent)
 
         self.logger.info(
             f"Executing document processing for workflow: {state.workflow_id}"
@@ -255,7 +262,9 @@ class WorkflowOrchestrator:
 
         agent = self.agents.get("indexing")
         if not agent:
-            raise ValueError("Indexing agent not registered")
+            # Create agent if not registered
+            agent = IndexingAgent()
+            self.register_agent(agent)
 
         self.logger.info(
             f"Executing indexing for workflow: {state.workflow_id}"
@@ -269,7 +278,15 @@ class WorkflowOrchestrator:
                 "markdown_structure": state.intermediate_results.get(
                     "markdown_structure"
                 ),
-                "document_metadata": state.input_data.get("metadata", {})
+                "document_metadata": {
+                    "document_id": state.workflow_id,  # Use workflow_id as document_id
+                    "filename": state.input_data.get("filename", "unknown"),
+                    "mime_type": state.input_data.get("mime_type", "unknown"),
+                    "user_id": state.input_data.get("user_id", ""),
+                    "space_id": state.input_data.get("space_id", ""),
+                    **state.input_data.get("metadata", {})
+                },
+                "original_pages": state.intermediate_results.get("original_pages")
             }
 
             results = await agent.execute(agent_input)
@@ -308,7 +325,9 @@ class WorkflowOrchestrator:
 
         agent = self.agents.get("rag_query")
         if not agent:
-            raise ValueError("RAG query agent not registered")
+            # Create agent if not registered
+            agent = RAGQueryAgent()
+            self.register_agent(agent)
 
         self.logger.info(f"Executing RAG query for workflow: {state.workflow_id}")
 

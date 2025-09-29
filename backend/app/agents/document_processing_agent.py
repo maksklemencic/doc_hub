@@ -10,8 +10,9 @@ import re
 import unicodedata
 from typing import Dict, Any, List, Tuple, Optional
 
-import httpx
-from langdetect import detect, LangDetectError
+from ..services.llm_service import get_default_llm_service
+from langdetect import detect
+from langdetect.lang_detect_exception import LangDetectException
 
 from .base_agent import BaseAgent
 from ..services.document_processor import (
@@ -36,11 +37,9 @@ class DocumentProcessingAgent(BaseAgent):
     - Content quality assessment
     """
 
-    def __init__(self, ollama_url: str = "http://localhost:11434",
-                 model_name: str = "qwen2.5:0.5b", max_retry_attempts: int = 3):
+    def __init__(self, max_retry_attempts: int = 3):
         super().__init__("document_processing", max_retry_attempts)
-        self.ollama_url = ollama_url
-        self.model_name = model_name
+        self.llm_service = get_default_llm_service()
         self.logger = logging.getLogger(f"{__name__}.DocumentProcessingAgent")
 
     async def _execute_main_logic(self, input_data: Dict[str, Any]) -> Dict[str, Any]:
@@ -145,10 +144,11 @@ class DocumentProcessingAgent(BaseAgent):
             if not sample_text:
                 return "unknown"
 
+
             detected = detect(sample_text)
             self.logger.debug(f"Detected language: {detected}")
             return detected
-        except (LangDetectError, Exception) as e:
+        except (LangDetectException, Exception) as e:
             self.logger.warning(f"Language detection failed: {str(e)}")
             return "unknown"
 
@@ -166,7 +166,7 @@ class DocumentProcessingAgent(BaseAgent):
         return cleaned.strip()
 
     async def _llm_enhanced_cleaning(self, text: str, language: str) -> str:
-        """Use LLM to correct OCR errors and improve text quality."""
+        """Use Groq LLM to correct OCR errors and improve text quality."""
         try:
             prompt = f"""Clean and correct the following text that may contain OCR errors. The text is in {language} language.
 
@@ -182,103 +182,92 @@ Text to clean:
 
 Return only the cleaned text, no explanations."""
 
-            async with httpx.AsyncClient(timeout=30.0) as client:
-                response = await client.post(
-                    f"{self.ollama_url}/api/generate",
-                    json={
-                        "model": self.model_name,
-                        "prompt": prompt,
-                        "stream": False
-                    }
-                )
-                response.raise_for_status()
+            cleaned_text = await self.llm_service.generate_response(
+                prompt=prompt,
+                max_tokens=4000,
+                temperature=0.1  # Low temperature for consistent cleaning
+            )
 
-                result = response.json()
-                cleaned_text = result.get("response", "").strip()
-
-                if cleaned_text:
-                    self.logger.debug("LLM text cleaning successful")
-                    return cleaned_text
-                else:
-                    self.logger.warning("LLM returned empty response, using basic cleaning")
-                    return self._basic_text_cleaning(text)
+            if cleaned_text:
+                self.logger.debug("Groq LLM text cleaning successful")
+                return cleaned_text
+            else:
+                self.logger.warning("LLM returned empty response, using basic cleaning")
+                return self._basic_text_cleaning(text)
 
         except Exception as e:
-            self.logger.warning(f"LLM text cleaning failed: {str(e)}, using basic cleaning")
+            self.logger.warning(f"Groq LLM text cleaning failed: {str(e)}, using basic cleaning")
             return self._basic_text_cleaning(text)
 
     async def _detect_markdown_structure(self, text: str) -> Dict[str, Any]:
-        """Detect potential markdown structure elements in the text."""
-        structure = {
-            "headers": [],
+        """Use LLM to detect document structure and generate proper markdown."""
+        try:
+            prompt = f"""Analyze this document text and identify its structural elements. Return a JSON object with the following structure:
+
+{{
+    "document_type": "article|report|manual|letter|other",
+    "title": "main document title if found",
+    "sections": [
+        {{
+            "type": "header",
+            "level": 1-6,
+            "text": "section title",
+            "start_line": 1
+        }}
+    ],
+    "lists": [
+        {{
+            "type": "ordered|unordered",
+            "items": ["item 1", "item 2"],
+            "start_line": 5
+        }}
+    ],
+    "tables": [
+        {{
+            "headers": ["col1", "col2"],
+            "rows": [["data1", "data2"]],
+            "start_line": 10
+        }}
+    ],
+    "has_structure": true|false,
+    "confidence": 0.0-1.0
+}}
+
+Document text to analyze:
+{text[:4000]}
+
+Return only the JSON object, no explanations."""
+
+            response = await self.llm_service.generate_response(
+                prompt=prompt,
+                max_tokens=2000,
+                temperature=0.1
+            )
+
+            if response:
+                import json
+                structure = json.loads(response.strip())
+                self.logger.debug(f"LLM detected structure with confidence: {structure.get('confidence', 'unknown')}")
+                return structure
+            else:
+                self.logger.warning("LLM returned empty response for structure detection")
+                return self._fallback_structure_detection(text)
+
+        except Exception as e:
+            self.logger.warning(f"LLM structure detection failed: {str(e)}, using fallback")
+            return self._fallback_structure_detection(text)
+
+    def _fallback_structure_detection(self, text: str) -> Dict[str, Any]:
+        """Fallback to basic structure detection if LLM fails."""
+        return {
+            "document_type": "other",
+            "title": None,
+            "sections": [],
             "lists": [],
             "tables": [],
-            "emphasis": [],
-            "has_structure": False
+            "has_structure": False,
+            "confidence": 0.3
         }
-
-        lines = text.split('\n')
-
-        # Detect potential headers (lines that look like titles)
-        for i, line in enumerate(lines):
-            line = line.strip()
-            if not line:
-                continue
-
-            # Check for all caps (potential headers)
-            if len(line) > 5 and line.isupper() and not line.endswith('.'):
-                structure["headers"].append({
-                    "level": 1,
-                    "text": line,
-                    "line_number": i + 1
-                })
-
-            # Check for short lines that might be headers (heuristic)
-            elif (len(line) < 60 and len(line) > 10 and
-                  not line.endswith('.') and not line.endswith(',') and
-                  line[0].isupper()):
-                # Look ahead to see if next line is empty (header pattern)
-                if i + 1 < len(lines) and not lines[i + 1].strip():
-                    structure["headers"].append({
-                        "level": 2,
-                        "text": line,
-                        "line_number": i + 1
-                    })
-
-        # Detect potential lists (lines starting with numbers, bullets, etc.)
-        list_patterns = [
-            r'^\d+[\.\)]\s+',  # Numbered lists
-            r'^[-•*]\s+',      # Bullet lists
-            r'^[a-zA-Z][\.\)]\s+'  # Lettered lists
-        ]
-
-        for i, line in enumerate(lines):
-            line = line.strip()
-            for pattern in list_patterns:
-                if re.match(pattern, line):
-                    structure["lists"].append({
-                        "type": "ordered" if pattern.startswith(r'^\d+') else "unordered",
-                        "text": line,
-                        "line_number": i + 1
-                    })
-                    break
-
-        # Detect potential tables (lines with multiple | or tab separations)
-        for i, line in enumerate(lines):
-            if line.count('|') >= 2 or line.count('\t') >= 2:
-                structure["tables"].append({
-                    "text": line,
-                    "line_number": i + 1
-                })
-
-        # Set has_structure flag
-        structure["has_structure"] = (
-            len(structure["headers"]) > 0 or
-            len(structure["lists"]) > 2 or
-            len(structure["tables"]) > 0
-        )
-
-        return structure
 
     async def _apply_markdown_formatting(self, text: str, structure: Dict[str, Any]) -> str:
         """Apply markdown formatting based on detected structure."""

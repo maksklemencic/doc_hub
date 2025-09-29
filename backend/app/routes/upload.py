@@ -1,4 +1,5 @@
 import logging
+import os
 import uuid
 from pathlib import Path
 from urllib.parse import urlparse
@@ -14,6 +15,7 @@ from ..errors.metadata_extractor_errors import MetadataExtractorError
 from ..errors.qdrant_errors import VectorStoreError
 from ..errors.web_scraper_errors import ContentExtractionError, InvalidURLError, URLFetchError
 from ..models.upload import Base64UploadRequest, UploadResponse, WebDocumentUploadRequest
+from ..agents.document_processing_agent import DocumentProcessingAgent
 from ..services import db_handler, document_processor, embedding, file_service, metadata_extractor, qdrant_client, web_scraper
 
 logger = logging.getLogger(__name__)
@@ -45,8 +47,8 @@ tags_metadata = [
         503: {"description": "Database or vector store unavailable"}
     }
 )
-def upload_base64(
-    request: Base64UploadRequest, 
+async def upload_base64(
+    request: Base64UploadRequest,
     current_user_id: uuid.UUID = Depends(get_current_user)
 ):
     logger.info(f"Starting base64 upload for user {current_user_id}, file: {request.filename}")
@@ -59,11 +61,48 @@ def upload_base64(
         logger.debug(f"Validating space {request.space_id} ownership for user {current_user_id}")
         db_handler.validate_space_ownership(request.space_id, current_user_id)
         
-        logger.debug(f"Processing document: {request.filename}")
-        pages = document_processor.base64_to_text(
-            base64_text=request.content_base64, 
-            mime_type=request.mime_type
-        )
+        logger.debug(f"Processing document with Document Processing Agent: {request.filename}")
+
+        # Initialize Document Processing Agent
+        doc_agent = DocumentProcessingAgent()
+
+        # Prepare agent input
+        agent_input = {
+            "file_bytes": request.content_base64,  # base64 string
+            "mime_type": request.mime_type,
+            "filename": request.filename,
+            "enable_llm_cleaning": True,  # Enable enhanced processing
+            "enable_quality_assessment": True
+        }
+
+        # Execute document processing agent with fallback
+        try:
+            agent_result = await doc_agent.execute(agent_input)
+
+            # Extract results for compatibility with existing workflow
+            pages = agent_result["original_pages"]
+            processed_text = agent_result["processed_text"]
+            language = agent_result.get("language", "unknown")
+            quality_score = agent_result.get("quality_score", 0.5)
+
+            logger.info(
+                f"Document processing complete: {request.filename} "
+                f"(language: {language}, quality: {quality_score:.2f})"
+            )
+        except Exception as agent_error:
+            logger.warning(
+                f"Document Processing Agent failed for {request.filename}: {str(agent_error)}"
+            )
+            logger.info("Falling back to direct document processor")
+
+            # Fallback to original processing
+            pages = document_processor.base64_to_text(
+                base64_text=request.content_base64,
+                mime_type=request.mime_type
+            )
+            processed_text = "\n\n".join([text for _, text in pages])
+            language = "unknown"
+            quality_score = None
         
         logger.debug(f"Saving file to filesystem")
         saved_file_path = file_service.save_base64_file(
@@ -93,6 +132,10 @@ def upload_base64(
             "mime_type": request.mime_type or "",
             "user_id": str(current_user_id),
             "space_id": str(request.space_id),
+            # Enhanced metadata from Document Processing Agent
+            "language": language,
+            "processed_with_agent": quality_score is not None,
+            **({"quality_score": quality_score} if quality_score is not None else {})
         }
         
         # metadata = metadata_extractor.create_document_metadata(
@@ -161,8 +204,8 @@ def upload_base64(
             cleanup_database_document(doc_id)
         raise HTTPException(status_code=500, detail="An unexpected error occurred during upload")
 
-@router.post("/file", 
-            response_model=UploadResponse, 
+@router.post("/file",
+            response_model=UploadResponse,
             status_code=status.HTTP_201_CREATED,
             tags=["upload"],
             summary="Upload a document via multipart/form-data",
@@ -184,27 +227,64 @@ async def upload_file_multipart(
     current_user_id: uuid.UUID = Depends(get_current_user)
 ):
     logger.info(f"Starting file upload for user {current_user_id}, file: {file.filename}")
-    
+
     saved_file_path = None
     doc_id = None
-    
+
     try:
         if not file.filename:
             raise HTTPException(status_code=400, detail="No filename provided")
-        
+
         # FIRST: Validate space ownership before any processing
         logger.debug(f"Validating space {space_id} ownership for user {current_user_id}")
         db_handler.validate_space_ownership(space_id, current_user_id)
-        
+
         logger.debug(f"Reading file contents: {file.filename}")
         contents = await file.read()
-        
+
         if not contents:
             raise HTTPException(status_code=400, detail="Empty file uploaded")
-        
-        logger.debug(f"Processing document: {file.filename}")
-        pages = document_processor.process_document_for_text(contents, file.content_type)
-        
+
+        logger.debug(f"Processing document with Document Processing Agent: {file.filename}")
+
+        # Initialize Document Processing Agent
+        doc_agent = DocumentProcessingAgent()
+
+        # Prepare agent input
+        agent_input = {
+            "file_bytes": contents,  # raw bytes
+            "mime_type": file.content_type,
+            "filename": file.filename,
+            "enable_llm_cleaning": True,  # Enable enhanced processing
+            "enable_quality_assessment": True
+        }
+
+        # Execute document processing agent with fallback
+        try:
+            agent_result = await doc_agent.execute(agent_input)
+
+            # Extract results for compatibility with existing workflow
+            pages = agent_result["original_pages"]
+            processed_text = agent_result["processed_text"]
+            language = agent_result.get("language", "unknown")
+            quality_score = agent_result.get("quality_score", 0.5)
+
+            logger.info(
+                f"Document processing complete: {file.filename} "
+                f"(language: {language}, quality: {quality_score:.2f})"
+            )
+        except Exception as agent_error:
+            logger.warning(
+                f"Document Processing Agent failed for {file.filename}: {str(agent_error)}"
+            )
+            logger.info("Falling back to direct document processor")
+
+            # Fallback to original processing
+            pages = document_processor.process_document_for_text(contents, file.content_type)
+            processed_text = "\n\n".join([text for _, text in pages])
+            language = "unknown"
+            quality_score = None
+
         # Reset file position and save to filesystem
         file.file.seek(0)
         logger.debug(f"Saving file to filesystem")
@@ -222,7 +302,7 @@ async def upload_file_multipart(
             space_id=space_id,
             file_size=file_size
         )
-        
+
         metadata = {
             # Basic metadata
             "document_id": str(doc_id),
@@ -230,19 +310,15 @@ async def upload_file_multipart(
             "mime_type": file.content_type or "",
             "user_id": str(current_user_id),
             "space_id": str(space_id),
+            # Enhanced metadata from Document Processing Agent
+            "language": language,
+            "processed_with_agent": quality_score is not None,
+            **({"quality_score": quality_score} if quality_score is not None else {})
         }
-        
-        # metadata = metadata_extractor.create_document_metadata(
-        #     document_id=doc_id,
-        #     filename=file.filename,
-        #     mime_type=file.content_type,
-        #     user_id=current_user_id,
-        #     space_id=space_id
-        # )
-        
+
         logger.debug(f"Creating embeddings and storing in vector database")
         chunks = save_to_vector_db(pages, metadata)
-        
+
         logger.info(f"Successfully uploaded file {file.filename} for user {current_user_id}")
         return UploadResponse(
             status="success",
@@ -251,7 +327,7 @@ async def upload_file_multipart(
             chunk_count=len(chunks),
             file_path=saved_file_path
         )
-        
+
     except NotFoundError as e:
         logger.warning(f"Space not found for {file.filename}: {str(e)}")
         if saved_file_path:

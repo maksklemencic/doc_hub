@@ -1,6 +1,6 @@
 import os
 import uuid
-from sqlalchemy import UniqueConstraint, create_engine, Column, String, Integer, TIMESTAMP, ForeignKey, inspect, text
+from sqlalchemy import UniqueConstraint, create_engine, Column, String, Integer, TIMESTAMP, ForeignKey, inspect, text, Boolean, CheckConstraint
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import declarative_base
 from sqlalchemy.orm import sessionmaker
@@ -56,12 +56,24 @@ class Space(Base):
 
 class Message(Base):
     __tablename__ = "messages"
+
+    # Core identification
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    space_id = Column(UUID(as_uuid=True), ForeignKey("spaces.id"), nullable=False)
-    user_id = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=False)
-    content = Column(String, nullable=False)
-    response = Column(String, nullable=True)  # AI response to the message
-    created_at = Column(TIMESTAMP, server_default=text("NOW()"))
+    space_id = Column(UUID(as_uuid=True), ForeignKey("spaces.id", ondelete="CASCADE"), nullable=False)
+    user_id = Column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+
+    # Message content
+    content = Column(String, nullable=False)  # User query
+    response = Column(String, nullable=True)  # AI response
+
+    # Status and timing information
+    status = Column(String(20), nullable=False, default='pending')
+    created_at = Column(TIMESTAMP(timezone=True), server_default=text("NOW()"), nullable=False)
+
+    # Data validation constraints
+    __table_args__ = (
+        CheckConstraint("status IN ('pending', 'streaming', 'completed', 'failed')", name='valid_status'),
+    )
 
 
 def database_is_empty(engine):
@@ -80,12 +92,23 @@ def create_indexes():
     with engine.connect() as conn:
         print("Creating performance indexes...")
         indexes = [
+            # Document indexes
             "CREATE INDEX IF NOT EXISTS idx_documents_space_id ON documents(space_id);",
-            "CREATE INDEX IF NOT EXISTS idx_documents_uploaded_by ON documents(uploaded_by);", 
+            "CREATE INDEX IF NOT EXISTS idx_documents_uploaded_by ON documents(uploaded_by);",
             "CREATE INDEX IF NOT EXISTS idx_documents_created_at ON documents(created_at DESC);",
             "CREATE INDEX IF NOT EXISTS idx_documents_space_uploaded ON documents(space_id, uploaded_by);",
+
+            # Enhanced message indexes
             "CREATE INDEX IF NOT EXISTS idx_messages_space_user ON messages(space_id, user_id);",
             "CREATE INDEX IF NOT EXISTS idx_messages_created_at ON messages(created_at DESC);",
+            "CREATE INDEX IF NOT EXISTS idx_messages_status ON messages(status);",
+            "CREATE INDEX IF NOT EXISTS idx_messages_space_status ON messages(space_id, status);",
+            "CREATE INDEX IF NOT EXISTS idx_messages_space_created ON messages(space_id, created_at DESC);",
+            "CREATE INDEX IF NOT EXISTS idx_messages_response_time ON messages(response_completed_at DESC) WHERE response_completed_at IS NOT NULL;",
+            "CREATE INDEX IF NOT EXISTS idx_messages_processing_time ON messages(processing_time_ms) WHERE processing_time_ms IS NOT NULL;",
+            "CREATE INDEX IF NOT EXISTS idx_messages_streaming ON messages(is_streaming) WHERE is_streaming = TRUE;",
+
+            # Other indexes
             "CREATE INDEX IF NOT EXISTS idx_spaces_user_id ON spaces(user_id);",
             "CREATE INDEX IF NOT EXISTS idx_users_google_id ON users(google_id);",
         ]
@@ -98,6 +121,36 @@ def create_indexes():
         
         conn.commit()
         print("Indexes created successfully!")
+
+def create_views():
+    """Create analytical views for message statistics."""
+    with engine.connect() as conn:
+        print("Creating analytical views...")
+
+        # Drop view if exists to handle schema changes
+        conn.execute(text("DROP VIEW IF EXISTS message_analytics;"))
+
+        view_sql = """
+        CREATE VIEW message_analytics AS
+        SELECT
+            space_id,
+            COUNT(*) as total_messages,
+            COUNT(CASE WHEN status = 'completed' THEN 1 END) as completed_messages,
+            COUNT(CASE WHEN status = 'failed' THEN 1 END) as failed_messages,
+            COUNT(CASE WHEN is_streaming = TRUE THEN 1 END) as streamed_messages,
+            ROUND(AVG(processing_time_ms)::NUMERIC, 2) as avg_processing_time_ms,
+            ROUND(AVG(context_size)::NUMERIC, 2) as avg_context_size,
+            ROUND(
+                COUNT(CASE WHEN status = 'completed' THEN 1 END)::NUMERIC /
+                NULLIF(COUNT(*), 0) * 100, 2
+            ) as success_rate_percent
+        FROM messages
+        GROUP BY space_id;
+        """
+
+        conn.execute(text(view_sql))
+        conn.commit()
+        print("Views created successfully!")
 
 def insert_test_data():
     session = SessionLocal()
@@ -131,6 +184,7 @@ if __name__ == "__main__":
         print("Database is empty. Creating tables...")
         create_tables()
         create_indexes()
+        create_views()
     else:
         print("Database already has tables. Skipping creation.")
 

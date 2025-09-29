@@ -159,7 +159,7 @@ def update_document(doc_id: uuid.UUID, user_id: uuid.UUID, **kwargs) -> Document
             raise DatabaseError(f"Error updating document: {str(e)}")
         
 
-def delete_document(doc_id: uuid.UUID, user_id: uuid.UUID = None) -> bool:
+def delete_document(doc_id: uuid.UUID, user_id: uuid.UUID | None = None) -> bool:
     """Delete document with proper authorization and error handling."""
     logger.info(f"Deleting document {doc_id}" + (f" for user {user_id}" if user_id else ""))
     with SessionLocal() as session:
@@ -393,7 +393,7 @@ def get_paginated_messages(user_id: uuid.UUID, space_id: uuid.UUID, limit: int, 
             raise DatabaseError(f"Error fetching messages: {str(e)}")
 
 
-def update_message(message_id: uuid.UUID, space_id: uuid.UUID, user_id: uuid.UUID, content: str, response: str = None) -> Message:
+def update_message(message_id: uuid.UUID, space_id: uuid.UUID, user_id: uuid.UUID, content: str, response: str | None = None) -> Message:
     """Update message content. Users can update any message in spaces they own."""
     logger.info(f"Updating message {message_id} in space {space_id} for user {user_id}")
     with SessionLocal() as session:
@@ -600,7 +600,7 @@ def get_user_by_email(email: str) -> Optional[User]:
             raise DatabaseError(f"Error fetching user: {str(e)}")
 
 
-def create_user_from_oauth(email: str, name: str, picture: str = None, google_id: str = None) -> User:
+def create_user_from_oauth(email: str, name: str, picture: str | None = None, google_id: str | None = None) -> User:
     """Create a new user from OAuth information."""
     logger.info(f"Creating user from OAuth with email: {email}")
     with SessionLocal() as session:
@@ -637,7 +637,7 @@ def create_user_from_oauth(email: str, name: str, picture: str = None, google_id
             raise DatabaseError(f"Error creating user: {str(e)}")
 
 
-def update_user_profile(user_id: uuid.UUID, name: str = None, picture: str = None) -> User:
+def update_user_profile(user_id: uuid.UUID, name: str | None = None, picture: str | None = None) -> User:
     """Update user profile information (used for OAuth updates)."""
     logger.info(f"Updating user profile for user {user_id}")
     with SessionLocal() as session:

@@ -7,12 +7,19 @@ This module provides a LangGraph-based agentic architecture with:
 - RAG Query Agent: Intelligent retrieval and response generation
 """
 
-from .base_agent import BaseAgent
+from .base_agent import BaseAgent, AgentStatus
 from .workflow_orchestrator import WorkflowOrchestrator
 from .document_processing_agent import DocumentProcessingAgent
+from .indexing_agent import IndexingAgent
+from .rag_query_agent import RAGQueryAgent
+from .communication import CommunicationBus
 
 __all__ = [
     "BaseAgent",
+    "AgentStatus",
     "WorkflowOrchestrator",
-    "DocumentProcessingAgent"
+    "DocumentProcessingAgent",
+    "IndexingAgent",
+    "RAGQueryAgent",
+    "CommunicationBus"
 ]

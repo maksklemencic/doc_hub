@@ -69,7 +69,7 @@ def extract_with_trafilatura(content: str, min_content_length: int, url: str) ->
         'date': '',
         'sitename': '',
     }
-    
+
     try:
         extracted = trafilatura.extract(content)
         if extracted and len(extracted.strip()) > min_content_length:
@@ -103,7 +103,7 @@ def extract_with_beautifulsoup(content: str, min_content_length: int, min_line_l
         'date': '',
         'sitename': '',
     }
-    
+
     try:
         soup = BeautifulSoup(content, 'html.parser')
         clean_soup(soup)

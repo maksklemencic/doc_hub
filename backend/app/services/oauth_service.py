@@ -96,7 +96,7 @@ class OAuthService:
         """Exchange authorization code for tokens."""
         try:
             logger.debug("Exchanging authorization code for tokens")
-            
+
             if not code or not code.strip():
                 logger.warning("Empty or invalid authorization code provided")
                 raise InvalidAuthorizationCodeError("Empty authorization code")
