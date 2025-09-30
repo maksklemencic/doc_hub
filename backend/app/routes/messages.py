@@ -38,6 +38,7 @@ async def stream_message_response(
     """
     full_response = ""
     message_id = None
+    rate_limit_info = None
 
     try:
         # Create message record in database
@@ -74,28 +75,35 @@ async def stream_message_response(
         if not response_stream:
             raise Exception("No response stream available")
 
-        async for chunk in response_stream:
-            chunk_count += 1
-            full_response += chunk
+        async for chunk, rate_limits in response_stream:
+            # Capture rate limit info when available (final chunk)
+            if rate_limits:
+                rate_limit_info = rate_limits
 
-            # Send chunk as SSE event
-            chunk_data = {
-                'type': 'chunk',
-                'content': chunk,
-                'chunk_number': chunk_count
-            }
-            yield f"data: {json.dumps(chunk_data)}\n\n"
+            # Only send chunk if there's content
+            if chunk:
+                chunk_count += 1
+                full_response += chunk
+
+                # Send chunk as SSE event
+                chunk_data = {
+                    'type': 'chunk',
+                    'content': chunk,
+                    'chunk_number': chunk_count
+                }
+                yield f"data: {json.dumps(chunk_data)}\n\n"
 
         # Update database with final response
         db_handler.update_message(message_id, space_id, user_id, content, full_response)
 
-        # Send final SSE event
+        # Send final SSE event with rate limit info
         final_data = {
             'type': 'message_complete',
             'message_id': str(message_id),
             'final_response': full_response,
             'context': context,
-            'total_chunks': chunk_count
+            'total_chunks': chunk_count,
+            'rate_limits': rate_limit_info
         }
         yield f"data: {json.dumps(final_data)}\n\n"
 

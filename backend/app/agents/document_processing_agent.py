@@ -18,8 +18,10 @@ from .base_agent import BaseAgent
 from ..services.document_processor import (
     process_document_for_text,
     base64_to_text,
-    clean_text as basic_clean_text
+    clean_text as basic_clean_text,
+    pdf_pages_to_images
 )
+from ..services.llm_service import LLMServiceFactory
 from ..errors.document_processor_errors import DocumentProcessorError
 
 logger = logging.getLogger(__name__)
@@ -39,12 +41,17 @@ class DocumentProcessingAgent(BaseAgent):
 
     def __init__(self, max_retry_attempts: int = 3):
         super().__init__("document_processing", max_retry_attempts)
+        # Text LLM for cleaning and conversion
         self.llm_service = get_default_llm_service()
+        # Vision LLM for PDF extraction - use full model ID
+        self.vision_service = LLMServiceFactory.get_service(
+            model_name="meta-llama/llama-4-scout-17b-16e-instruct"
+        )
         self.logger = logging.getLogger(f"{__name__}.DocumentProcessingAgent")
 
     async def _execute_main_logic(self, input_data: Dict[str, Any]) -> Dict[str, Any]:
         """
-        Execute document processing with enhanced cleaning and structure detection.
+        Execute document processing with enhanced cleaning and markdown conversion.
 
         Args:
             input_data: Dict containing:
@@ -52,11 +59,14 @@ class DocumentProcessingAgent(BaseAgent):
                 - mime_type: MIME type of the file
                 - filename: optional filename
                 - enable_llm_cleaning: whether to use LLM for text cleaning
+                - enable_markdown_conversion: whether to convert to markdown
                 - enable_quality_assessment: whether to assess content quality
 
         Returns:
             Dict containing:
-                - processed_text: cleaned and structured text
+                - raw_text: original extracted text (unprocessed)
+                - cleaned_text: cleaned text with structure preserved
+                - markdown_text: markdown-formatted version
                 - language: detected language
                 - markdown_structure: detected structure elements
                 - quality_score: optional quality assessment
@@ -69,6 +79,7 @@ class DocumentProcessingAgent(BaseAgent):
         mime_type = input_data.get("mime_type")
         filename = input_data.get("filename", "unknown")
         enable_llm_cleaning = input_data.get("enable_llm_cleaning", True)
+        enable_markdown_conversion = input_data.get("enable_markdown_conversion", True)
         enable_quality_assessment = input_data.get("enable_quality_assessment", False)
 
         if not file_bytes or not mime_type:
@@ -76,8 +87,35 @@ class DocumentProcessingAgent(BaseAgent):
 
         self.logger.info(f"Processing document: {filename} ({mime_type})")
 
-        # Step 1: Extract raw text using existing functionality
-        self.update_progress(10, "Extracting raw text")
+        # Step 1: Extract raw text
+        # For PDFs, try vision extraction first, then fallback to traditional
+        vision_markdown = None
+        is_pdf = mime_type == "application/pdf"
+
+        if is_pdf:
+            self.update_progress(10, "Extracting PDF with vision model")
+            try:
+                # Convert base64 to bytes if needed
+                if isinstance(file_bytes, str):
+                    import base64 as b64
+                    pdf_bytes = b64.b64decode(file_bytes)
+                else:
+                    pdf_bytes = file_bytes
+
+                # Try vision extraction
+                vision_markdown, page_images = await self._extract_pdf_with_vision(
+                    pdf_bytes, filename
+                )
+                self.logger.info("Vision extraction successful")
+
+            except Exception as vision_error:
+                self.logger.warning(
+                    f"Vision extraction failed: {str(vision_error)}, falling back to traditional extraction"
+                )
+                vision_markdown = None  # Mark as failed
+
+        # Traditional extraction (for non-PDFs or as fallback)
+        self.update_progress(15, "Extracting raw text (traditional method)")
         try:
             if isinstance(file_bytes, str):
                 # Handle base64 encoded input
@@ -89,52 +127,187 @@ class DocumentProcessingAgent(BaseAgent):
             self.logger.error(f"Text extraction failed: {str(e)}")
             raise DocumentProcessorError(f"Text extraction failed: {str(e)}")
 
-        # Combine all pages into single text
-        combined_text = "\n\n".join([text for _, text in page_texts])
+        # Combine all pages into single text (raw text)
+        raw_text = "\n\n".join([text for _, text in page_texts])
 
         self.update_progress(30, "Detecting language")
 
         # Step 2: Detect language
-        detected_language = await self._detect_language(combined_text)
+        detected_language = await self._detect_language(raw_text)
 
-        self.update_progress(40, "Cleaning and correcting text")
+        self.update_progress(40, "Processing document text")
 
-        # Step 3: Enhanced text cleaning
-        if enable_llm_cleaning:
-            cleaned_text = await self._llm_enhanced_cleaning(
-                combined_text, detected_language
+        # Step 3: Generate markdown (vision or LLM-based)
+        if vision_markdown:
+            markdown_text = vision_markdown
+            self.logger.info("Using vision-extracted markdown")
+        elif enable_markdown_conversion:
+            # Traditional flow: clean text first, then convert to markdown
+            if enable_llm_cleaning:
+                cleaned_text = await self._llm_enhanced_cleaning(
+                    raw_text, detected_language
+                )
+            else:
+                cleaned_text = self._basic_text_cleaning(raw_text)
+
+            markdown_text = await self._convert_to_markdown(
+                cleaned_text, detected_language
             )
         else:
-            cleaned_text = self._basic_text_cleaning(combined_text)
+            # No markdown conversion
+            if enable_llm_cleaning:
+                cleaned_text = await self._llm_enhanced_cleaning(
+                    raw_text, detected_language
+                )
+            else:
+                cleaned_text = self._basic_text_cleaning(raw_text)
+            markdown_text = cleaned_text
 
-        self.update_progress(60, "Detecting markdown structure")
+        self.update_progress(70, "Generating clean text for RAG")
 
-        # Step 4: Markdown structure detection
-        markdown_structure = await self._detect_markdown_structure(cleaned_text)
-
-        self.update_progress(80, "Applying structural formatting")
-
-        # Step 5: Apply markdown formatting
-        processed_text = await self._apply_markdown_formatting(
-            cleaned_text, markdown_structure
+        # Step 4: Generate clean text optimized for RAG from markdown
+        cleaned_text = await self._generate_clean_text_from_markdown(
+            markdown_text, detected_language
         )
+
+        self.update_progress(75, "Detecting markdown structure")
+
+        # Step 5: Markdown structure detection (for metadata)
+        markdown_structure = await self._detect_markdown_structure(cleaned_text)
 
         # Step 6: Optional quality assessment
         quality_score = None
         if enable_quality_assessment:
             self.update_progress(90, "Assessing content quality")
-            quality_score = await self._assess_content_quality(processed_text)
+            quality_score = await self._assess_content_quality(cleaned_text)
 
         self.update_progress(100, "Document processing complete")
 
         return {
-            "processed_text": processed_text,
+            "raw_text": raw_text,
+            "cleaned_text": cleaned_text,
+            "markdown_text": markdown_text,  # Unified markdown (vision or LLM-converted)
+            "used_vision": vision_markdown is not None,  # Flag to indicate vision was used
             "language": detected_language,
             "markdown_structure": markdown_structure,
             "quality_score": quality_score,
             "original_pages": page_texts,
             "filename": filename
         }
+
+    async def _extract_pdf_with_vision(
+        self,
+        file_bytes: bytes,
+        filename: str
+    ) -> Tuple[str, List[Tuple[int, str]]]:
+        """
+        Extract text from PDF using vision model.
+
+        Args:
+            file_bytes: PDF file bytes
+            filename: Name of the file for logging
+
+        Returns:
+            Tuple of (combined_markdown, page_images)
+        """
+        self.logger.info(f"Extracting PDF with vision model: {filename}")
+
+        try:
+            # Convert PDF pages to high-res images
+            page_images = pdf_pages_to_images(file_bytes, dpi=300)
+
+            if not page_images:
+                raise DocumentProcessorError("No pages found in PDF")
+
+            # Process pages in batches (max 5 images per request per Groq limit)
+            batch_size = 5
+            all_markdown_pages = []
+
+            for batch_start in range(0, len(page_images), batch_size):
+                batch_end = min(batch_start + batch_size, len(page_images))
+                batch = page_images[batch_start:batch_end]
+
+                page_numbers = [page_num for page_num, _ in batch]
+                images = [img_data for _, img_data in batch]
+
+                self.logger.info(f"Processing pages {page_numbers[0]}-{page_numbers[-1]} with vision model")
+
+                # Create prompt for vision model
+                prompt = f"""You are an expert document analyzer. Extract ALL text from {"this page" if len(batch) == 1 else "these pages"} and convert it to clean, well-structured markdown.
+
+Your task:
+1. Extract ALL text accurately, preserving the exact wording
+2. Identify and format structural elements:
+   - Headers: Use #, ##, ### based on hierarchy
+   - Lists: Use - for bullets, 1. 2. 3. for numbered lists
+   - Tables: Use markdown table format with | pipes
+   - Code blocks: Use ``` for code snippets
+   - Emphasis: Use **bold** and *italic* appropriately
+3. Handle special content intelligently:
+   - For diagrams/images: ONLY if visible and meaningful, provide detailed descriptions in [Image: ...] format including:
+     * What the diagram shows (flowchart, architecture, process, etc.)
+     * Key components and their relationships
+     * Labels, arrows, and connections
+     * Colors or visual distinctions if meaningful
+   - For charts/graphs: ONLY if visible, describe in detail in [Chart: ...] format:
+     * Type of chart (bar, line, pie, scatter, etc.)
+     * Axes labels and scales
+     * Key data points and trends
+     * Legend information
+   - For photographs/illustrations: ONLY if meaningful, describe what is shown and its relevance
+   - For tables: Extract and format accurately, preserving all symbols and structure
+4. Preserve all relationships between text blocks (maintain logical flow)
+5. Add horizontal rules (---) between major sections if appropriate
+
+CRITICAL RULES:
+- Do NOT omit any text, even if it seems redundant
+- Do NOT add placeholder text like "No data visible" or "No charts present" - simply skip those sections
+- Do NOT add explanations or commentary beyond describing actual visual elements
+- Do NOT invent content - only describe what you actually see
+- If there are no images/charts/diagrams, simply extract the text without mentioning their absence
+- Output ONLY the markdown-formatted text
+
+{"Page " + str(page_numbers[0]) + ":" if len(batch) == 1 else f"Pages {page_numbers[0]}-{page_numbers[-1]}:"}"""
+
+                # Call vision model
+                markdown_text = await self.vision_service.generate_vision_response(
+                    prompt=prompt,
+                    images=images,
+                    temperature=0.1,  # Low temp for accuracy
+                    max_tokens=8000
+                )
+
+                # Log rate limit info after request
+                rate_limit_info = self.vision_service.get_rate_limit_info()
+                self.logger.info(
+                    f"Vision model rate limits - "
+                    f"Requests remaining: {rate_limit_info['requests_remaining']}/{rate_limit_info['requests_per_minute_limit']} per minute, "
+                    f"{rate_limit_info['day_remaining']}/{rate_limit_info['requests_per_day_limit']} per day"
+                )
+
+                all_markdown_pages.append(markdown_text)
+
+            # Combine all pages
+            combined_markdown = "\n\n---\n\n".join(all_markdown_pages)
+
+            # Calculate total API calls made
+            num_batches = len(all_markdown_pages)
+            final_rate_info = self.vision_service.get_rate_limit_info()
+
+            self.logger.info(
+                f"Vision extraction complete: {len(page_images)} pages, "
+                f"{len(combined_markdown)} characters, "
+                f"{num_batches} API calls made"
+            )
+            self.logger.info(
+                f"Vision model daily quota: {final_rate_info['day_remaining']}/{final_rate_info['requests_per_day_limit']} requests remaining"
+            )
+
+            return combined_markdown, page_images
+
+        except Exception as e:
+            self.logger.error(f"Vision-based PDF extraction failed: {str(e)}")
+            raise DocumentProcessorError(f"Vision extraction failed: {str(e)}")
 
     async def _detect_language(self, text: str) -> str:
         """Detect the language of the text."""
@@ -166,25 +339,32 @@ class DocumentProcessingAgent(BaseAgent):
         return cleaned.strip()
 
     async def _llm_enhanced_cleaning(self, text: str, language: str) -> str:
-        """Use Groq LLM to correct OCR errors and improve text quality."""
+        """Use Groq LLM to intelligently clean text while preserving structure."""
         try:
-            prompt = f"""Clean and correct the following text that may contain OCR errors. The text is in {language} language.
+            prompt = f"""You are a text cleaning expert. Clean the following text that may contain OCR errors and structural artifacts. The text is in {language} language.
 
-Please:
-1. Fix obvious OCR errors and character misrecognitions
-2. Correct spacing and punctuation issues
-3. Preserve the original structure and meaning
-4. Remove unnecessary line breaks while keeping paragraph structure
-5. Fix hyphenated words that were broken across lines
+Your task is to produce clean, readable text that:
+1. Fixes OCR errors (misrecognized characters like 'l' for 'I', '0' for 'O')
+2. Removes structural symbols that don't add meaning (excessive dashes, asterisks, underscores used for decoration)
+3. Preserves meaningful structure:
+   - Keep list indicators (numbers, bullets) but make them consistent
+   - Maintain paragraph breaks
+   - Preserve table-like structures
+   - Keep section separators that indicate topic changes
+4. Fixes spacing issues (multiple spaces, broken hyphenated words)
+5. Removes headers/footers that repeat on every page
+6. Corrects punctuation
+
+IMPORTANT: Do not remove all structural elements - keep those that help understand the content organization (lists, tables, sections). Only remove decorative/meaningless symbols.
 
 Text to clean:
-{text[:3000]}  # Limit text length for LLM processing
+{text[:5000]}
 
-Return only the cleaned text, no explanations."""
+Return only the cleaned text with preserved structure. No explanations or meta-commentary."""
 
             cleaned_text = await self.llm_service.generate_response(
                 prompt=prompt,
-                max_tokens=4000,
+                max_tokens=6000,
                 temperature=0.1  # Low temperature for consistent cleaning
             )
 
@@ -198,6 +378,104 @@ Return only the cleaned text, no explanations."""
         except Exception as e:
             self.logger.warning(f"Groq LLM text cleaning failed: {str(e)}, using basic cleaning")
             return self._basic_text_cleaning(text)
+
+    async def _generate_clean_text_from_markdown(self, markdown_text: str, language: str) -> str:
+        """
+        Generate clean text optimized for RAG/LLM from markdown.
+        Removes markdown syntax while preserving document structure for smart chunking.
+        """
+        try:
+            prompt = f"""You are a text processing expert. Convert the following markdown document into clean plain text optimized for semantic search and RAG systems. The text is in {language} language.
+
+Your task:
+1. Remove ALL markdown syntax (#, **, `, |, etc.)
+2. Preserve document structure using simple markers:
+   - Use "SECTION: " prefix for major headings
+   - Use "SUBSECTION: " prefix for subheadings
+   - Keep list items on separate lines with proper indentation
+   - Preserve paragraph breaks (double newlines)
+   - Keep table data in readable format (rows separated by newlines)
+3. Maintain semantic boundaries for smart chunking:
+   - Add clear section breaks
+   - Keep related content together
+   - Preserve logical flow
+4. Remove redundant whitespace but keep structural spacing
+5. Keep ALL original text content - do not summarize or omit
+
+IMPORTANT:
+- Output plain text without markdown syntax
+- Preserve enough structure for context-aware chunking
+- Make text easily searchable and embeddable
+- Do NOT add meta-commentary or explanations
+
+Markdown document:
+{markdown_text[:8000]}
+
+Return only the clean text:"""
+
+            clean_text = await self.llm_service.generate_response(
+                prompt=prompt,
+                max_tokens=8000,
+                temperature=0.1
+            )
+
+            if clean_text:
+                self.logger.debug("Generated clean text from markdown successfully")
+                return clean_text
+            else:
+                self.logger.warning("LLM returned empty response for clean text generation")
+                # Fallback: basic markdown stripping
+                return markdown_text.replace('#', '').replace('**', '').replace('`', '')
+
+        except Exception as e:
+            self.logger.warning(f"Clean text generation from markdown failed: {str(e)}")
+            # Fallback: basic markdown stripping
+            return markdown_text.replace('#', '').replace('**', '').replace('`', '')
+
+    async def _convert_to_markdown(self, text: str, language: str) -> str:
+        """Use Groq LLM to convert cleaned text into well-structured markdown."""
+        try:
+            prompt = f"""You are a markdown conversion expert. Convert the following text into clean, well-structured markdown format. The text is in {language} language.
+
+Your task is to:
+1. Identify and format headers (use #, ##, ###, etc.)
+2. Convert lists to proper markdown format:
+   - Unordered lists: use "- " prefix
+   - Ordered lists: use "1. ", "2. ", etc.
+3. Convert tables to markdown table format with pipes (|)
+4. Preserve paragraph breaks with blank lines
+5. Use **bold** for emphasis where appropriate (section titles, important terms)
+6. Use > for blockquotes if any
+7. Use `code` formatting for technical terms, commands, or code snippets
+8. Add horizontal rules (---) between major sections if appropriate
+
+IMPORTANT:
+- Maintain the logical structure of the document
+- Don't invent content - only restructure what's there
+- Keep all the original text content, just apply markdown formatting
+- Make the document easy to read and navigate
+
+Text to convert:
+{text[:5000]}
+
+Return only the markdown-formatted text. No explanations or meta-commentary."""
+
+            markdown_text = await self.llm_service.generate_response(
+                prompt=prompt,
+                max_tokens=6000,
+                temperature=0.2  # Slightly higher for better formatting decisions
+            )
+
+            if markdown_text:
+                self.logger.debug("Groq LLM markdown conversion successful")
+                return markdown_text
+            else:
+                self.logger.warning("LLM returned empty response for markdown conversion")
+                return text  # Return original text if conversion fails
+
+        except Exception as e:
+            self.logger.warning(f"Groq LLM markdown conversion failed: {str(e)}")
+            return text  # Return original text if conversion fails
 
     async def _detect_markdown_structure(self, text: str) -> Dict[str, Any]:
         """Use LLM to detect document structure and generate proper markdown."""

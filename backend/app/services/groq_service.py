@@ -183,7 +183,13 @@ class GroqRateLimiter:
 
 
 class GroqService(LLMService):
-    """Groq LLM service implementation with rate limiting."""
+    """Groq LLM service implementation with rate limiting and vision support."""
+
+    # Vision model IDs
+    VISION_MODELS = {
+        "llama-4-scout": "meta-llama/llama-4-scout-17b-16e-instruct",
+        "llama-4-maverick": "meta-llama/llama-4-maverick-17b-128e-instruct"
+    }
 
     def __init__(self, model_name: str, api_key: str | None = None, **kwargs):
         super().__init__(LLMProvider.GROQ, model_name)
@@ -200,7 +206,14 @@ class GroqService(LLMService):
         # Rate limiting with dynamic detection
         self.rate_limiter = GroqRateLimiter()
 
+        # Check if this is a vision model
+        self.is_vision_model = self._is_vision_model(model_name)
+
         # No fallback needed - Groq is the only provider
+
+    def _is_vision_model(self, model_name: str) -> bool:
+        """Check if the model supports vision."""
+        return model_name in self.VISION_MODELS.values() or model_name in self.VISION_MODELS.keys()
 
 
     async def generate_response(
@@ -268,8 +281,14 @@ class GroqService(LLMService):
         self,
         prompt: str,
         **kwargs
-    ) -> AsyncGenerator[str, None]:
-        """Generate streaming response using Groq API."""
+    ) -> AsyncGenerator[tuple[str, Optional[Dict[str, Any]]], None]:
+        """
+        Generate streaming response using Groq API.
+
+        Yields:
+            Tuple of (content_chunk, rate_limit_info)
+            rate_limit_info is only included in the final chunk, None otherwise
+        """
         # Check rate limits
         can_request, retry_after = await self.rate_limiter.can_make_request()
         if not can_request:
@@ -301,6 +320,7 @@ class GroqService(LLMService):
 
             # Track if we've updated rate limits from headers
             headers_updated = False
+            is_last_chunk = False
 
             async for chunk in stream:
                 # Update rate limits from first chunk headers if available
@@ -311,7 +331,16 @@ class GroqService(LLMService):
                     headers_updated = True
 
                 if chunk.choices[0].delta.content:
-                    yield chunk.choices[0].delta.content
+                    yield chunk.choices[0].delta.content, None
+
+                # Check if this is the last chunk
+                if chunk.choices[0].finish_reason is not None:
+                    is_last_chunk = True
+
+            # After streaming completes, yield final rate limit info
+            if is_last_chunk or headers_updated:
+                rate_limit_info = self.rate_limiter.get_usage_info()
+                yield "", rate_limit_info
 
             self.logger.debug("Groq streaming response completed")
 
@@ -361,3 +390,86 @@ class GroqService(LLMService):
     def get_rate_limit_info(self) -> Dict[str, Any]:
         """Get current rate limit information."""
         return self.rate_limiter.get_usage_info()
+
+    async def generate_vision_response(
+        self,
+        prompt: str,
+        images: list[str],  # List of base64 encoded images or URLs
+        **kwargs
+    ) -> str:
+        """
+        Generate response using vision model with images.
+
+        Args:
+            prompt: Text prompt for the vision model
+            images: List of base64 encoded images (with data URI prefix) or URLs
+            **kwargs: Additional parameters (temperature, max_tokens, etc.)
+
+        Returns:
+            Generated response text
+
+        Raises:
+            ValueError: If model doesn't support vision
+            RateLimitExceeded: If rate limit is exceeded
+        """
+        if not self.is_vision_model:
+            raise ValueError(f"Model {self.model_name} does not support vision. Use a vision model like llama-4-scout or llama-4-maverick.")
+
+        # Check rate limits
+        can_request, retry_after = await self.rate_limiter.can_make_request()
+        if not can_request:
+            self.logger.warning(f"Groq rate limit exceeded, retry after {retry_after}s")
+            raise RateLimitExceeded(
+                "groq",
+                f"Rate limit exceeded. Retry after {retry_after} seconds.",
+                retry_after
+            )
+
+        try:
+            # Build content array with text and images
+            content = [{"type": "text", "text": prompt}]
+
+            # Add images
+            for image_data in images:
+                content.append({
+                    "type": "image_url",
+                    "image_url": {
+                        "url": image_data  # Can be URL or data URI
+                    }
+                })
+
+            # Make Groq API request with vision
+            response = await self.client.chat.completions.create(
+                messages=[
+                    {"role": "user", "content": content}
+                ],
+                model=self.model_name,
+                temperature=kwargs.get("temperature", 0.7),
+                max_tokens=kwargs.get("max_tokens", 8000),
+                **{k: v for k, v in kwargs.items()
+                   if k not in ["temperature", "max_tokens"]}
+            )
+
+            # Update rate limits from response headers if available
+            if (hasattr(response, '_raw_response') and
+                    hasattr(response._raw_response, 'headers')):
+                headers = dict(response._raw_response.headers)
+                await self.rate_limiter.update_limits_from_headers(headers)
+
+            # Record successful request
+            await self.rate_limiter.record_request()
+
+            generated_text = response.choices[0].message.content.strip()
+            if not generated_text:
+                raise LLMResponseError("groq", "Empty response from Groq vision model")
+
+            self.logger.debug(
+                f"Generated Groq vision response: {len(generated_text)} characters"
+            )
+            return generated_text
+
+        except RateLimitExceeded:
+            raise
+        except Exception as e:
+            self.logger.error(f"Groq vision request failed: {str(e)}")
+            raise LLMRequestError("groq", str(e))

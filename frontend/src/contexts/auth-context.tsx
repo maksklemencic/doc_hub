@@ -110,13 +110,16 @@ export function AuthProvider({ children }: AuthProviderProps) {
           user: mockUser
         }
         
+        console.log('🔧 DEV MODE: Mock JWT Token for API testing:', mockAuthResponse.access_token)
+        console.log('📋 Copy this token for Swagger docs:', `Bearer ${mockAuthResponse.access_token}`)
+
         // Set mock data in localStorage
         localStorage.setItem(STORAGE_KEYS.ACCESS_TOKEN, mockAuthResponse.access_token)
         localStorage.setItem(STORAGE_KEYS.USER, JSON.stringify(mockAuthResponse.user))
-        
+
         // Set mock cookie
         document.cookie = `access_token=${mockAuthResponse.access_token}; path=/; max-age=${mockAuthResponse.expires_in}; SameSite=Lax`
-        
+
         dispatch({ type: 'LOGIN_SUCCESS', payload: mockAuthResponse })
         return
       }
@@ -126,15 +129,23 @@ export function AuthProvider({ children }: AuthProviderProps) {
       const userData = localStorage.getItem(STORAGE_KEYS.USER)
       const user = userData ? JSON.parse(userData) : null
 
+      if (token) {
+        console.log('🔑 Current JWT Token for API testing:', token)
+        console.log('📋 Copy this token for Swagger docs:', `Bearer ${token}`)
+      }
+
       dispatch({ type: 'HYDRATE', payload: { user, token } })
     }
   }, [])
 
   const login = (authResponse: AuthTokenResponse) => {
+    console.log('🔑 JWT Token for API testing:', authResponse.access_token)
+    console.log('📋 Copy this token for Swagger docs:', `Bearer ${authResponse.access_token}`)
+
     if (typeof window !== 'undefined') {
       localStorage.setItem(STORAGE_KEYS.ACCESS_TOKEN, authResponse.access_token)
       localStorage.setItem(STORAGE_KEYS.USER, JSON.stringify(authResponse.user))
-      
+
       // Also set cookie for middleware
       document.cookie = `access_token=${authResponse.access_token}; path=/; max-age=${authResponse.expires_in}; SameSite=Lax`
     }

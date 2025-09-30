@@ -4,24 +4,34 @@ import * as React from 'react'
 import { useState } from 'react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
+import { ScrollArea } from '@/components/ui/scroll-area'
 import { useAuth } from '@/hooks/use-auth'
 import { useRouter, usePathname } from 'next/navigation'
 import Image from 'next/image'
 import {
   FolderClosed,
+  FolderOpen,
   LogOut,
   Plus,
   Check,
   X,
   Edit2,
   PanelLeftClose,
-  Trash2
+  Trash2,
+  FileText,
+  ChevronRight,
+  ChevronDown,
+  CornerDownRight
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { SpaceResponse } from '@/lib/api'
 import { Spinner } from '@/components/ui/spinner'
+import { Badge } from '@/components/ui/badge'
 import { useSpaces, useCreateSpace, useUpdateSpace, useDeleteSpace } from '@/hooks/use-spaces'
 import { useSpaceDocumentCounts } from '@/hooks/use-space-document-counts'
+import { documentsKeys } from '@/hooks/use-documents'
+import { useQueryClient } from '@tanstack/react-query'
+import { GetSpaceDocumentsResponse } from '@/lib/api'
 import {
   Dialog,
   DialogContent,
@@ -50,6 +60,7 @@ export function Sidebar({ className }: SidebarProps) {
   const createSpaceMutation = useCreateSpace()
   const updateSpaceMutation = useUpdateSpace()
   const deleteSpaceMutation = useDeleteSpace()
+  const queryClient = useQueryClient()
 
   // UI state
   const [isCreatingSpace, setIsCreatingSpace] = useState(false)
@@ -59,14 +70,42 @@ export function Sidebar({ className }: SidebarProps) {
   const [isLoggingOut, setIsLoggingOut] = useState(false)
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
   const [spaceToDelete, setSpaceToDelete] = useState<Space | null>(null)
+  const [expandedSpaceIds, setExpandedSpaceIds] = useState<Set<string>>(new Set())
 
   // Get document counts for all spaces
   const spaceIds = spacesData.map(space => space.id)
   const { data: documentCounts = {} } = useSpaceDocumentCounts(spaceIds)
 
+  // Force re-render when document cache changes
+  const [, forceUpdate] = React.useReducer(x => x + 1, 0)
+
   // Transform spaces data to include UI state
-  const pathMatch = pathname.match(/^\/spaces\/(.+)$/)
+  const pathMatch = pathname.match(/^\/spaces\/([^/]+)/)
   const activeSpaceId = pathMatch ? pathMatch[1] : null
+  const docMatch = pathname.match(/^\/spaces\/[^/]+\/documents\/(.+)$/)
+  const activeDocId = docMatch ? docMatch[1] : null
+
+  // Auto-expand active space
+  React.useEffect(() => {
+    if (activeSpaceId) {
+      setExpandedSpaceIds((prev) => new Set(prev).add(activeSpaceId))
+    }
+  }, [activeSpaceId])
+
+  // Subscribe to document cache changes to update sidebar
+  React.useEffect(() => {
+    const unsubscribe = queryClient.getQueryCache().subscribe((event) => {
+      // Listen for successful mutations or invalidations of document queries
+      if (
+        event.type === 'updated' &&
+        event.query.queryKey[0] === 'documents'
+      ) {
+        forceUpdate()
+      }
+    })
+
+    return () => unsubscribe()
+  }, [queryClient])
 
   const spaces: Space[] = spacesData.map(space => ({
     ...space,
@@ -78,9 +117,13 @@ export function Sidebar({ className }: SidebarProps) {
     if (!newSpaceName.trim() || createSpaceMutation.isPending) return
 
     try {
-      await createSpaceMutation.mutateAsync({ name: newSpaceName.trim() })
+      const newSpace = await createSpaceMutation.mutateAsync({ name: newSpaceName.trim() })
       setNewSpaceName('')
       setIsCreatingSpace(false)
+      // Auto-select the newly created space
+      if (newSpace?.id) {
+        router.push(`/spaces/${newSpace.id}`)
+      }
     } catch (error) {
       console.error('Failed to create space:', error)
       // Error is handled by the mutation hook with toast notifications
@@ -110,8 +153,11 @@ export function Sidebar({ className }: SidebarProps) {
         spaceId: editingSpaceId,
         data: { name: editingSpaceName.trim() }
       })
+      const previousEditingSpaceId = editingSpaceId
       setEditingSpaceId(null)
       setEditingSpaceName('')
+      // Auto-select the edited space
+      router.push(`/spaces/${previousEditingSpaceId}`)
     } catch (error) {
       console.error('Failed to update space:', error)
       // Error is handled by the mutation hook with toast notifications
@@ -162,8 +208,35 @@ export function Sidebar({ className }: SidebarProps) {
       setEditingSpaceName('')
     }
 
-    // Navigate to space page without space info in URL params
+    // Close the previously active space when navigating to a new one
+    if (activeSpaceId && activeSpaceId !== spaceId) {
+      setExpandedSpaceIds((prev) => {
+        const newSet = new Set(prev)
+        newSet.delete(activeSpaceId)
+        newSet.add(spaceId)
+        return newSet
+      })
+    }
+
+    // Navigate to the space
     router.push(`/spaces/${spaceId}`)
+  }
+
+  const toggleSpaceExpansion = (spaceId: string, e: React.MouseEvent) => {
+    e.stopPropagation()
+    setExpandedSpaceIds((prev) => {
+      const newSet = new Set(prev)
+      if (newSet.has(spaceId)) {
+        newSet.delete(spaceId) // Collapse if already expanded
+      } else {
+        newSet.add(spaceId) // Expand this space
+      }
+      return newSet
+    })
+  }
+
+  const handleDocumentClick = (spaceId: string, docId: string) => {
+    router.push(`/spaces/${spaceId}/documents/${docId}`)
   }
 
   const handleLogout = async () => {
@@ -233,8 +306,61 @@ export function Sidebar({ className }: SidebarProps) {
                     No spaces yet
                   </div>
                 ) : (
-                  spaces.map((space) => (
-                    <div key={space.id} className="group h-8 relative">
+                  spaces.map((space) => {
+                    const isExpanded = expandedSpaceIds.has(space.id)
+
+                    // Get documents from cache for this space (already loaded by space page)
+                    const spaceDocuments = isExpanded
+                      ? queryClient.getQueryData<GetSpaceDocumentsResponse>(
+                          documentsKeys.spaceDocuments(space.id, 'limit=100&offset=0')
+                        )
+                      : null
+                    const documents = spaceDocuments?.documents || []
+
+                    // Document type enum matching the main page
+                    enum DocumentType {
+                      word = 'word',
+                      pdf = 'pdf',
+                      image = 'image',
+                      audio = 'audio',
+                      video = 'video',
+                      web = 'web',
+                      other = 'other'
+                    }
+
+                    // Helper to determine document type from mime_type (matching main page)
+                    const getDocumentType = (mimeType: string): DocumentType => {
+                      if (mimeType.includes('pdf')) return DocumentType.pdf
+                      if (mimeType.includes('word') || mimeType.includes('document')) return DocumentType.word
+                      if (mimeType.startsWith('image/')) return DocumentType.image
+                      if (mimeType.startsWith('audio/')) return DocumentType.audio
+                      if (mimeType.startsWith('video/')) return DocumentType.video
+                      if (mimeType.includes('html')) return DocumentType.web
+                      return DocumentType.other
+                    }
+
+                    // Helper to get file type color (matching main page)
+                    const getFileTypeColor = (type: DocumentType) => {
+                      switch (type) {
+                        case DocumentType.pdf:
+                          return 'bg-red-100 text-red-800'
+                        case DocumentType.word:
+                          return 'bg-blue-100 text-blue-800'
+                        case DocumentType.image:
+                          return 'bg-green-100 text-green-800'
+                        case DocumentType.audio:
+                          return 'bg-yellow-100 text-yellow-800'
+                        case DocumentType.video:
+                          return 'bg-purple-100 text-purple-800'
+                        case DocumentType.web:
+                          return 'bg-cyan-100 text-cyan-800'
+                        default:
+                          return 'bg-gray-100 text-gray-800'
+                      }
+                    }
+
+                    return (
+                    <div key={space.id} className="group relative">
                     {editingSpaceId === space.id ? (
                       <div className="flex items-center h-8 px-2  pr-0">
                         <FolderClosed className="h-4 w-4 text-slate-400 flex-shrink-0 ml-0.5" />
@@ -267,18 +393,40 @@ export function Sidebar({ className }: SidebarProps) {
                         </Button>
                       </div>
                     ) : (
+                      <>
                       <div className={cn(
-                        "w-full h-8 relative group flex items-center px-3 py-2 rounded-lg transition-colors cursor-pointer",
+                        "w-full h-8 relative group flex items-center px-3 py-2 rounded-md transition-colors cursor-pointer",
                         space.isActive
                           ? "bg-primary hover:bg-primary/90 text-primary-foreground"
                           : "hover:bg-slate-700/50"
                       )}
                       onClick={() => handleSpaceClick(space.id)}
                       >
-                        <FolderClosed className={cn(
-                          "mr-2 h-4 w-4 flex-shrink-0",
-                          space.isActive ? "text-primary-foreground" : "text-slate-400"
-                        )} />
+                        {/* Chevron for expand/collapse */}
+                        <button
+                          onClick={(e) => toggleSpaceExpansion(space.id, e)}
+                          className={cn(
+                            "mr-1 h-4 w-4 flex-shrink-0 flex items-center justify-center",
+                            space.isActive ? "text-primary-foreground" : "text-slate-400"
+                          )}
+                        >
+                          {isExpanded ? (
+                            <ChevronDown className="h-3 w-3" />
+                          ) : (
+                            <ChevronRight className="h-3 w-3" />
+                          )}
+                        </button>
+                        {isExpanded ? (
+                          <FolderOpen className={cn(
+                            "mr-2 h-4 w-4 flex-shrink-0",
+                            space.isActive ? "text-primary-foreground" : "text-slate-400"
+                          )} />
+                        ) : (
+                          <FolderClosed className={cn(
+                            "mr-2 h-4 w-4 flex-shrink-0",
+                            space.isActive ? "text-primary-foreground" : "text-slate-400"
+                          )} />
+                        )}
                         <span className={cn(
                           "flex-1 text-left truncate text-sm",
                           space.isActive ? "text-primary-foreground font-medium" : ""
@@ -332,9 +480,66 @@ export function Sidebar({ className }: SidebarProps) {
                           {space.documentCount}
                         </span>
                       </div>
+
+                      {/* Documents list - shown when expanded */}
+                      {isExpanded && (
+                        <div className="ml-5 mt-1 mb-2 space-y-0.5 border-l border-slate-700 pl-2">
+                          {documents.length === 0 ? (
+                            <div className="px-2 py-1 text-xs text-slate-400">
+                              No documents
+                            </div>
+                          ) : (
+                          <ScrollArea className="max-h-[256px]">
+                            <div className="space-y-0.5 pr-2">
+                            {documents.slice(0, 8).map((doc) => {
+                              const docType = getDocumentType(doc.mime_type)
+                              return (
+                              <div
+                                key={doc.id}
+                                className="flex items-center gap-1"
+                              >
+                                {/* Arrow icon - outside the hover area */}
+                                <CornerDownRight className="h-3 w-3 flex-shrink-0 text-slate-600" />
+
+                                {/* Document item */}
+                                <div
+                                  className={cn(
+                                    "flex items-center h-7 px-2 py-1 rounded-md cursor-pointer text-xs transition-colors gap-1.5 flex-1 overflow-hidden",
+                                    activeDocId === doc.id
+                                      ? "bg-slate-600 text-white"
+                                      : "hover:bg-slate-700/30 text-slate-300"
+                                  )}
+                                  onClick={() => handleDocumentClick(space.id, doc.id)}
+                                >
+                                  <span
+                                    className="block truncate flex-1 overflow-hidden text-ellipsis whitespace-nowrap"
+                                    title={doc.filename}
+                                    style={{ minWidth: 0 }}
+                                  >
+                                    {doc.filename}
+                                  </span>
+                                  <Badge variant="secondary" className={cn("text-[10px] px-1.5 py-0.5 flex-shrink-0", getFileTypeColor(docType))}>
+                                    {docType.toUpperCase()}
+                                  </Badge>
+                                </div>
+                              </div>
+                              )
+                            })}
+                            </div>
+                            {documents.length > 8 && (
+                              <div className="px-2 py-1 text-xs text-slate-400 text-center">
+                                +{documents.length - 8} more
+                              </div>
+                            )}
+                          </ScrollArea>
+                          )}
+                        </div>
+                      )}
+                      </>
                     )}
                   </div>
-                  ))
+                    )
+                  })
                 )}
 
                 {/* Create new space input */}

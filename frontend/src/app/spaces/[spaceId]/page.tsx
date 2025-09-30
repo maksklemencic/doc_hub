@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { useParams } from 'next/navigation'
+import { useParams, useRouter } from 'next/navigation'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Badge } from '@/components/ui/badge'
@@ -85,6 +85,7 @@ const getDocumentType = (mimeType: string): DocumentType => {
 
 export default function SpacePage() {
   const params = useParams()
+  const router = useRouter()
   const { getSpaceById } = useSpacesContext()
   const spaceId = params.spaceId as string
   const space = getSpaceById(spaceId)
@@ -264,6 +265,10 @@ export default function SpacePage() {
   const clearAllFilters = () => {
     setSelectedTypes(new Set())
     setSearchTerm('')
+  }
+
+  const handleDocumentClick = (documentId: string) => {
+    router.push(`/spaces/${spaceId}/documents/${documentId}`)
   }
 
   const handleSort = (newSortBy: SortBy) => {
@@ -623,8 +628,12 @@ export default function SpacePage() {
                     {filteredDocuments.map((document) => {
                       const docType = getDocumentType(document.mime_type)
                       return (
-                        <TableRow key={document.id} className="hover:bg-muted/50">
-                          <TableCell>
+                        <TableRow
+                          key={document.id}
+                          className="hover:bg-muted/50 cursor-pointer"
+                          onClick={() => handleDocumentClick(document.id)}
+                        >
+                          <TableCell onClick={(e) => e.stopPropagation()}>
                             <Checkbox
                               checked={selectedDocuments.has(document.id)}
                               onCheckedChange={() => handleSelectDocument(document.id)}
@@ -651,7 +660,7 @@ export default function SpacePage() {
                           <TableCell className="text-muted-foreground">
                             {formatDate(document.created_at)}
                           </TableCell>
-                          <TableCell>
+                          <TableCell onClick={(e) => e.stopPropagation()}>
                             <div className="flex items-center gap-1">
                               <Button variant="ghost" size="sm">
                                 <Download className="h-4 w-4" />
@@ -705,7 +714,7 @@ export default function SpacePage() {
                         {/* Preview Section - Top 2/3 */}
                         <div
                           className="aspect-[4/3] bg-muted/30 flex items-center justify-center border-b cursor-pointer"
-                          onClick={() => handleSelectDocument(document.id)}
+                          onClick={() => handleDocumentClick(document.id)}
                         >
                           <div className="w-16 h-16 rounded-lg bg-muted flex items-center justify-center text-muted-foreground">
                             {getFileIcon(docType)}

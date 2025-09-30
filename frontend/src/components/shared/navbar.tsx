@@ -2,6 +2,7 @@
 
 import { useAuth } from '@/hooks/use-auth'
 import { usePathname } from 'next/navigation'
+import { useNavbar } from '@/contexts/navbar-context'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { FileText, User } from 'lucide-react'
 
@@ -9,9 +10,10 @@ interface NavbarProps {
   title?: string
 }
 
-export function Navbar({ title }: NavbarProps) {
+export function Navbar({ title: propTitle }: NavbarProps) {
   const { user } = useAuth()
   const pathname = usePathname()
+  const { title: contextTitle } = useNavbar()
   
   // Get page title based on pathname if not provided
   // const getPageTitle = () => {
@@ -34,12 +36,27 @@ export function Navbar({ title }: NavbarProps) {
   //   }
   // }
 
+  const getPageTitle = () => {
+    // Priority: prop title > context title > pathname-based default
+    if (propTitle) return propTitle
+    if (contextTitle) return contextTitle
+
+    // Default fallback based on pathname
+    if (pathname.startsWith('/spaces/') && pathname.includes('/documents/')) {
+      return 'Document Viewer'
+    }
+    if (pathname.startsWith('/spaces/')) {
+      return 'Space'
+    }
+    return 'Documents'
+  }
+
   return (
     <nav className="bg-background h-16 flex items-center px-2">
       <div className="bg-gradient-to-r from-slate-700 to-primary h-12 w-full rounded-lg flex items-center justify-between px-6">
         {/* Page Title */}
         <h1 className="text-xl font-semibold text-primary-foreground">
-          Documents
+          {getPageTitle()}
         </h1>
         
         {/* User Info */}

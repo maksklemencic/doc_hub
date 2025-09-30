@@ -331,17 +331,23 @@ class RAGQueryAgent(BaseAgent):
         self,
         query: str,
         context: str
-    ) -> AsyncGenerator[str, None]:
-        """Generate streaming response using Groq."""
+    ) -> AsyncGenerator[tuple[str, Optional[Dict[str, Any]]], None]:
+        """
+        Generate streaming response using Groq.
+
+        Yields:
+            Tuple of (content_chunk, rate_limit_info)
+            rate_limit_info is only included in the final chunk, None otherwise
+        """
         prompt = self._create_enhanced_prompt(query, context)
 
         try:
-            async for chunk in self.llm_service.generate_streaming_response(
+            async for chunk, rate_limit_info in self.llm_service.generate_streaming_response(
                 prompt=prompt,
                 max_tokens=4000,
                 temperature=0.7
             ):
-                yield chunk
+                yield chunk, rate_limit_info
 
             self.logger.info("Generated streaming response successfully")
 
@@ -355,42 +361,26 @@ class RAGQueryAgent(BaseAgent):
     def _create_enhanced_prompt(self, query: str, context: str) -> str:
         """Create enhanced prompt with better engineering."""
         prompt_template = """<|im_start|>system
-You are a highly knowledgeable and accurate RAG system with enhanced context
-understanding. Your primary goal is to provide comprehensive, well-structured
-answers based on the provided context.
+You are a highly knowledgeable assistant that provides clear, concise, and accurate answers.
 
-**Guidelines:**
-1. **Prioritize Context**: Base your answer exclusively on the provided context
-2. **Use Hierarchical Information**: Pay attention to section headings and
-   document structure
-3. **Synthesize Information**: Combine relevant information from multiple
-   sources in the context
-4. **Maintain Accuracy**: If the context doesn't contain sufficient
-   information, clearly state this
-5. **Structure Response**: Use clear formatting with bullet points or
-   numbered lists when appropriate
-6. **Context Awareness**: Consider the document structure and relationships
-   between sections
-
-**Context Quality**: The context below has been enhanced with:
-- Parent heading information for better understanding
-- Related section cross-references
-- Multilingual content support
-- Structure-aware chunking
-- Powered by Groq for fast, high-quality responses
+**Core Rules:**
+1. Answer directly - never mention "the context", "the provided information", "the documents", or "sections"
+2. Write as if you naturally know this information
+3. Be concise and get straight to the point
+4. Use markdown formatting: **bold** for emphasis, headers for structure, bullet points and numbered lists
+5. If information is insufficient, say "I don't have enough information about that" without mentioning context or documents
+6. Never reference sections, pages, or document structure
+7. Structure your response clearly with headers and lists when appropriate
 
 <|im_end|>
 <|im_start|>user
-<context>
+Here is relevant information:
+
 {context}
-</context>
 
-<query>
-{query}
-</query>
+Question: {query}
 
-Please provide a comprehensive answer based on the enhanced context above.
-If you reference specific sections or documents, mention them clearly.
+Provide a clear, direct answer using markdown formatting.
 <|im_end|>"""
 
         return prompt_template.format(context=context, query=query)

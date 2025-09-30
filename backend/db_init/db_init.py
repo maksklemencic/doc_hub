@@ -98,15 +98,12 @@ def create_indexes():
             "CREATE INDEX IF NOT EXISTS idx_documents_created_at ON documents(created_at DESC);",
             "CREATE INDEX IF NOT EXISTS idx_documents_space_uploaded ON documents(space_id, uploaded_by);",
 
-            # Enhanced message indexes
+            # Message indexes
             "CREATE INDEX IF NOT EXISTS idx_messages_space_user ON messages(space_id, user_id);",
             "CREATE INDEX IF NOT EXISTS idx_messages_created_at ON messages(created_at DESC);",
             "CREATE INDEX IF NOT EXISTS idx_messages_status ON messages(status);",
             "CREATE INDEX IF NOT EXISTS idx_messages_space_status ON messages(space_id, status);",
             "CREATE INDEX IF NOT EXISTS idx_messages_space_created ON messages(space_id, created_at DESC);",
-            "CREATE INDEX IF NOT EXISTS idx_messages_response_time ON messages(response_completed_at DESC) WHERE response_completed_at IS NOT NULL;",
-            "CREATE INDEX IF NOT EXISTS idx_messages_processing_time ON messages(processing_time_ms) WHERE processing_time_ms IS NOT NULL;",
-            "CREATE INDEX IF NOT EXISTS idx_messages_streaming ON messages(is_streaming) WHERE is_streaming = TRUE;",
 
             # Other indexes
             "CREATE INDEX IF NOT EXISTS idx_spaces_user_id ON spaces(user_id);",
@@ -137,9 +134,7 @@ def create_views():
             COUNT(*) as total_messages,
             COUNT(CASE WHEN status = 'completed' THEN 1 END) as completed_messages,
             COUNT(CASE WHEN status = 'failed' THEN 1 END) as failed_messages,
-            COUNT(CASE WHEN is_streaming = TRUE THEN 1 END) as streamed_messages,
-            ROUND(AVG(processing_time_ms)::NUMERIC, 2) as avg_processing_time_ms,
-            ROUND(AVG(context_size)::NUMERIC, 2) as avg_context_size,
+            COUNT(CASE WHEN response IS NOT NULL THEN 1 END) as messages_with_response,
             ROUND(
                 COUNT(CASE WHEN status = 'completed' THEN 1 END)::NUMERIC /
                 NULLIF(COUNT(*), 0) * 100, 2

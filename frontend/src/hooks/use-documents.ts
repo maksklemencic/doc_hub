@@ -116,6 +116,8 @@ export function useDeleteDocument() {
       // Invalidate and refetch the affected space's documents
       if (context?.affectedSpaceId) {
         queryClient.invalidateQueries({ queryKey: documentsKeys.space(context.affectedSpaceId) })
+        // Also invalidate document counts to update sidebar
+        queryClient.invalidateQueries({ queryKey: ['space-document-counts'] })
       }
     },
   })
@@ -198,6 +200,8 @@ export function useDeleteDocumentSilent() {
       // Invalidate and refetch the affected space's documents
       if (context?.affectedSpaceId) {
         queryClient.invalidateQueries({ queryKey: documentsKeys.space(context.affectedSpaceId) })
+        // Also invalidate document counts to update sidebar
+        queryClient.invalidateQueries({ queryKey: ['space-document-counts'] })
       }
     },
   })

@@ -4,7 +4,7 @@ import logging
 import mimetypes
 import re
 import unicodedata
-from typing import List, Tuple
+from typing import List, Tuple, Optional
 
 import fitz
 import pytesseract
@@ -178,6 +178,53 @@ def process_document_for_text(file_bytes: bytes, mime_type: str) -> List[Tuple[i
     except Exception as e:
         logger.error(f"Unexpected error processing document: {str(e)}")
         raise DocumentProcessorError(f"Document processing failed: {str(e)}")
+
+def pdf_pages_to_images(file_bytes: bytes, dpi: int = 300) -> List[Tuple[int, str]]:
+    """
+    Convert PDF pages to high-resolution base64-encoded images.
+
+    Args:
+        file_bytes: PDF file bytes
+        dpi: Resolution for image conversion (default 300 DPI)
+
+    Returns:
+        List of tuples (page_number, base64_image_data_uri)
+    """
+    logger.info(f"Converting PDF pages to images at {dpi} DPI")
+
+    try:
+        doc = fitz.open(stream=file_bytes, filetype="pdf")
+    except Exception as e:
+        logger.error(f"Failed to open PDF file: {str(e)}")
+        raise DocumentCorruptedError("PDF", str(e))
+
+    page_images = []
+    for i, page in enumerate(doc):
+        page_number = i + 1
+        try:
+            # Convert page to high-res image, maintaining aspect ratio
+            mat = fitz.Matrix(dpi / 72, dpi / 72)  # 72 is default DPI
+            pix = page.get_pixmap(matrix=mat, alpha=False)
+
+            # Convert to PNG bytes
+            img_bytes = pix.tobytes("png")
+
+            # Encode to base64
+            img_base64 = base64.b64encode(img_bytes).decode('utf-8')
+
+            # Create data URI
+            data_uri = f"data:image/png;base64,{img_base64}"
+
+            page_images.append((page_number, data_uri))
+            logger.debug(f"Converted page {page_number} to image ({len(img_base64)} bytes base64)")
+
+        except Exception as e:
+            logger.error(f"Failed to convert page {page_number} to image: {str(e)}")
+            raise TextExtractionError("PDF", f"Page {page_number} image conversion: {str(e)}")
+
+    logger.info(f"Successfully converted {len(page_images)} PDF pages to images")
+    return page_images
+
 
 def base64_to_text(base64_text: str, mime_type: str) -> List[Tuple[int, str]]:
     logger.info("Processing base64 encoded document")

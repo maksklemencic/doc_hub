@@ -107,13 +107,33 @@ class MarkdownChunker:
         current_section = {"content": [], "headers": [], "type": SectionType.CONTENT}
 
         for line_num, line in enumerate(lines):
-            line = line.strip()
-            if not line:
+            line_stripped = line.strip()
+            if not line_stripped:
                 current_section["content"].append("")
                 continue
 
+            # Detect structure markers from cleaned text (SECTION:, SUBSECTION:)
+            section_marker_match = re.match(r'^(SECTION|SUBSECTION):\s*(.+)$', line_stripped)
+            if section_marker_match:
+                # Save current section
+                if current_section["content"] or current_section["headers"]:
+                    sections.append(current_section.copy())
+
+                # Start new section with structure marker
+                marker_type = section_marker_match.group(1)
+                marker_text = section_marker_match.group(2)
+                level = 1 if marker_type == "SECTION" else 2
+
+                current_section = {
+                    "content": [line_stripped],  # Keep marker for context
+                    "headers": [{"level": level, "text": marker_text, "line": line_num}],
+                    "type": SectionType.HEADER,
+                    "markdown_level": level
+                }
+                continue
+
             # Detect headers
-            header_match = re.match(r'^(#{1,6})\s+(.+)$', line)
+            header_match = re.match(r'^(#{1,6})\s+(.+)$', line_stripped)
             if header_match:
                 # Save current section
                 if current_section["content"] or current_section["headers"]:
@@ -124,7 +144,7 @@ class MarkdownChunker:
                 header_text = header_match.group(2)
 
                 current_section = {
-                    "content": [line],
+                    "content": [line_stripped],
                     "headers": [{"level": level, "text": header_text, "line": line_num}],
                     "type": SectionType.HEADER,
                     "markdown_level": level
@@ -132,49 +152,49 @@ class MarkdownChunker:
                 continue
 
             # Detect lists
-            if re.match(r'^[-*+]\s+', line) or re.match(r'^\d+\.\s+', line):
+            if re.match(r'^[-*+]\s+', line_stripped) or re.match(r'^\d+\.\s+', line_stripped):
                 if current_section["type"] != SectionType.LIST:
                     if current_section["content"]:
                         sections.append(current_section.copy())
                     current_section = {
-                        "content": [line],
+                        "content": [line_stripped],
                         "headers": current_section["headers"].copy(),
                         "type": SectionType.LIST
                     }
                 else:
-                    current_section["content"].append(line)
+                    current_section["content"].append(line_stripped)
                 continue
 
             # Detect tables
-            if '|' in line and line.count('|') >= 2:
+            if '|' in line_stripped and line_stripped.count('|') >= 2:
                 if current_section["type"] != SectionType.TABLE:
                     if current_section["content"]:
                         sections.append(current_section.copy())
                     current_section = {
-                        "content": [line],
+                        "content": [line_stripped],
                         "headers": current_section["headers"].copy(),
                         "type": SectionType.TABLE
                     }
                 else:
-                    current_section["content"].append(line)
+                    current_section["content"].append(line_stripped)
                 continue
 
             # Detect code blocks
-            if line.startswith('```'):
+            if line_stripped.startswith('```'):
                 if current_section["type"] != SectionType.CODE:
                     if current_section["content"]:
                         sections.append(current_section.copy())
                     current_section = {
-                        "content": [line],
+                        "content": [line_stripped],
                         "headers": current_section["headers"].copy(),
                         "type": SectionType.CODE
                     }
                 else:
-                    current_section["content"].append(line)
+                    current_section["content"].append(line_stripped)
                 continue
 
             # Regular content
-            current_section["content"].append(line)
+            current_section["content"].append(line_stripped)
             if current_section["type"] == SectionType.HEADER:
                 current_section["type"] = SectionType.CONTENT
 

@@ -254,6 +254,78 @@ export const documentsApi = {
       method: 'DELETE',
     })
   },
+
+  // Get document markdown content
+  getDocumentMarkdown: async (documentId: string): Promise<string> => {
+    const token = typeof window !== 'undefined'
+      ? localStorage.getItem('access_token')
+      : null
+
+    const response = await fetch(`${API_BASE_URL}/documents/view/${documentId}/markdown`, {
+      headers: {
+        ...(token && { Authorization: `Bearer ${token}` }),
+      },
+    })
+
+    if (!response.ok) {
+      throw new ApiError(`Failed to fetch markdown: ${response.statusText}`, response.status)
+    }
+
+    return response.text()
+  },
+
+  // Get document text content
+  getDocumentText: async (documentId: string): Promise<string> => {
+    const token = typeof window !== 'undefined'
+      ? localStorage.getItem('access_token')
+      : null
+
+    const response = await fetch(`${API_BASE_URL}/documents/view/${documentId}/text`, {
+      headers: {
+        ...(token && { Authorization: `Bearer ${token}` }),
+      },
+    })
+
+    if (!response.ok) {
+      throw new ApiError(`Failed to fetch text: ${response.statusText}`, response.status)
+    }
+
+    return response.text()
+  },
+
+  // Get document PDF URL (for embedding)
+  getDocumentPdfUrl: (documentId: string): string => {
+    const token = typeof window !== 'undefined'
+      ? localStorage.getItem('access_token')
+      : null
+
+    const url = `${API_BASE_URL}/documents/view/${documentId}`
+
+    // For PDF viewer, we need to include auth token in URL or header
+    // react-pdf will handle the URL directly
+    return url
+  },
+
+  // Get document file with auth headers (for react-pdf)
+  getDocumentFile: async (documentId: string): Promise<string> => {
+    const token = typeof window !== 'undefined'
+      ? localStorage.getItem('access_token')
+      : null
+
+    const response = await fetch(`${API_BASE_URL}/documents/view/${documentId}`, {
+      headers: {
+        ...(token && { Authorization: `Bearer ${token}` }),
+      },
+    })
+
+    if (!response.ok) {
+      throw new ApiError(`Failed to fetch document: ${response.statusText}`, response.status)
+    }
+
+    // Return blob URL instead of ArrayBuffer/Uint8Array to avoid detachment issues with Workers
+    const blob = await response.blob()
+    return URL.createObjectURL(blob)
+  },
 }
 
 // Upload API

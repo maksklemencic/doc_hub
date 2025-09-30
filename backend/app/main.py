@@ -100,11 +100,11 @@ app.add_middleware(AuthMiddleware)
 
 API_V1_PREFIX = "/api/v1"
 
-app.include_router(auth.router, prefix=f"{API_V1_PREFIX}/auth", tags=["v1"])
-app.include_router(upload.router, prefix=f"{API_V1_PREFIX}/upload", tags=["v1"])
-app.include_router(documents.router, prefix=f"{API_V1_PREFIX}", tags=["v1"])
-app.include_router(spaces.router, prefix=f"{API_V1_PREFIX}/spaces", tags=["v1"])
-app.include_router(messages.router, prefix=f"{API_V1_PREFIX}/spaces", tags=["v1"])
+app.include_router(auth.router, prefix=f"{API_V1_PREFIX}/auth")
+app.include_router(upload.router, prefix=f"{API_V1_PREFIX}/upload")
+app.include_router(documents.router, prefix=f"{API_V1_PREFIX}")
+app.include_router(spaces.router, prefix=f"{API_V1_PREFIX}/spaces")
+app.include_router(messages.router, prefix=f"{API_V1_PREFIX}/spaces")
 
 # API Info endpoint
 @app.get("/", tags=["info"])

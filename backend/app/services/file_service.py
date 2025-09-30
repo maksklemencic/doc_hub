@@ -131,23 +131,84 @@ def get_file_content(file_path: str) -> Tuple[bytes, str]:
         raise FileReadError(file_path, str(e))
 
 
+def save_text_variants(
+    original_file_path: str,
+    raw_text: str,
+    cleaned_text: str,
+    markdown_text: str
+) -> Tuple[str, str, str]:
+    """
+    Save raw text, cleaned text, and markdown versions alongside the original document.
+
+    Args:
+        original_file_path: Path to the original uploaded document
+        raw_text: Raw extracted text (unprocessed)
+        cleaned_text: Cleaned text optimized for RAG (generated from markdown)
+        markdown_text: Unified markdown (vision-extracted or LLM-converted)
+
+    Returns:
+        Tuple of (raw_text_path, cleaned_text_path, markdown_path)
+    """
+    logger.info(f"Saving text variants for document: {original_file_path}")
+
+    try:
+        original_path = Path(original_file_path)
+        base_dir = original_path.parent
+        base_name = original_path.stem  # filename without extension
+
+        # Create paths for text variants
+        raw_text_path = base_dir / f"{base_name}_raw.txt"
+        cleaned_text_path = base_dir / f"{base_name}_cleaned.txt"
+        markdown_path = base_dir / f"{base_name}.md"
+
+        # Validate paths
+        if not is_safe_path(UPLOAD_DIR, raw_text_path):
+            raise ValueError("Invalid raw text path - potential directory traversal")
+        if not is_safe_path(UPLOAD_DIR, cleaned_text_path):
+            raise ValueError("Invalid cleaned text path - potential directory traversal")
+        if not is_safe_path(UPLOAD_DIR, markdown_path):
+            raise ValueError("Invalid markdown path - potential directory traversal")
+
+        # Save raw text
+        with raw_text_path.open("w", encoding="utf-8") as f:
+            f.write(raw_text)
+        logger.debug(f"Saved raw text to: {raw_text_path}")
+
+        # Save cleaned text (optimized for RAG)
+        with cleaned_text_path.open("w", encoding="utf-8") as f:
+            f.write(cleaned_text)
+        logger.debug(f"Saved cleaned text to: {cleaned_text_path}")
+
+        # Save unified markdown
+        with markdown_path.open("w", encoding="utf-8") as f:
+            f.write(markdown_text)
+        logger.debug(f"Saved markdown to: {markdown_path}")
+
+        logger.info(f"Successfully saved all text variants for: {original_file_path}")
+        return str(raw_text_path), str(cleaned_text_path), str(markdown_path)
+
+    except Exception as e:
+        logger.error(f"Failed to save text variants for {original_file_path}: {str(e)}")
+        raise FileSaveError(original_file_path, f"Failed to save text variants: {str(e)}")
+
+
 def delete_file_and_cleanup(file_path: str) -> None:
     logger.info(f"Deleting file: {file_path}")
-    
+
     path_obj = Path(file_path)
     if not path_obj.exists():
         logger.warning(f"File not found for deletion: {file_path}")
         raise FileNotFoundError(file_path)
-    
+
     try:
         path_obj.unlink()
         logger.info(f"Successfully deleted file: {file_path}")
-        
+
         user_folder = path_obj.parent
         if user_folder.exists() and not any(user_folder.iterdir()):
             user_folder.rmdir()
             logger.info(f"Cleaned up empty user folder: {user_folder}")
-            
+
     except Exception as e:
         logger.error(f"Failed to delete file {file_path}: {str(e)}")
         raise FileDeleteError(file_path, str(e))

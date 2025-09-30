@@ -1,8 +1,9 @@
 import logging
 import uuid
+from pathlib import Path
 
 from fastapi import APIRouter, Depends, HTTPException, status
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, PlainTextResponse
 
 from ..dependencies.auth import get_current_user
 from ..errors.database_errors import DatabaseError, NotFoundError, PermissionError
@@ -141,6 +142,134 @@ def view_document(
         raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail=f"Database error: {e.message}")
     except Exception as e:
         logger.error(f"Unexpected error viewing document {doc_id}: {str(e)}")
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="An unexpected error occurred")
+
+
+@router.get(
+    "/documents/view/{doc_id}/markdown",
+    tags=["documents"],
+    summary="View document as markdown",
+    description="Retrieve the markdown version of a document. Returns vision-extracted markdown if available, otherwise LLM-converted markdown.",
+    response_description="Markdown content as plain text.",
+    response_class=PlainTextResponse,
+    status_code=status.HTTP_200_OK,
+    responses={
+        200: {"description": "Markdown content successfully retrieved", "content": {"text/plain": {"schema": {"type": "string"}}}},
+        401: {"description": "Authentication required"},
+        403: {"description": "Permission denied"},
+        404: {"description": "Document or markdown file not found"},
+        422: {"description": "Invalid document ID format"},
+        500: {"description": "Internal server error"},
+        503: {"description": "Database unavailable"}
+    }
+)
+def view_document_markdown(
+    doc_id: uuid.UUID,
+    current_user_id: uuid.UUID = Depends(get_current_user)
+):
+    try:
+        # Get document with authorization check
+        document = db_handler.get_user_document_by_id(doc_id, current_user_id)
+        if not document:
+            logger.warning(f"Document {doc_id} not found or not owned by user {current_user_id}")
+            raise NotFoundError("Document", str(doc_id))
+
+        if not document.file_path:
+            logger.warning(f"Document {doc_id} is a web document without file path")
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Web documents do not have markdown files")
+
+        # Determine markdown file path
+        original_path = Path(document.file_path)
+        base_dir = original_path.parent
+        base_name = original_path.stem
+
+        markdown_path = base_dir / f"{base_name}.md"
+
+        if not markdown_path.exists():
+            logger.warning(f"No markdown file found for document {doc_id}")
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Markdown file not found")
+
+        # Read and return markdown content
+        with markdown_path.open("r", encoding="utf-8") as f:
+            markdown_content = f.read()
+
+        return PlainTextResponse(content=markdown_content, media_type="text/markdown")
+
+    except PermissionError as e:
+        logger.warning(f"Permission denied for user {current_user_id} to view markdown for document {doc_id}")
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=e.message)
+    except NotFoundError as e:
+        logger.warning(f"Document {doc_id} not found")
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=e.message)
+    except DatabaseError as e:
+        logger.error(f"Database error accessing document {doc_id}: {str(e)}")
+        raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail=f"Database error: {e.message}")
+    except Exception as e:
+        logger.error(f"Unexpected error viewing markdown for document {doc_id}: {str(e)}")
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="An unexpected error occurred")
+
+
+@router.get(
+    "/documents/view/{doc_id}/text",
+    tags=["documents"],
+    summary="View document as cleaned text",
+    description="Retrieve the cleaned text version of a document.",
+    response_description="Cleaned text content as plain text.",
+    response_class=PlainTextResponse,
+    status_code=status.HTTP_200_OK,
+    responses={
+        200: {"description": "Text content successfully retrieved", "content": {"text/plain": {"schema": {"type": "string"}}}},
+        401: {"description": "Authentication required"},
+        403: {"description": "Permission denied"},
+        404: {"description": "Document or text file not found"},
+        422: {"description": "Invalid document ID format"},
+        500: {"description": "Internal server error"},
+        503: {"description": "Database unavailable"}
+    }
+)
+def view_document_text(
+    doc_id: uuid.UUID,
+    current_user_id: uuid.UUID = Depends(get_current_user)
+):
+    try:
+        # Get document with authorization check
+        document = db_handler.get_user_document_by_id(doc_id, current_user_id)
+        if not document:
+            logger.warning(f"Document {doc_id} not found or not owned by user {current_user_id}")
+            raise NotFoundError("Document", str(doc_id))
+
+        if not document.file_path:
+            logger.warning(f"Document {doc_id} is a web document without file path")
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Web documents do not have text files")
+
+        # Determine text file path
+        original_path = Path(document.file_path)
+        base_dir = original_path.parent
+        base_name = original_path.stem
+
+        cleaned_text_path = base_dir / f"{base_name}_cleaned.txt"
+
+        if not cleaned_text_path.exists():
+            logger.warning(f"No cleaned text file found for document {doc_id}")
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Text file not found")
+
+        # Read and return text content
+        with cleaned_text_path.open("r", encoding="utf-8") as f:
+            text_content = f.read()
+
+        return PlainTextResponse(content=text_content, media_type="text/plain")
+
+    except PermissionError as e:
+        logger.warning(f"Permission denied for user {current_user_id} to view text for document {doc_id}")
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=e.message)
+    except NotFoundError as e:
+        logger.warning(f"Document {doc_id} not found")
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=e.message)
+    except DatabaseError as e:
+        logger.error(f"Database error accessing document {doc_id}: {str(e)}")
+        raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail=f"Database error: {e.message}")
+    except Exception as e:
+        logger.error(f"Unexpected error viewing text for document {doc_id}: {str(e)}")
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="An unexpected error occurred")
 
 

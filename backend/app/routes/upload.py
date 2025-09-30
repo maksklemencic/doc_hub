@@ -81,13 +81,16 @@ async def upload_base64(
 
             # Extract results for compatibility with existing workflow
             pages = agent_result["original_pages"]
-            processed_text = agent_result["processed_text"]
+            raw_text = agent_result.get("raw_text", "")
+            cleaned_text = agent_result.get("cleaned_text", "")
+            markdown_text = agent_result.get("markdown_text", "")
+            used_vision = agent_result.get("used_vision", False)
             language = agent_result.get("language", "unknown")
             quality_score = agent_result.get("quality_score", 0.5)
 
             logger.info(
                 f"Document processing complete: {request.filename} "
-                f"(language: {language}, quality: {quality_score:.2f})"
+                f"(language: {language}, quality: {quality_score:.2f}, vision: {used_vision})"
             )
         except Exception as agent_error:
             logger.warning(
@@ -100,16 +103,32 @@ async def upload_base64(
                 base64_text=request.content_base64,
                 mime_type=request.mime_type
             )
-            processed_text = "\n\n".join([text for _, text in pages])
+            raw_text = "\n\n".join([text for _, text in pages])
+            cleaned_text = raw_text
+            markdown_text = raw_text
             language = "unknown"
             quality_score = None
-        
+
         logger.debug(f"Saving file to filesystem")
         saved_file_path = file_service.save_base64_file(
             request.content_base64,
             request.filename,
             current_user_id
         )
+
+        # Save text variants (raw, cleaned, markdown)
+        logger.debug(f"Saving text variants")
+        try:
+            raw_path, cleaned_path, markdown_path = file_service.save_text_variants(
+                saved_file_path,
+                raw_text,
+                cleaned_text,
+                markdown_text
+            )
+            logger.info(f"Saved text variants: raw={raw_path}, cleaned={cleaned_path}, md={markdown_path}")
+        except Exception as text_save_error:
+            logger.warning(f"Failed to save text variants: {str(text_save_error)}")
+            # Continue even if text variants fail to save
 
         # Calculate file size from saved file
         import os
@@ -265,7 +284,10 @@ async def upload_file_multipart(
 
             # Extract results for compatibility with existing workflow
             pages = agent_result["original_pages"]
-            processed_text = agent_result["processed_text"]
+            raw_text = agent_result.get("raw_text", "")
+            cleaned_text = agent_result.get("cleaned_text", "")
+            markdown_text = agent_result.get("markdown_text", "")
+            vision_markdown = agent_result.get("vision_markdown")  # May be None
             language = agent_result.get("language", "unknown")
             quality_score = agent_result.get("quality_score", 0.5)
 
@@ -281,7 +303,9 @@ async def upload_file_multipart(
 
             # Fallback to original processing
             pages = document_processor.process_document_for_text(contents, file.content_type)
-            processed_text = "\n\n".join([text for _, text in pages])
+            raw_text = "\n\n".join([text for _, text in pages])
+            cleaned_text = raw_text
+            markdown_text = raw_text
             language = "unknown"
             quality_score = None
 
@@ -289,6 +313,20 @@ async def upload_file_multipart(
         file.file.seek(0)
         logger.debug(f"Saving file to filesystem")
         saved_file_path = file_service.save_file(file, current_user_id)
+
+        # Save text variants (raw, cleaned, markdown)
+        logger.debug(f"Saving text variants")
+        try:
+            raw_path, cleaned_path, markdown_path = file_service.save_text_variants(
+                saved_file_path,
+                raw_text,
+                cleaned_text,
+                markdown_text
+            )
+            logger.info(f"Saved text variants: raw={raw_path}, cleaned={cleaned_path}, md={markdown_path}")
+        except Exception as text_save_error:
+            logger.warning(f"Failed to save text variants: {str(text_save_error)}")
+            # Continue even if text variants fail to save
 
         # Get file size from the uploaded file
         file_size = len(contents)
