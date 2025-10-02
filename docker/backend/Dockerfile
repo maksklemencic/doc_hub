@@ -21,10 +21,15 @@ RUN apt-get update && apt-get install -y \
     htop \
     postgresql-client \
     redis-tools \
+    libreoffice \
+    wget \
+    gnupg \
     && apt-get clean \
     && rm -rf /var/lib/apt/lists/*
 
 RUN pip install --no-cache-dir -r requirements.txt
+
+RUN pip install playwright && playwright install chromium --with-deps
 
 # Install additional development tools
 RUN pip install --no-cache-dir debugpy black flake8 pytest-xdist

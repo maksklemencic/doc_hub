@@ -2,11 +2,12 @@
 
 import { useState, useEffect, useMemo } from 'react'
 import { useParams, useRouter } from 'next/navigation'
+import Image from 'next/image'
 import { Button } from '@/components/ui/button'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { Spinner } from '@/components/ui/spinner'
-import { ArrowLeft, FileText, FileCode, File } from 'lucide-react'
+import { ArrowLeft, FileText, FileCode, File, FileImage, Globe } from 'lucide-react'
 import { documentsApi, DocumentResponse } from '@/lib/api'
 import { useSpaceDocuments } from '@/hooks/use-documents'
 import { useSpacesContext } from '@/contexts/spaces-context'
@@ -37,6 +38,8 @@ export default function DocumentViewerPage() {
   const [markdownContent, setMarkdownContent] = useState<string>('')
   const [textContent, setTextContent] = useState<string>('')
   const [pdfUrl, setPdfUrl] = useState<string | null>(null)
+  const [docType, setDocType] = useState<string>('pdf')
+  const [originalFilename, setOriginalFilename] = useState<string>('')
   const [isLoadingMarkdown, setIsLoadingMarkdown] = useState(false)
   const [isLoadingText, setIsLoadingText] = useState(false)
   const [isLoadingPdf, setIsLoadingPdf] = useState(false)
@@ -58,12 +61,12 @@ export default function DocumentViewerPage() {
   const document = documentsData?.documents?.find((doc: DocumentResponse) => doc.id === docId)
   const documentName = document?.filename || 'Document'
 
-  // Load PDF on mount (default tab)
+  // Load document file on mount (default tab)
   useEffect(() => {
     let currentUrl: string | null = null
     let mounted = true
 
-    const loadPdf = async () => {
+    const loadDocument = async () => {
       // Revoke old URL if it exists
       if (pdfUrl) {
         URL.revokeObjectURL(pdfUrl)
@@ -76,19 +79,21 @@ export default function DocumentViewerPage() {
       setPdfKey(docId) // Update key to force remount of PDF component
 
       try {
-        const url = await documentsApi.getDocumentFile(docId)
-        currentUrl = url
+        const result = await documentsApi.getDocumentFile(docId)
+        currentUrl = result.url
 
         if (mounted) {
-          setPdfUrl(url)
+          setPdfUrl(result.url)
+          setDocType(result.docType)
+          setOriginalFilename(result.originalFilename)
         } else {
           // If component unmounted during fetch, clean up immediately
-          URL.revokeObjectURL(url)
+          URL.revokeObjectURL(result.url)
         }
       } catch (error) {
-        console.error('Failed to load PDF:', error)
+        console.error('Failed to load document:', error)
         if (mounted) {
-          setPdfError('Failed to load PDF document')
+          setPdfError('Failed to load document')
         }
       } finally {
         if (mounted) {
@@ -97,7 +102,7 @@ export default function DocumentViewerPage() {
       }
     }
 
-    loadPdf()
+    loadDocument()
 
     // Cleanup: revoke blob URL when component unmounts or docId changes
     return () => {
@@ -188,8 +193,14 @@ export default function DocumentViewerPage() {
           {/* Right: Tabs */}
           <TabsList className="flex-shrink-0">
             <TabsTrigger value="pdf" className="cursor-pointer">
-              <File className="h-4 w-4 mr-2" />
-              View
+              {docType === 'image' ? (
+                <FileImage className="h-4 w-4 mr-2" />
+              ) : docType === 'web' ? (
+                <Globe className="h-4 w-4 mr-2" />
+              ) : (
+                <File className="h-4 w-4 mr-2" />
+              )}
+              {docType === 'word' ? 'Preview' : 'View'}
             </TabsTrigger>
             <TabsTrigger value="markdown" className="cursor-pointer">
               <FileCode className="h-4 w-4 mr-2" />
@@ -205,7 +216,7 @@ export default function DocumentViewerPage() {
 
       {/* Content Area */}
       <div className="flex-1 min-h-0">
-        {/* PDF Tab */}
+        {/* View Tab - handles PDF, Word (as PDF), and Images */}
         <TabsContent value="pdf" className="h-full m-0 px-8 py-6">
           <div className="h-full bg-white overflow-hidden">
             <ScrollArea className="h-full">
@@ -213,46 +224,68 @@ export default function DocumentViewerPage() {
                 {isLoadingPdf ? (
                   <div className="flex items-center justify-center py-12">
                     <Spinner className="mr-2" />
-                    <span className="text-muted-foreground">Loading PDF...</span>
+                    <span className="text-muted-foreground">Loading document...</span>
                   </div>
                 ) : pdfError ? (
                   <div className="text-center py-12">
                     <File className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
-                    <h3 className="text-lg font-medium mb-2">Failed to load PDF</h3>
+                    <h3 className="text-lg font-medium mb-2">Failed to load document</h3>
                     <p className="text-muted-foreground">{pdfError}</p>
                   </div>
                 ) : pdfUrl ? (
-                  <Document
-                    key={pdfKey}
-                    file={pdfUrl}
-                    onLoadSuccess={onDocumentLoadSuccess}
-                    onLoadError={onDocumentLoadError}
-                    loading={
-                      <div className="flex items-center justify-center py-12">
-                        <Spinner className="mr-2" />
-                        <span className="text-muted-foreground">Loading PDF...</span>
+                  (docType === 'image' || docType === 'web') ? (
+                    // Image viewer (for images and web screenshots)
+                    <div className="w-full flex flex-col items-center justify-center py-8">
+                      <div className="relative w-full max-w-4xl">
+                        <Image
+                          src={pdfUrl}
+                          alt={originalFilename || documentName}
+                          width={0}
+                          height={0}
+                          sizes="100vw"
+                          style={{ width: '100%', height: 'auto' }}
+                          className="rounded-lg shadow-lg"
+                          unoptimized // Since we're using blob URLs
+                        />
                       </div>
-                    }
-                    error={
-                      <div className="text-center py-12">
-                        <File className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
-                        <h3 className="text-lg font-medium mb-2">Failed to render PDF</h3>
-                        <p className="text-muted-foreground">The PDF file could not be displayed</p>
-                      </div>
-                    }
-                    className="w-full"
-                  >
-                    {Array.from(new Array(numPages), (el, index) => (
-                      <Page
-                        key={`page_${index + 1}`}
-                        pageNumber={index + 1}
-                        className="mb-4 shadow-lg"
-                        width={Math.min(800, typeof window !== 'undefined' ? window.innerWidth - 200 : 800)}
-                        renderTextLayer={true}
-                        renderAnnotationLayer={true}
-                      />
-                    ))}
-                  </Document>
+                      <p className="text-sm text-muted-foreground mt-4">
+                        {docType === 'web' ? 'Webpage Screenshot' : originalFilename || documentName}
+                      </p>
+                    </div>
+                  ) : (
+                    // PDF viewer (for PDF and Word documents converted to PDF)
+                    <Document
+                      key={pdfKey}
+                      file={pdfUrl}
+                      onLoadSuccess={onDocumentLoadSuccess}
+                      onLoadError={onDocumentLoadError}
+                      loading={
+                        <div className="flex items-center justify-center py-12">
+                          <Spinner className="mr-2" />
+                          <span className="text-muted-foreground">Loading {docType === 'word' ? 'Word document' : 'PDF'}...</span>
+                        </div>
+                      }
+                      error={
+                        <div className="text-center py-12">
+                          <File className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
+                          <h3 className="text-lg font-medium mb-2">Failed to render document</h3>
+                          <p className="text-muted-foreground">The document could not be displayed</p>
+                        </div>
+                      }
+                      className="w-full"
+                    >
+                      {Array.from(new Array(numPages), (el, index) => (
+                        <Page
+                          key={`page_${index + 1}`}
+                          pageNumber={index + 1}
+                          className="mb-4 shadow-lg"
+                          width={Math.min(800, typeof window !== 'undefined' ? window.innerWidth - 200 : 800)}
+                          renderTextLayer={true}
+                          renderAnnotationLayer={true}
+                        />
+                      ))}
+                    </Document>
+                  )
                 ) : null}
               </div>
             </ScrollArea>

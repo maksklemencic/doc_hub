@@ -307,7 +307,7 @@ export const documentsApi = {
   },
 
   // Get document file with auth headers (for react-pdf)
-  getDocumentFile: async (documentId: string): Promise<string> => {
+  getDocumentFile: async (documentId: string): Promise<{url: string, docType: string, originalFilename: string}> => {
     const token = typeof window !== 'undefined'
       ? localStorage.getItem('access_token')
       : null
@@ -322,9 +322,17 @@ export const documentsApi = {
       throw new ApiError(`Failed to fetch document: ${response.statusText}`, response.status)
     }
 
+    // Extract document type from response header
+    const docType = response.headers.get('X-Document-Type') || 'other'
+    const originalFilename = response.headers.get('X-Original-Filename') || 'document'
+
     // Return blob URL instead of ArrayBuffer/Uint8Array to avoid detachment issues with Workers
     const blob = await response.blob()
-    return URL.createObjectURL(blob)
+    return {
+      url: URL.createObjectURL(blob),
+      docType,
+      originalFilename
+    }
   },
 }
 

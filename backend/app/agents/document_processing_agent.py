@@ -81,6 +81,7 @@ class DocumentProcessingAgent(BaseAgent):
         enable_llm_cleaning = input_data.get("enable_llm_cleaning", True)
         enable_markdown_conversion = input_data.get("enable_markdown_conversion", True)
         enable_quality_assessment = input_data.get("enable_quality_assessment", False)
+        custom_vision_prompt = input_data.get("custom_vision_prompt")  # NEW: Custom prompt for vision model
 
         if not file_bytes or not mime_type:
             raise DocumentProcessorError("file_bytes and mime_type are required")
@@ -88,9 +89,10 @@ class DocumentProcessingAgent(BaseAgent):
         self.logger.info(f"Processing document: {filename} ({mime_type})")
 
         # Step 1: Extract raw text
-        # For PDFs, try vision extraction first, then fallback to traditional
+        # For PDFs and images, try vision extraction first, then fallback to traditional
         vision_markdown = None
         is_pdf = mime_type == "application/pdf"
+        is_image = mime_type.startswith("image/")
 
         if is_pdf:
             self.update_progress(10, "Extracting PDF with vision model")
@@ -102,15 +104,37 @@ class DocumentProcessingAgent(BaseAgent):
                 else:
                     pdf_bytes = file_bytes
 
-                # Try vision extraction
+                # Try vision extraction with optional custom prompt
                 vision_markdown, page_images = await self._extract_pdf_with_vision(
-                    pdf_bytes, filename
+                    pdf_bytes, filename, custom_prompt=custom_vision_prompt
                 )
                 self.logger.info("Vision extraction successful")
 
             except Exception as vision_error:
                 self.logger.warning(
                     f"Vision extraction failed: {str(vision_error)}, falling back to traditional extraction"
+                )
+                vision_markdown = None  # Mark as failed
+
+        elif is_image:
+            self.update_progress(10, "Extracting image with vision model")
+            try:
+                # Convert base64 to bytes if needed
+                if isinstance(file_bytes, str):
+                    import base64 as b64
+                    image_bytes = b64.b64decode(file_bytes)
+                else:
+                    image_bytes = file_bytes
+
+                # Try vision extraction for single image with optional custom prompt
+                vision_markdown = await self._extract_image_with_vision(
+                    image_bytes, filename, custom_prompt=custom_vision_prompt
+                )
+                self.logger.info("Image vision extraction successful")
+
+            except Exception as vision_error:
+                self.logger.warning(
+                    f"Image vision extraction failed: {str(vision_error)}, falling back to OCR"
                 )
                 vision_markdown = None  # Mark as failed
 
@@ -183,6 +207,21 @@ class DocumentProcessingAgent(BaseAgent):
 
         self.update_progress(100, "Document processing complete")
 
+        # Create markdown pages for chunking
+        # Priority: vision markdown > LLM-converted markdown > original pages
+        if vision_markdown:
+            # Best case: Use vision-extracted markdown for chunking
+            markdown_pages = [(1, markdown_text)]
+            self.logger.info("Using vision-extracted markdown for chunking")
+        elif enable_markdown_conversion and markdown_text != raw_text:
+            # Fallback case 1: Vision failed but LLM converted to markdown successfully
+            markdown_pages = [(1, markdown_text)]
+            self.logger.info("Using LLM-converted markdown for chunking (vision unavailable)")
+        else:
+            # Fallback case 2: No markdown available, use original pages
+            markdown_pages = page_texts
+            self.logger.info("Using original extracted text for chunking (no markdown conversion)")
+
         return {
             "raw_text": raw_text,
             "cleaned_text": cleaned_text,
@@ -191,14 +230,16 @@ class DocumentProcessingAgent(BaseAgent):
             "language": detected_language,
             "markdown_structure": markdown_structure,
             "quality_score": quality_score,
-            "original_pages": page_texts,
+            "original_pages": page_texts,  # Original OCR/text extraction
+            "markdown_pages": markdown_pages,  # NEW: Use this for chunking (structured markdown)
             "filename": filename
         }
 
     async def _extract_pdf_with_vision(
         self,
         file_bytes: bytes,
-        filename: str
+        filename: str,
+        custom_prompt: Optional[str] = None
     ) -> Tuple[str, List[Tuple[int, str]]]:
         """
         Extract text from PDF using vision model.
@@ -206,6 +247,7 @@ class DocumentProcessingAgent(BaseAgent):
         Args:
             file_bytes: PDF file bytes
             filename: Name of the file for logging
+            custom_prompt: Optional custom prompt for vision extraction
 
         Returns:
             Tuple of (combined_markdown, page_images)
@@ -232,8 +274,12 @@ class DocumentProcessingAgent(BaseAgent):
 
                 self.logger.info(f"Processing pages {page_numbers[0]}-{page_numbers[-1]} with vision model")
 
-                # Create prompt for vision model
-                prompt = f"""You are an expert document analyzer. Extract ALL text from {"this page" if len(batch) == 1 else "these pages"} and convert it to clean, well-structured markdown.
+                # Use custom prompt if provided, otherwise use default
+                if custom_prompt:
+                    prompt = custom_prompt
+                else:
+                    # Create default prompt for vision model
+                    prompt = f"""You are an expert document analyzer. Extract ALL text from {"this page" if len(batch) == 1 else "these pages"} and convert it to clean, well-structured markdown.
 
 Your task:
 1. Extract ALL text accurately, preserving the exact wording
@@ -308,6 +354,99 @@ CRITICAL RULES:
         except Exception as e:
             self.logger.error(f"Vision-based PDF extraction failed: {str(e)}")
             raise DocumentProcessorError(f"Vision extraction failed: {str(e)}")
+
+    async def _extract_image_with_vision(
+        self,
+        image_bytes: bytes,
+        filename: str,
+        custom_prompt: Optional[str] = None
+    ) -> str:
+        """
+        Extract text from a single image using vision model.
+
+        Args:
+            image_bytes: Image file bytes
+            filename: Name of the file for logging
+            custom_prompt: Optional custom prompt for vision extraction
+
+        Returns:
+            Markdown-formatted text extracted from the image
+        """
+        self.logger.info(f"Extracting image with vision model: {filename}")
+
+        try:
+            # Convert image bytes to base64 data URI
+            import base64
+            img_base64 = base64.b64encode(image_bytes).decode('utf-8')
+
+            # Detect image format from bytes
+            if image_bytes.startswith(b'\x89PNG'):
+                image_format = 'png'
+            elif image_bytes.startswith(b'\xff\xd8\xff'):
+                image_format = 'jpeg'
+            elif image_bytes.startswith(b'GIF'):
+                image_format = 'gif'
+            elif image_bytes.startswith(b'RIFF') and image_bytes[8:12] == b'WEBP':
+                image_format = 'webp'
+            else:
+                image_format = 'png'  # Default
+
+            data_uri = f"data:image/{image_format};base64,{img_base64}"
+
+            # Use custom prompt if provided, otherwise use default
+            if custom_prompt:
+                prompt = custom_prompt
+            else:
+                # Default prompt for image extraction
+                prompt = """You are an expert image analyzer. Extract ALL text from this image and convert it to clean, well-structured markdown.
+
+Your task:
+1. Extract ALL text accurately, preserving the exact wording
+2. Identify and format structural elements:
+   - Headers: Use #, ##, ### based on hierarchy
+   - Lists: Use - for bullets, 1. 2. 3. for numbered lists
+   - Tables: Use markdown table format with | pipes
+   - Code blocks: Use ``` for code snippets
+   - Emphasis: Use **bold** and *italic* appropriately
+3. Handle special content intelligently:
+   - For diagrams: Provide detailed descriptions in [Diagram: ...] format
+   - For charts/graphs: Describe data, trends, and axes in [Chart: ...] format
+   - For photos: Describe what is shown if relevant to content
+4. Preserve logical flow and relationships between text blocks
+5. Add horizontal rules (---) between major sections if appropriate
+
+CRITICAL RULES:
+- Do NOT omit any text
+- Do NOT add placeholder text if no visuals exist - simply skip
+- Do NOT add explanations beyond describing actual visual elements
+- Do NOT invent content
+- Output ONLY the markdown-formatted text
+
+Extract the content now:"""
+
+            # Call vision model with single image
+            markdown_text = await self.vision_service.generate_vision_response(
+                prompt=prompt,
+                images=[data_uri],
+                temperature=0.1,  # Low temp for accuracy
+                max_tokens=8000
+            )
+
+            # Log rate limit info
+            rate_limit_info = self.vision_service.get_rate_limit_info()
+            self.logger.info(
+                f"Vision model rate limits - "
+                f"Requests remaining: {rate_limit_info['requests_remaining']}/{rate_limit_info['requests_per_minute_limit']} per minute, "
+                f"{rate_limit_info['day_remaining']}/{rate_limit_info['requests_per_day_limit']} per day"
+            )
+
+            self.logger.info(f"Image vision extraction complete: {len(markdown_text)} characters")
+
+            return markdown_text
+
+        except Exception as e:
+            self.logger.error(f"Vision-based image extraction failed: {str(e)}")
+            raise DocumentProcessorError(f"Image vision extraction failed: {str(e)}")
 
     async def _detect_language(self, text: str) -> str:
         """Detect the language of the text."""

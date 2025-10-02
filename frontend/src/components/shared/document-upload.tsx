@@ -269,28 +269,39 @@ export function DocumentUpload({ open, onOpenChange, spaceId }: DocumentUploadPr
     const uploadUrl = async (uploadItem: UploadItem) => {
         if (!uploadItem.url) return;
 
-        // Check if this item is already uploading to prevent duplicates
-        const currentItem = uploadItems.find(item => item.id === uploadItem.id);
-        if (currentItem && (currentItem.status === "uploading" || currentItem.status === "completed")) {
-            console.log(`Skipping duplicate upload for URL ${uploadItem.name}`);
+        console.log(`uploadUrl called for ${uploadItem.name} (ID: ${uploadItem.id})`);
+
+        // Global duplicate prevention
+        if (uploadingIds.current.has(uploadItem.id)) {
+            console.log(`GLOBAL BLOCK: ${uploadItem.name} is already uploading`);
             return;
         }
 
-        console.log(`Starting upload for URL ${uploadItem.name}`);
-        setUploadItems((prev) =>
-            prev.map((f) =>
+        uploadingIds.current.add(uploadItem.id);
+        console.log(`Added ${uploadItem.id} to uploading set`);
+
+        // Check current state
+        setUploadItems((prev) => {
+            const currentItem = prev.find(item => item.id === uploadItem.id);
+            console.log(`Current status for ${uploadItem.name}: ${currentItem?.status}`);
+
+            console.log(`Setting ${uploadItem.name} to uploading status`);
+            return prev.map((f) =>
                 f.id === uploadItem.id
                     ? { ...f, status: "uploading", progress: 0 }
                     : f
-            )
-        );
+            );
+        });
 
         try {
+            console.log(`Making API call for ${uploadItem.name}`);
             const response = await uploadWebDocumentMutation.mutateAsync({
                 url: uploadItem.url,
                 space_id: spaceId,
             });
+            console.log(`API call completed for ${uploadItem.name}`);
 
+            console.log(`Setting ${uploadItem.name} to completed`);
             setUploadItems((prev) =>
                 prev.map((f) =>
                     f.id === uploadItem.id
@@ -299,9 +310,14 @@ export function DocumentUpload({ open, onOpenChange, spaceId }: DocumentUploadPr
                 )
             );
 
+            // Remove from uploading set
+            uploadingIds.current.delete(uploadItem.id);
+            console.log(`Removed ${uploadItem.id} from uploading set`);
+
             // Process next item in queue
             setTimeout(processQueue, 200);
         } catch (error) {
+            console.log(`Upload failed for ${uploadItem.name}:`, error);
             setUploadItems((prev) =>
                 prev.map((f) =>
                     f.id === uploadItem.id
@@ -313,6 +329,10 @@ export function DocumentUpload({ open, onOpenChange, spaceId }: DocumentUploadPr
                         : f
                 )
             );
+
+            // Remove from uploading set
+            uploadingIds.current.delete(uploadItem.id);
+            console.log(`Removed ${uploadItem.id} from uploading set (error)`);
 
             // Process next item in queue even if this one failed
             setTimeout(processQueue, 200);

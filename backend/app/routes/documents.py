@@ -88,7 +88,7 @@ def get_documents(
     "/documents/view/{doc_id}",
     tags=["documents"],
     summary="View a document",
-    description="Retrieve and view a document file by its ID.",
+    description="Retrieve and view a document file by its ID. For Word documents, returns the converted PDF.",
     response_description="The document file as a file response.",
     status_code=status.HTTP_200_OK,
     responses={
@@ -111,20 +111,44 @@ def view_document(
         if not document:
             logger.warning(f"Document {doc_id} not found or not owned by user {current_user_id}")
             raise NotFoundError("Document", str(doc_id))
-        
-        # Additional check: ensure web documents (no file_path) are handled properly
-        if not document.file_path:
-            logger.warning(f"Document {doc_id} is a web document without file content")
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Web documents cannot be downloaded")
 
-        # Get file content using file service
-        content, mime_type = file_service.get_file_content(document.file_path)
-        
-        return FileResponse(
-            path=document.file_path,
+        # Additional check: ensure web documents (no file_path) are handled properly
+        if not document.file_path or document.file_path.strip() == "":
+            logger.warning(f"Document {doc_id} is a web document without file content (path: '{document.file_path}')")
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Web document screenshot not available - fallback text extraction was used")
+
+        file_path = Path(document.file_path)
+
+        # Determine document type from folder structure
+        doc_type = file_path.parent.name if file_path.parent.name in ["pdf", "word", "image", "web", "other"] else "other"
+
+        # For Word documents, check if converted PDF exists and return that instead
+        if doc_type == "word":
+            converted_pdf_path = file_path.parent / f"{file_path.stem}_converted.pdf"
+            if converted_pdf_path.exists():
+                logger.debug(f"Returning converted PDF for Word document {doc_id}")
+                file_path = converted_pdf_path
+                mime_type = "application/pdf"
+            else:
+                # If conversion hasn't happened yet, return original
+                logger.warning(f"Converted PDF not found for Word document {doc_id}, returning original")
+                content, mime_type = file_service.get_file_content(str(file_path))
+        else:
+            # Get file content using file service
+            content, mime_type = file_service.get_file_content(str(file_path))
+
+        response = FileResponse(
+            path=str(file_path),
             media_type=mime_type,
-            filename=document.filename,
+            filename=document.filename if doc_type != "word" else Path(document.filename).stem + ".pdf",
         )
+
+        # Add custom header to indicate original document type
+        response.headers["X-Document-Type"] = doc_type
+        response.headers["X-Original-Filename"] = document.filename
+
+        return response
+
     except PermissionError as e:
         logger.warning(f"Permission denied for user {current_user_id} to view document {doc_id}")
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=e.message)
