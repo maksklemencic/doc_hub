@@ -12,9 +12,6 @@ import { MessageResponse } from '@/lib/api'
 import {
   Send,
   Sparkles,
-  Minimize2,
-  Maximize2,
-  X,
   Square,
   Edit3,
   Check,
@@ -40,6 +37,8 @@ interface SpaceChatProps {
   className?: string
   chatState?: ChatState
   onChatStateChange?: (state: ChatState) => void
+  initialMessage?: string
+  hideHeader?: boolean
 }
 
 // Transform backend MessageResponse to ChatMessage format
@@ -50,9 +49,11 @@ const transformMessage = (msg: MessageResponse, role: 'user' | 'assistant' = 'us
   timestamp: msg.created_at
 })
 
-export function SpaceChat({ spaceId, spaceName, className, chatState = 'visible', onChatStateChange }: SpaceChatProps) {
+export function SpaceChat({ spaceId, spaceName, className, chatState = 'visible', onChatStateChange, initialMessage, hideHeader = false }: SpaceChatProps) {
   const { user } = useAuth()
   const [inputValue, setInputValue] = useState('')
+  const initialMessageSentRef = useRef(false)
+  const processedInitialMessageRef = useRef<string | undefined>(undefined)
   const [messageContexts, setMessageContexts] = useState<Record<string, string>>({})
   const [editingMessageId, setEditingMessageId] = useState<string | null>(null)
   const [editValue, setEditValue] = useState('')
@@ -64,7 +65,7 @@ export function SpaceChat({ spaceId, spaceName, className, chatState = 'visible'
 
   // Transform backend messages to chat format
   const messages: ChatMessage[] = messagesData?.messages ?
-    messagesData.messages.flatMap(msg => {
+    messagesData.messages.flatMap((msg, index) => {
       const chatMessages: ChatMessage[] = []
 
       // Add user message (from content field)
@@ -72,7 +73,7 @@ export function SpaceChat({ spaceId, spaceName, className, chatState = 'visible'
 
       // Add assistant response if exists (from response field)
       if (msg.response) {
-        const responseId = `${msg.id}-response`
+        const responseId = `${msg.id}-response-${index}`
         chatMessages.push({
           id: responseId,
           content: msg.response,
@@ -110,6 +111,32 @@ export function SpaceChat({ spaceId, spaceName, className, chatState = 'visible'
   useEffect(() => {
     scrollToBottom()
   }, [messages])
+
+  // Send initial message if provided - using ref to prevent double sends
+  useEffect(() => {
+    // Only send if:
+    // 1. We have an initial message
+    // 2. We haven't sent this exact message before
+    // 3. We're not already sending a message
+    if (
+      initialMessage &&
+      !initialMessageSentRef.current &&
+      processedInitialMessageRef.current !== initialMessage &&
+      !createMessageMutation.isPending
+    ) {
+      initialMessageSentRef.current = true
+      processedInitialMessageRef.current = initialMessage
+
+      createMessageMutation.mutateAsync({
+        content: initialMessage,
+        use_context: true,
+        only_space_documents: true,
+        top_k: 5
+      }).catch((error) => {
+        initialMessageSentRef.current = false
+      })
+    }
+  }, [initialMessage, createMessageMutation])
 
   // Auto-focus input when typing
   useEffect(() => {
@@ -158,10 +185,7 @@ export function SpaceChat({ spaceId, spaceName, className, chatState = 'visible'
         only_space_documents: true,
         top_k: 5
       })
-
-      console.log('✅ Streaming message completed successfully!')
     } catch (error) {
-      console.error('Failed to send message:', error)
       // Error handling is done in the mutation
     }
   }
@@ -197,33 +221,18 @@ export function SpaceChat({ spaceId, spaceName, className, chatState = 'visible'
     if (!editValue.trim() || editValue === editingMessageId) return
 
     try {
-      console.log('💾 Saving edited message and re-generating response...')
-      console.log('🔍 Pre-edit mutation state:', {
-        isPending: createMessageMutation.isPending,
-        status: createMessageMutation.status
-      })
-
-      // Store current edit values in case of error
       const currentEditValue = editValue.trim()
 
-      // Cancel any current editing state before starting new stream
       setEditingMessageId(null)
       setEditValue('')
 
-      console.log('🚀 Starting edit-triggered stream...')
-
-      // Send the edited message to get a new AI response
       await createMessageMutation.mutateAsync({
         content: currentEditValue,
         use_context: true,
         only_space_documents: true,
         top_k: 5
       })
-
-      console.log('✅ Message edited and new response generated!')
     } catch (error) {
-      console.error('Failed to save edited message:', error)
-      // Re-open edit mode on error with original values
       setEditingMessageId(messageId)
       setEditValue(editValue)
     }
@@ -231,48 +240,17 @@ export function SpaceChat({ spaceId, spaceName, className, chatState = 'visible'
 
   return (
     <div className={cn("flex flex-col h-full bg-background", chatState !== 'fullscreen' && "border-l", className)}>
-      {/* Header */}
-      <div className="flex items-center gap-3 p-4 border-b bg-muted/20">
-        <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center">
-          <Sparkles className="w-4 h-4 text-primary" />
+      {/* Header - Simple and matching toolbar height */}
+      {!hideHeader && (
+        <div className="flex items-center gap-3 px-6 h-[52px] border-b border-border bg-background">
+          <div className="w-6 h-6 rounded-full bg-primary/10 flex items-center justify-center">
+            <Sparkles className="w-4 h-4 text-primary" />
+          </div>
+          <div className="flex-1">
+            <h3 className="text-sm font-semibold">AI Chat</h3>
+          </div>
         </div>
-        <div className="flex-1">
-          <h3 className="font-semibold">Space Assistant</h3>
-          <p className="text-xs text-muted-foreground">Ask about documents in {spaceName}</p>
-        </div>
-        
-        {/* Chat Controls */}
-        <div className="flex items-center gap-1">
-          {chatState === 'fullscreen' ? (
-            <Button 
-              variant="ghost" 
-              size="sm"
-              onClick={() => onChatStateChange?.('visible')}
-              className="h-8 w-8 p-0"
-            >
-              <Minimize2 className="h-4 w-4" />
-            </Button>
-          ) : (
-            <Button 
-              variant="ghost" 
-              size="sm"
-              onClick={() => onChatStateChange?.('fullscreen')}
-              className="h-8 w-8 p-0"
-            >
-              <Maximize2 className="h-4 w-4" />
-            </Button>
-          )}
-          
-          <Button 
-            variant="ghost" 
-            size="sm"
-            onClick={() => onChatStateChange?.('hidden')}
-            className="h-8 w-8 p-0"
-          >
-            <X className="h-4 w-4" />
-          </Button>
-        </div>
-      </div>
+      )}
 
       {/* Messages */}
       <div className="flex-1 overflow-hidden">
@@ -403,7 +381,6 @@ export function SpaceChat({ spaceId, spaceName, className, chatState = 'visible'
                     variant="outline"
                     size="sm"
                     onClick={() => {
-                      console.log('🛑 Stop button clicked!')
                       createMessageMutation.stopStreaming()
                     }}
                     className="h-8 px-3 text-xs"
@@ -428,7 +405,7 @@ export function SpaceChat({ spaceId, spaceName, className, chatState = 'visible'
             onChange={(e) => setInputValue(e.target.value)}
             onKeyPress={handleKeyPress}
             placeholder="Ask about documents in this space..."
-            className="flex-1"
+            className="flex-1 bg-white"
             disabled={isLoading}
           />
           <Button 

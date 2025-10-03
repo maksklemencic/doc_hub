@@ -13,7 +13,6 @@ export default function CallbackPage() {
   const hasProcessed = useRef(false)
 
   useEffect(() => {
-    // Prevent multiple processing
     if (hasProcessed.current) {
       return
     }
@@ -26,34 +25,17 @@ export default function CallbackPage() {
       const user_email = searchParams.get('user_email')
       const user_name = searchParams.get('user_name')
 
-      console.log('Callback parameters:', {
-        error,
-        access_token: access_token ? 'present' : 'missing',
-        expires_in,
-        user_id,
-        user_email,
-        user_name
-      })
-
       if (error) {
-        console.error('OAuth error:', error)
         router.push(ROUTES.LOGIN + '?error=oauth_failed')
         return
       }
 
       if (!access_token || !user_id || !user_email || !user_name) {
-        console.error('Missing authentication parameters', {
-          access_token: !!access_token,
-          user_id: !!user_id,
-          user_email: !!user_email,
-          user_name: !!user_name
-        })
         router.push(ROUTES.LOGIN + '?error=missing_params')
         return
       }
 
       try {
-        // Create auth response object
         const authData = {
           access_token,
           token_type: 'bearer',
@@ -61,18 +43,15 @@ export default function CallbackPage() {
           user: {
             id: user_id,
             email: user_email,
-            name: decodeURIComponent(user_name), // Decode URL-encoded name
+            name: decodeURIComponent(user_name),
             created_at: new Date().toISOString()
           }
         }
-        
-        // Store auth data in context
+
         login(authData)
-        
-        // Redirect to home page
+
         router.push(ROUTES.HOME)
       } catch (error) {
-        console.error('Authentication failed:', error)
         router.push(ROUTES.LOGIN + '?error=auth_failed')
       }
     }

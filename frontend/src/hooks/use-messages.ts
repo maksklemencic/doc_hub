@@ -54,11 +54,8 @@ export function useCreateMessage(spaceId: string) {
 
   const mutation = useMutation<void, Error, CreateMessageRequest, MutationContext>({
     mutationFn: async (data: CreateMessageRequest) => {
-      console.log('🚀 Starting streaming message:', { spaceId, data })
-
       // Stop any existing streaming operation first
       if (abortControllerRef.current) {
-        console.log('🛑 Stopping previous streaming operation...')
         abortControllerRef.current.abort()
         abortControllerRef.current = null
       }
@@ -71,15 +68,11 @@ export function useCreateMessage(spaceId: string) {
         const abortController = new AbortController()
         abortControllerRef.current = abortController
 
-        console.log('✅ New abort controller set:', !!abortControllerRef.current)
-
         messagesApi.createMessage(spaceId, data, (event: StreamingEvent) => {
-          console.log('📡 Received streaming event:', event)
 
           switch (event.type) {
             case 'message_start': {
               const startEvent = event as MessageStartEvent
-              console.log('🎬 Message started:', startEvent)
 
               // Replace the optimistic user message with the real one from backend
               // This message will hold both the user query AND the streaming AI response
@@ -102,7 +95,6 @@ export function useCreateMessage(spaceId: string) {
 
                 // Set the temp assistant ID to the real message ID for updates
                 tempAssistantId = startEvent.message_id
-                console.log('✨ Updated user message for streaming:', startEvent.message_id)
 
                 return {
                   ...old,
@@ -116,7 +108,6 @@ export function useCreateMessage(spaceId: string) {
             case 'chunk': {
               const chunkEvent = event as ChunkEvent
               streamingContent += chunkEvent.content
-              console.log('📝 Received chunk:', chunkEvent.content)
 
               // Update the message's response field in real-time
               if (tempAssistantId) {
@@ -138,7 +129,6 @@ export function useCreateMessage(spaceId: string) {
 
             case 'message_complete': {
               const completeEvent = event as MessageCompleteEvent
-              console.log('✅ Message completed:', completeEvent)
 
               // Final update with complete response
               if (tempAssistantId) {
@@ -157,8 +147,6 @@ export function useCreateMessage(spaceId: string) {
                     )
                   }
                 })
-
-                console.log('🎯 Final message update completed')
               }
 
               resolve()
@@ -167,11 +155,9 @@ export function useCreateMessage(spaceId: string) {
 
             case 'error': {
               const errorEvent = event as ErrorEvent & { partial_response?: string }
-              console.error('❌ Streaming error:', errorEvent.error)
 
               // If we have a partial response, save it before rejecting
               if (errorEvent.partial_response && tempAssistantId) {
-                console.log('💾 Saving partial response before error:', errorEvent.partial_response.length, 'characters')
                 queryClient.setQueryData<GetMessagesResponse>(messagesKeys.list(spaceId), (old) => {
                   if (!old) return old
 
@@ -195,11 +181,8 @@ export function useCreateMessage(spaceId: string) {
           }
         }, abortController).catch((error) => {
           if (error.message.includes('aborted')) {
-            console.log('🛑 Streaming was aborted by user')
-
             // Save partial response if we have any streaming content
             if (streamingContent && tempAssistantId) {
-              console.log('💾 Saving partial response after abort:', streamingContent.length, 'characters')
               queryClient.setQueryData<GetMessagesResponse>(messagesKeys.list(spaceId), (old) => {
                 if (!old) return old
 
@@ -228,8 +211,6 @@ export function useCreateMessage(spaceId: string) {
 
     // Optimistic update - only add user message (backend creates the real one)
     onMutate: async (newMessage) => {
-      console.log('⚡ Starting optimistic update for streaming:', newMessage.content)
-
       await queryClient.cancelQueries({ queryKey: messagesKeys.list(spaceId) })
 
       const previousMessages = queryClient.getQueryData<GetMessagesResponse>(messagesKeys.list(spaceId))
@@ -244,7 +225,6 @@ export function useCreateMessage(spaceId: string) {
       }
 
       // DON'T create assistant message yet - backend will tell us when to create it
-      console.log('💫 Created optimistic user message:', optimisticUserMessage)
 
       // Add only user message to cache
       queryClient.setQueryData<GetMessagesResponse>(messagesKeys.list(spaceId), (old) => {
@@ -253,7 +233,7 @@ export function useCreateMessage(spaceId: string) {
           pagination: { limit: 50, offset: 0, total_count: 1 }
         }
 
-        const updated = {
+        return {
           ...old,
           messages: [...old.messages, optimisticUserMessage],
           pagination: {
@@ -261,8 +241,6 @@ export function useCreateMessage(spaceId: string) {
             total_count: old.pagination.total_count + 1
           }
         }
-        console.log('✨ Updated cache with user message:', updated)
-        return updated
       })
 
       return { previousMessages, optimisticUserMessage, streamingAssistantMessage: null }
@@ -270,16 +248,12 @@ export function useCreateMessage(spaceId: string) {
 
     // On success, the streaming has completed successfully
     onSuccess: () => {
-      console.log('🎉 Streaming completed successfully!')
     },
 
     // If mutation fails, roll back
     onError: (err, variables, context) => {
-      console.log('❌ Streaming failed:', err)
-
       if (context?.previousMessages) {
         queryClient.setQueryData(messagesKeys.list(spaceId), context.previousMessages)
-        console.log('↩️  Restored previous messages')
       }
 
       toast.error('Failed to send message. Please try again.')
@@ -290,7 +264,6 @@ export function useCreateMessage(spaceId: string) {
       abortControllerRef.current = null
 
       if (error) {
-        console.log('🔄 Invalidating cache due to error...')
         queryClient.invalidateQueries({ queryKey: messagesKeys.list(spaceId) })
       }
     },
@@ -298,42 +271,25 @@ export function useCreateMessage(spaceId: string) {
 
   // Add stop streaming function
   const stopStreaming = () => {
-    console.log('🛑 Stopping streaming...')
-    console.log('🔍 Abort controller exists:', !!abortControllerRef.current)
-    console.log('🔍 Mutation is pending:', mutation.isPending)
-    console.log('🔍 Mutation status:', mutation.status)
-
     let stopped = false
 
     // Try both abort methods for reliability
     if (abortControllerRef.current) {
-      console.log('✅ Aborting via abort controller')
       try {
         abortControllerRef.current.abort()
         abortControllerRef.current = null
         stopped = true
-        console.log('✅ Abort controller successfully triggered')
       } catch (error) {
-        console.error('❌ Error aborting controller:', error)
       }
     }
 
     // Also use React Query's built-in reset method as backup
     if (mutation.isPending) {
-      console.log('✅ Resetting mutation via React Query')
       try {
         mutation.reset()
         stopped = true
-        console.log('✅ Mutation successfully reset')
       } catch (error) {
-        console.error('❌ Error resetting mutation:', error)
       }
-    }
-
-    if (!stopped) {
-      console.log('❌ No active stream found to stop or both methods failed')
-    } else {
-      console.log('🎯 Stream stopping initiated successfully')
     }
   }
 

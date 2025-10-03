@@ -30,13 +30,10 @@ export default function Home() {
     )
   }
 
-  // Show authenticated dashboard
   if (isAuthenticated && user) {
     return (
       <div className="p-2 h-full bg-background">
-        {/* border-1 rounded-lg */}
         <div className="bg-white h-full py-2 px-6 space-y-6">
-          {/* Header */}
           <div className="space-y-2">
             <h1 className="text-3xl font-bold tracking-tight">
               Welcome back, {user.name?.split(' ')[0] || 'User'}!

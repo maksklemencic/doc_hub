@@ -87,66 +87,21 @@ export function AuthProvider({ children }: AuthProviderProps) {
   const [state, dispatch] = useReducer(authReducer, initialState)
   const router = useRouter()
 
-  // Hydrate auth state from localStorage on client-side
   useEffect(() => {
     if (typeof window !== 'undefined') {
-      // Check if we're in development mode with auth bypass
-      const devModeBypass = process.env.NEXT_PUBLIC_DEV_MODE_BYPASS_AUTH === 'true'
-      
-      if (devModeBypass) {
-        // Auto-login with mock user in development mode
-        const mockUser: User = {
-          id: 'dev-user-123',
-          email: 'maks.klemencic6@gmail.com',
-          name: 'Maks Klemenčič',
-          picture: undefined,
-          created_at: '2024-01-01T00:00:00.000Z' // Fixed date to avoid hydration mismatch
-        }
-        
-        const mockAuthResponse: AuthTokenResponse = {
-          access_token: 'dev-mock-token',
-          token_type: 'Bearer',
-          expires_in: 86400, // 24 hours
-          user: mockUser
-        }
-        
-        console.log('🔧 DEV MODE: Mock JWT Token for API testing:', mockAuthResponse.access_token)
-        console.log('📋 Copy this token for Swagger docs:', `Bearer ${mockAuthResponse.access_token}`)
-
-        // Set mock data in localStorage
-        localStorage.setItem(STORAGE_KEYS.ACCESS_TOKEN, mockAuthResponse.access_token)
-        localStorage.setItem(STORAGE_KEYS.USER, JSON.stringify(mockAuthResponse.user))
-
-        // Set mock cookie
-        document.cookie = `access_token=${mockAuthResponse.access_token}; path=/; max-age=${mockAuthResponse.expires_in}; SameSite=Lax`
-
-        dispatch({ type: 'LOGIN_SUCCESS', payload: mockAuthResponse })
-        return
-      }
-      
-      // Normal flow - check localStorage
       const token = localStorage.getItem(STORAGE_KEYS.ACCESS_TOKEN)
       const userData = localStorage.getItem(STORAGE_KEYS.USER)
       const user = userData ? JSON.parse(userData) : null
-
-      if (token) {
-        console.log('🔑 Current JWT Token for API testing:', token)
-        console.log('📋 Copy this token for Swagger docs:', `Bearer ${token}`)
-      }
 
       dispatch({ type: 'HYDRATE', payload: { user, token } })
     }
   }, [])
 
   const login = (authResponse: AuthTokenResponse) => {
-    console.log('🔑 JWT Token for API testing:', authResponse.access_token)
-    console.log('📋 Copy this token for Swagger docs:', `Bearer ${authResponse.access_token}`)
-
     if (typeof window !== 'undefined') {
       localStorage.setItem(STORAGE_KEYS.ACCESS_TOKEN, authResponse.access_token)
       localStorage.setItem(STORAGE_KEYS.USER, JSON.stringify(authResponse.user))
 
-      // Also set cookie for middleware
       document.cookie = `access_token=${authResponse.access_token}; path=/; max-age=${authResponse.expires_in}; SameSite=Lax`
     }
     dispatch({ type: 'LOGIN_SUCCESS', payload: authResponse })
@@ -157,16 +112,13 @@ export function AuthProvider({ children }: AuthProviderProps) {
       localStorage.removeItem(STORAGE_KEYS.ACCESS_TOKEN)
       localStorage.removeItem(STORAGE_KEYS.USER)
 
-      // Remove cookie
       document.cookie = 'access_token=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT'
 
-      // Set a flag to show toast after redirect
       sessionStorage.setItem('show_logout_toast', 'true')
     }
 
     dispatch({ type: 'LOGOUT' })
 
-    // Redirect to login page
     router.push('/login')
   }
 
