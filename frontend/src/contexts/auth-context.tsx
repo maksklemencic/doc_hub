@@ -4,7 +4,7 @@ import { createContext, useContext, useReducer, useEffect, ReactNode } from 'rea
 import toast from 'react-hot-toast'
 import { useRouter } from 'next/navigation'
 import { User, AuthTokenResponse } from '@/types'
-import { STORAGE_KEYS } from '@/constants'
+import { STORAGE_KEYS, ROUTES } from '@/constants'
 
 interface AuthState {
   user: User | null
@@ -119,7 +119,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
 
     dispatch({ type: 'LOGOUT' })
 
-    router.push('/login')
+    router.push(ROUTES.LANDING)
   }
 
   const setUser = (user: User) => {

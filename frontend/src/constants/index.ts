@@ -7,7 +7,7 @@ export const STORAGE_KEYS = {
 
 // Routes
 export const ROUTES = {
-  HOME: '/',
-  LOGIN: '/login',
+  LANDING: '/',
   AUTH_CALLBACK: '/auth/callback',
+  SPACES: (spaceId?: string) => spaceId ? `/spaces/${spaceId}` : '/spaces',
 } as const

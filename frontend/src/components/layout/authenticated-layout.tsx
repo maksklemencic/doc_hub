@@ -3,19 +3,30 @@
 import { useAuth } from '@/hooks/use-auth'
 import { Sidebar } from '@/components/shared/sidebar'
 import { Spinner } from '@/components/ui/spinner'
-import { usePathname } from 'next/navigation'
+import { usePathname, useRouter } from 'next/navigation'
+import { useEffect } from 'react'
+import { ROUTES } from '@/constants'
 
 interface AuthenticatedLayoutProps {
   children: React.ReactNode
 }
 
-const NO_SIDEBAR_PAGES = ['/login', '/auth/callback']
+const PUBLIC_PAGES = ['/auth/callback', '/']
 
 export function AuthenticatedLayout({ children }: AuthenticatedLayoutProps) {
   const { isAuthenticated, isLoading } = useAuth()
   const pathname = usePathname()
+  const router = useRouter()
 
-  const shouldShowSidebar = !NO_SIDEBAR_PAGES.includes(pathname)
+  const isPublicPage = PUBLIC_PAGES.includes(pathname)
+  const shouldShowSidebar = isAuthenticated && !isPublicPage
+
+  // Redirect unauthenticated users to landing page for protected routes
+  useEffect(() => {
+    if (!isLoading && !isAuthenticated && !isPublicPage) {
+      router.push(ROUTES.LANDING)
+    }
+  }, [isAuthenticated, isLoading, isPublicPage, router])
 
   if (shouldShowSidebar) {
     return (
@@ -47,5 +58,15 @@ export function AuthenticatedLayout({ children }: AuthenticatedLayoutProps) {
     )
   }
 
-  return <>{children}</>
+  // For public pages (landing, auth callback), render without sidebar
+  if (isPublicPage) {
+    return <>{children}</>
+  }
+
+  // For protected pages when not authenticated, show loading while redirecting
+  return (
+    <div className="flex items-center justify-center h-screen">
+      <Spinner size="lg" />
+    </div>
+  )
 }

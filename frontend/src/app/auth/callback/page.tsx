@@ -1,23 +1,25 @@
 'use client'
 
-import { useEffect, useRef } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { useAuth } from '@/hooks/use-auth'
 import { Spinner } from '@/components/ui/spinner'
 import { ROUTES } from '@/constants'
+import { spacesApi } from '@/lib/api'
 
 export default function CallbackPage() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const { login } = useAuth()
   const hasProcessed = useRef(false)
+  const [isRedirecting, setIsRedirecting] = useState(false)
 
   useEffect(() => {
     if (hasProcessed.current) {
       return
     }
     hasProcessed.current = true
-    const handleCallback = () => {
+    const handleCallback = async () => {
       const error = searchParams.get('error')
       const access_token = searchParams.get('access_token')
       const expires_in = searchParams.get('expires_in')
@@ -26,12 +28,12 @@ export default function CallbackPage() {
       const user_name = searchParams.get('user_name')
 
       if (error) {
-        router.push(ROUTES.LOGIN + '?error=oauth_failed')
+        router.push(ROUTES.LANDING + '?error=oauth_failed')
         return
       }
 
       if (!access_token || !user_id || !user_email || !user_name) {
-        router.push(ROUTES.LOGIN + '?error=missing_params')
+        router.push(ROUTES.LANDING + '?error=missing_params')
         return
       }
 
@@ -50,9 +52,23 @@ export default function CallbackPage() {
 
         login(authData)
 
-        router.push(ROUTES.HOME)
+        setIsRedirecting(true)
+
+        // Try to get user's first space and redirect there
+        try {
+          const spacesData = await spacesApi.getSpaces(1, 0)
+          if (spacesData.spaces && spacesData.spaces.length > 0) {
+            router.push(ROUTES.SPACES(spacesData.spaces[0].id))
+          } else {
+            // No spaces yet, stay on landing or redirect to a "create first space" page
+            router.push(ROUTES.LANDING)
+          }
+        } catch (err) {
+          // If fetching spaces fails, just go to landing
+          router.push(ROUTES.LANDING)
+        }
       } catch (error) {
-        router.push(ROUTES.LOGIN + '?error=auth_failed')
+        router.push(ROUTES.LANDING + '?error=auth_failed')
       }
     }
 
