@@ -15,13 +15,24 @@ import { Progress } from "@/components/ui/progress";
 import { Spinner } from "@/components/ui/spinner";
 import { Cloud, Upload, X, FileText, Trash2, Check, Link, AlertCircle } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { useUploadFile, useUploadWebDocument } from "@/hooks/use-upload";
+import { useUploadFile, useUploadWebDocument, useUploadYouTubeVideo } from "@/hooks/use-upload";
 import { useDeleteDocument } from "@/hooks/use-documents";
 import { useSpaceDocuments } from "@/hooks/use-documents";
 
+// YouTube URL detection utility
+const isYouTubeUrl = (url: string): boolean => {
+    const youtubePatterns = [
+        /(?:https?:\/\/)?(?:www\.)?youtu\.be\//,
+        /(?:https?:\/\/)?(?:www\.)?youtube\.com\/watch/,
+        /(?:https?:\/\/)?(?:www\.)?youtube\.com\/embed\//,
+        /(?:https?:\/\/)?(?:m\.)?youtube\.com\/watch/
+    ];
+    return youtubePatterns.some(pattern => pattern.test(url));
+};
+
 interface UploadItem {
     id: string;
-    type: "file" | "url";
+    type: "file" | "url" | "youtube";
     file?: File;
     url?: string;
     name: string;
@@ -47,6 +58,7 @@ export function DocumentUpload({ open, onOpenChange, spaceId }: DocumentUploadPr
 
     const uploadFileMutation = useUploadFile();
     const uploadWebDocumentMutation = useUploadWebDocument();
+    const uploadYouTubeVideoMutation = useUploadYouTubeVideo();
     const deleteDocumentMutation = useDeleteDocument();
 
     // Queue processing function
@@ -225,11 +237,14 @@ export function DocumentUpload({ open, onOpenChange, spaceId }: DocumentUploadPr
     const handleUrlUpload = async () => {
         if (!urlInput.trim()) return;
 
+        const trimmedUrl = urlInput.trim();
+        const isYouTube = isYouTubeUrl(trimmedUrl);
+
         const urlItem: UploadItem = {
             id: Date.now().toString(),
-            type: "url",
-            url: urlInput.trim(),
-            name: urlInput.trim(),
+            type: isYouTube ? "youtube" : "url",
+            url: trimmedUrl,
+            name: trimmedUrl,
             status: "waiting",
             progress: 0,
         };
@@ -258,10 +273,23 @@ export function DocumentUpload({ open, onOpenChange, spaceId }: DocumentUploadPr
         );
 
         try {
-            const response = await uploadWebDocumentMutation.mutateAsync({
-                url: uploadItem.url,
-                space_id: spaceId,
-            });
+            let response;
+
+            if (uploadItem.type === "youtube") {
+                // YouTube upload
+                response = await uploadYouTubeVideoMutation.mutateAsync({
+                    url: uploadItem.url,
+                    space_id: spaceId,
+                    segment_duration: 60,
+                    languages: ['en'],
+                });
+            } else {
+                // Regular web document upload
+                response = await uploadWebDocumentMutation.mutateAsync({
+                    url: uploadItem.url,
+                    space_id: spaceId,
+                });
+            }
 
             setUploadItems((prev) =>
                 prev.map((f) =>
@@ -300,6 +328,14 @@ export function DocumentUpload({ open, onOpenChange, spaceId }: DocumentUploadPr
     };
 
     const getUploadIcon = (uploadItem: UploadItem) => {
+        if (uploadItem.type === "youtube") {
+            return (
+                <div className="w-8 h-8 bg-red-100 rounded flex items-center justify-center">
+                    <span className="text-red-600 text-xs font-semibold">YT</span>
+                </div>
+            );
+        }
+
         if (uploadItem.type === "url") {
             return (
                 <div className="w-8 h-8 bg-indigo-100 rounded flex items-center justify-center">
@@ -435,6 +471,12 @@ export function DocumentUpload({ open, onOpenChange, spaceId }: DocumentUploadPr
                                                     <span>•</span>
                                                 </>
                                             )}
+                                            {uploadItem.type === "youtube" && (
+                                                <>
+                                                    <span>YouTube Video</span>
+                                                    <span>•</span>
+                                                </>
+                                            )}
                                             {uploadItem.status === "pending" && (
                                                 <span>Pending...</span>
                                             )}
@@ -482,8 +524,8 @@ export function DocumentUpload({ open, onOpenChange, spaceId }: DocumentUploadPr
                     <div>
                         <div className="flex items-center justify-between mb-3">
                             <div className="flex items-center gap-2">
-                                <h3 className="text-sm font-medium">Import from URL Link</h3>
-                                <div className="w-4 h-4 bg-gray-200 rounded-full flex items-center justify-center">
+                                <h3 className="text-sm font-medium">Import from Web or YouTube</h3>
+                                <div className="w-4 h-4 bg-gray-200 rounded-full flex items-center justify-center" title="Paste any web URL or YouTube video link">
                                     <span className="text-xs text-gray-500">?</span>
                                 </div>
                             </div>
@@ -499,7 +541,7 @@ export function DocumentUpload({ open, onOpenChange, spaceId }: DocumentUploadPr
                         <div className="relative">
                             <Link className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-muted-foreground" />
                             <Input
-                                placeholder="Paste file URL"
+                                placeholder="Paste web or YouTube URL"
                                 value={urlInput}
                                 onChange={(e) => setUrlInput(e.target.value)}
                                 onKeyDown={handleKeyDown}

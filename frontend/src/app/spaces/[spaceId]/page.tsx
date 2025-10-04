@@ -73,7 +73,7 @@ import Image from 'next/image'
 pdfjs.GlobalWorkerOptions.workerSrc = `//unpkg.com/pdfjs-dist@${pdfjs.version}/build/pdf.worker.min.mjs`
 
 // Document Viewer Component for Right Pane
-function DocumentViewer({ documentId, filename }: { documentId: string; filename: string }) {
+function DocumentViewer({ documentId, filename, mimeType }: { documentId: string; filename: string; mimeType?: string }) {
   const [pdfUrl, setPdfUrl] = useState<string | null>(null)
   const [docType, setDocType] = useState<string>('pdf')
   const [isLoading, setIsLoading] = useState(true)
@@ -116,6 +116,18 @@ function DocumentViewer({ documentId, filename }: { documentId: string; filename
       setIsLoading(true)
       setError(null)
 
+      // Check if document type is supported for preview
+      const unsupportedTypes = ['text/youtube', 'audio/', 'video/', 'html']
+      const isUnsupported = unsupportedTypes.some(type => mimeType?.includes(type))
+
+      if (isUnsupported) {
+        if (mounted) {
+          setIsLoading(false)
+          setDocType('unsupported')
+        }
+        return
+      }
+
       try {
         const result = await documentsApi.getDocumentFile(documentId)
         currentUrl = result.url
@@ -126,7 +138,7 @@ function DocumentViewer({ documentId, filename }: { documentId: string; filename
         } else {
           URL.revokeObjectURL(result.url)
         }
-      } catch (err) {
+      } catch (err: any) {
         console.error('Failed to load document:', err)
         if (mounted) {
           setError('Failed to load document')
@@ -146,7 +158,7 @@ function DocumentViewer({ documentId, filename }: { documentId: string; filename
         URL.revokeObjectURL(currentUrl)
       }
     }
-  }, [documentId])
+  }, [documentId, mimeType])
 
   const onDocumentLoadSuccess = ({ numPages }: { numPages: number }) => {
     setNumPages(numPages)
@@ -168,6 +180,20 @@ function DocumentViewer({ documentId, filename }: { documentId: string; filename
           <FileText className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
           <h3 className="text-lg font-medium mb-2">Failed to load document</h3>
           <p className="text-muted-foreground">{error}</p>
+        </div>
+      </div>
+    )
+  }
+
+  if (docType === 'unsupported') {
+    return (
+      <div className="h-full flex items-center justify-center">
+        <div className="text-center">
+          <FileText className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
+          <h3 className="text-lg font-medium mb-2">Preview not supported</h3>
+          <p className="text-muted-foreground">
+            This document type cannot be previewed in the browser.
+          </p>
         </div>
       </div>
     )
@@ -242,7 +268,7 @@ function DocumentViewer({ documentId, filename }: { documentId: string; filename
 
       <ScrollArea className="h-full">
         <div className="p-6 flex flex-col items-center" ref={scrollAreaRef}>
-          {docType === 'image' || docType === 'web' ? (
+          {docType === 'image' || docType === 'web' || mimeType?.startsWith('image/') ? (
             <div className="w-full flex flex-col items-center justify-center">
               <div className="relative w-full max-w-4xl">
                 <Image
@@ -299,6 +325,7 @@ enum DocumentType {
   audio = 'audio',
   video = 'video',
   web = 'web',
+  youtube = 'youtube',
   other = 'other'
 }
 type ViewMode = 'list' | 'grid'
@@ -312,6 +339,7 @@ const getDocumentType = (mimeType: string): DocumentType => {
   if (mimeType.startsWith('image/')) return DocumentType.image
   if (mimeType.startsWith('audio/')) return DocumentType.audio
   if (mimeType.startsWith('video/')) return DocumentType.video
+  if (mimeType.includes('youtube')) return DocumentType.youtube
   if (mimeType.includes('html')) return DocumentType.web
   return DocumentType.other
 }
@@ -337,6 +365,7 @@ export default function SpacePage() {
   const [documentToDelete, setDocumentToDelete] = useState<string | null>(null)
   const [isDeleting, setIsDeleting] = useState(false)
   const [selectedTypes, setSelectedTypes] = useState<Set<DocumentType>>(new Set())
+  const [typeFilterSearch, setTypeFilterSearch] = useState('')
   const [sortBy, setSortBy] = useState<SortBy>('date')
   const [sortOrder, setSortOrder] = useState<SortOrder>('desc') // newest first by default
 
@@ -958,25 +987,40 @@ export default function SpacePage() {
                       Filter by Type
                     </DropdownMenuLabel>
                     <DropdownMenuSeparator className="my-2" />
-                    <div className="space-y-1">
-                      {Object.values(DocumentType).map((type) => {
-                        const typeColor = getFileTypeColor(type as DocumentType)
-                        const isSelected = selectedTypes.has(type as DocumentType)
-                        return (
-                          <div
-                            key={type}
-                            onClick={() => handleTypeFilter(type as DocumentType)}
-                            className="cursor-pointer px-2 py-2 rounded-md hover:bg-teal-50 transition-colors duration-150 flex items-center justify-between"
-                          >
-                            <Badge variant="secondary" className={cn("text-xs px-2 py-0.5", typeColor)}>
-                              {type.toUpperCase()}
-                            </Badge>
-                            {isSelected && (
-                              <Check className="h-4 w-4 text-teal-600" />
-                            )}
-                          </div>
+
+                    {/* Search Input */}
+                    <div className="px-2 pb-2">
+                      <Input
+                        placeholder="Search types..."
+                        value={typeFilterSearch}
+                        onChange={(e) => setTypeFilterSearch(e.target.value)}
+                        className="h-8 text-sm"
+                      />
+                    </div>
+
+                    <div className="space-y-1 max-h-64 overflow-y-auto">
+                      {Object.values(DocumentType)
+                        .filter((type) =>
+                          type.toLowerCase().includes(typeFilterSearch.toLowerCase())
                         )
-                      })}
+                        .map((type) => {
+                          const typeColor = getFileTypeColor(type as DocumentType)
+                          const isSelected = selectedTypes.has(type as DocumentType)
+                          return (
+                            <div
+                              key={type}
+                              onClick={() => handleTypeFilter(type as DocumentType)}
+                              className="cursor-pointer px-2 py-2 rounded-md hover:bg-teal-50 transition-colors duration-150 flex items-center justify-between"
+                            >
+                              <Badge variant="secondary" className={cn("text-xs px-2 py-0.5", typeColor)}>
+                                {type.toUpperCase()}
+                              </Badge>
+                              {isSelected && (
+                                <Check className="h-4 w-4 text-teal-600" />
+                              )}
+                            </div>
+                          )
+                        })}
                     </div>
                     {selectedTypes.size > 0 && (
                       <>
@@ -1121,6 +1165,7 @@ export default function SpacePage() {
                         size={formatFileSize(getFileSize(document), docType)}
                         timestamp={formatDate(document.created_at)}
                         pageCount={getPageCount(document, docType)}
+                        url={document.url}
                         isSelected={selectedDocuments.has(document.id)}
                         onSelect={() => handleSelectDocument(document.id)}
                         onClick={() => handleDocumentClick(document.id)}
@@ -1214,7 +1259,7 @@ export default function SpacePage() {
     // Document preview tab
     const document = documents.find(d => d.id === activeTab.id)
     if (document) {
-      return <DocumentViewer documentId={document.id} filename={document.filename} />
+      return <DocumentViewer documentId={document.id} filename={document.filename} mimeType={document.mime_type} />
     }
 
     return documentsContent
@@ -1240,7 +1285,7 @@ export default function SpacePage() {
     // Document preview in right pane
     const document = documents.find(d => d.id === activeTab.id)
     if (document) {
-      return <DocumentViewer documentId={document.id} filename={document.filename} />
+      return <DocumentViewer documentId={document.id} filename={document.filename} mimeType={document.mime_type} />
     }
 
     return (

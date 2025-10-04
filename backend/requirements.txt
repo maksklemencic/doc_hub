@@ -34,3 +34,5 @@ markdown
 python-markdown
 redis
 asyncio-throttle
+youtube-transcript-api
+yt-dlp

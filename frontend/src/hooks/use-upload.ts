@@ -1,7 +1,7 @@
 'use client'
 
 import { useMutation, useQueryClient } from '@tanstack/react-query'
-import { uploadApi, ApiError, UploadResponse, WebDocumentUploadRequest } from '@/lib/api'
+import { uploadApi, ApiError, UploadResponse, WebDocumentUploadRequest, YouTubeUploadRequest } from '@/lib/api'
 import toast from 'react-hot-toast'
 import { documentsKeys } from './use-documents'
 
@@ -57,6 +57,34 @@ export function useUploadWebDocument() {
     onError: (error, variables) => {
       console.error('Web upload error:', error)
       toast.error(`Failed to import from URL: ${error.message}`)
+    },
+  })
+}
+
+export function useUploadYouTubeVideo() {
+  const queryClient = useQueryClient()
+
+  return useMutation<UploadResponse, ApiError, YouTubeUploadRequest>({
+    mutationFn: (request) => uploadApi.uploadYouTubeVideo(request),
+    onSuccess: (data, variables) => {
+      toast.success(`Successfully imported transcript from YouTube video`)
+
+      // Invalidate space documents query to refresh the list
+      queryClient.invalidateQueries({
+        queryKey: documentsKeys.space(variables.space_id)
+      })
+
+      // Also invalidate spaces query and document counts to update sidebar
+      queryClient.invalidateQueries({
+        queryKey: ['spaces']
+      })
+      queryClient.invalidateQueries({
+        queryKey: ['space-document-counts']
+      })
+    },
+    onError: (error, variables) => {
+      console.error('YouTube upload error:', error)
+      toast.error(`Failed to import YouTube video: ${error.message}`)
     },
   })
 }

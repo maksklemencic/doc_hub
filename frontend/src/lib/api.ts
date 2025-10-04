@@ -59,6 +59,13 @@ export interface WebDocumentUploadRequest {
   space_id: string
 }
 
+export interface YouTubeUploadRequest {
+  url: string
+  space_id: string
+  segment_duration?: number
+  languages?: string[]
+}
+
 // Messages API types
 export interface MessageResponse {
   id: string
@@ -376,6 +383,14 @@ export const uploadApi = {
   // Upload web document from URL
   uploadWebDocument: async (request: WebDocumentUploadRequest): Promise<UploadResponse> => {
     return apiRequest<UploadResponse>('/upload/web', {
+      method: 'POST',
+      body: JSON.stringify(request),
+    })
+  },
+
+  // Upload YouTube video transcript
+  uploadYouTubeVideo: async (request: YouTubeUploadRequest): Promise<UploadResponse> => {
+    return apiRequest<UploadResponse>('/upload/youtube', {
       method: 'POST',
       body: JSON.stringify(request),
     })

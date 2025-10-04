@@ -1,5 +1,5 @@
 import { ReactNode } from 'react'
-import { FileText, Image as ImageIcon, Volume2, FileVideo, Globe } from 'lucide-react'
+import { FileText, Image as ImageIcon, Volume2, FileVideo, Globe, Youtube } from 'lucide-react'
 
 export enum DocumentType {
   word = 'word',
@@ -8,6 +8,7 @@ export enum DocumentType {
   audio = 'audio',
   video = 'video',
   web = 'web',
+  youtube = 'youtube',
   other = 'other'
 }
 
@@ -17,6 +18,7 @@ export function getDocumentType(mimeType: string): DocumentType {
   if (mimeType.startsWith('image/')) return DocumentType.image
   if (mimeType.startsWith('audio/')) return DocumentType.audio
   if (mimeType.startsWith('video/')) return DocumentType.video
+  if (mimeType.includes('youtube')) return DocumentType.youtube
   if (mimeType.includes('html')) return DocumentType.web
   return DocumentType.other
 }
@@ -37,6 +39,8 @@ export function getTypeIcon(type: DocumentType, size: 'sm' | 'md' = 'sm'): React
       return <FileVideo className={`${className} text-purple-600`} />
     case DocumentType.web:
       return <Globe className={`${className} text-indigo-600`} />
+    case DocumentType.youtube:
+      return <Youtube className={`${className} text-red-600`} />
     default:
       return <FileText className={`${className} text-gray-600`} />
   }
@@ -59,9 +63,36 @@ export function getTypeName(type: DocumentType): string {
     case DocumentType.video:
       return 'Video'
     case DocumentType.web:
-      return 'web'
+      return 'Web'
+    case DocumentType.youtube:
+      return 'YouTube'
     default:
       return 'Other'
+  }
+}
+
+export function getTypeBadge(type: DocumentType) {
+  switch (type) {
+    case DocumentType.pdf:
+      return { text: 'PDF', className: 'bg-amber-100 text-amber-700 border-amber-200' }
+    case DocumentType.word:
+      return { text: 'WORD', className: 'bg-blue-100 text-blue-700 border-blue-200' }
+    case DocumentType.video:
+      return { text: 'Video', className: 'bg-purple-100 text-purple-700 border-purple-200' }
+    case DocumentType.audio:
+      return { text: 'Audio', className: 'bg-blue-100 text-blue-700 border-blue-200' }
+    case DocumentType.aiNote:
+      return { text: 'AI Note', className: 'bg-teal-100 text-teal-700 border-teal-200' }
+    case DocumentType.note:
+      return { text: 'Note', className: 'bg-purple-100 text-purple-700 border-purple-200' }
+    case DocumentType.image:
+      return { text: 'Image', className: 'bg-green-100 text-green-700 border-green-200' }
+    case DocumentType.web:
+      return { text: 'Web', className: 'bg-indigo-100 text-indigo-700 border-indigo-200' }
+    case DocumentType.youtube:
+      return { text: 'YouTube', className: 'bg-red-100 text-red-700 border-red-200' }
+    default:
+      return { text: 'Other', className: 'bg-gray-100 text-gray-700 border-gray-200' }
   }
 }
 
@@ -79,13 +110,15 @@ export function getFileTypeColor(type: DocumentType): string {
       return 'bg-purple-100 text-purple-800'
     case DocumentType.web:
       return 'bg-indigo-100 text-indigo-800'
+    case DocumentType.youtube:
+      return 'bg-red-100 text-red-700'
     default:
       return 'bg-gray-100 text-gray-800'
   }
 }
 
 export function formatFileSize(bytes: number | null | undefined, docType?: DocumentType): string {
-  if (docType === DocumentType.web) return 'Link'
+  if (docType === DocumentType.web || docType === DocumentType.youtube) return 'Link'
 
   if (bytes === null || bytes === undefined) return 'Unknown'
 

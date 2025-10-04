@@ -1,7 +1,7 @@
 import base64
 import re
 import uuid
-from typing import Optional
+from typing import Optional, List
 
 from pydantic import BaseModel, Field, field_validator
 
@@ -61,6 +61,35 @@ class WebDocumentUploadRequest(BaseModel):
         if not url_pattern.match(v):
             raise ValueError('Invalid URL format')
         return v
+
+class YouTubeUploadRequest(BaseModel):
+    url: str = Field(..., min_length=1, description="YouTube video URL")
+    space_id: uuid.UUID = Field(..., description="ID of the space to upload the video to")
+    segment_duration: int = Field(
+        60,
+        ge=30,
+        le=300,
+        description="Duration of each transcript section in seconds (30-300)"
+    )
+    languages: Optional[List[str]] = Field(
+        None,
+        description="Preferred transcript languages (e.g., ['en', 'es']). Defaults to ['en']"
+    )
+
+    @field_validator('url')
+    @classmethod
+    def validate_youtube_url(cls, v):
+        # Basic YouTube URL validation
+        youtube_patterns = [
+            r'(?:https?://)?(?:www\.)?youtu\.be/',
+            r'(?:https?://)?(?:www\.)?youtube\.com/watch',
+            r'(?:https?://)?(?:www\.)?youtube\.com/embed/',
+            r'(?:https?://)?(?:m\.)?youtube\.com/watch'
+        ]
+        if not any(re.search(pattern, v) for pattern in youtube_patterns):
+            raise ValueError('Invalid YouTube URL format')
+        return v
+
 
 class UploadResponse(BaseModel):
     status: str = Field("success", description="Upload status")

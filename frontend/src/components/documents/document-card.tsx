@@ -16,7 +16,8 @@ import {
   Share2,
   Trash2,
   ExternalLink,
-  PanelRightOpen
+  PanelRightOpen,
+  Youtube
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import {
@@ -34,6 +35,7 @@ export enum DocumentType {
   audio = 'audio',
   video = 'video',
   web = 'web',
+  youtube = 'youtube',
   note = 'note',
   aiNote = 'aiNote',
   other = 'other'
@@ -46,6 +48,7 @@ interface DocumentCardProps {
   size?: string
   timestamp?: string
   pageCount?: string
+  url?: string
   isSelected: boolean
   onSelect: () => void
   onClick: () => void
@@ -73,6 +76,8 @@ const getDocumentIcon = (type: DocumentType) => {
       return <ImageIcon className="w-6 h-6 text-gray-600" />
     case DocumentType.web:
       return <Globe className="w-6 h-6 text-gray-600" />
+    case DocumentType.youtube:
+      return <Youtube className="w-6 h-6 text-red-600" />
     default:
       return <FileText className="w-6 h-6 text-gray-600" />
   }
@@ -97,6 +102,8 @@ const getTypeBadge = (type: DocumentType) => {
       return { text: 'Image', className: 'bg-green-100 text-green-700 border-green-200' }
     case DocumentType.web:
       return { text: 'Web', className: 'bg-indigo-100 text-indigo-700 border-indigo-200' }
+    case DocumentType.youtube:
+      return { text: 'YouTube', className: 'bg-red-100 text-red-700 border-red-200' }
     default:
       return { text: 'Other', className: 'bg-gray-100 text-gray-700 border-gray-200' }
   }
@@ -109,6 +116,7 @@ export function DocumentCard({
   size,
   timestamp,
   pageCount,
+  url,
   isSelected,
   onSelect,
   onClick,
@@ -122,7 +130,7 @@ export function DocumentCard({
     <div
       className={cn(
         "group relative bg-card border rounded-lg p-4 card-hover cursor-pointer",
-        isSelected ? "border-primary bg-primary/5" : "border-border"
+        isSelected ? "border-teal-500 bg-teal-50" : "border-border"
       )}
       onClick={onClick}
     >
@@ -161,6 +169,19 @@ export function DocumentCard({
         <h3 className="font-medium text-sm text-gray-900 line-clamp-2 pr-16 ml-7">
           {filename}
         </h3>
+        {/* YouTube URL - shown for YouTube videos */}
+        {type === DocumentType.youtube && url && (
+          <a
+            href={url}
+            target="_blank"
+            rel="noopener noreferrer"
+            onClick={(e) => e.stopPropagation()}
+            className="text-xs text-blue-600 hover:text-blue-800 hover:underline ml-7 block truncate pr-16"
+            title={url}
+          >
+            {url}
+          </a>
+        )}
         <div className="flex items-center gap-2 text-xs text-gray-500 ml-7">
           {pageCount && <span>{pageCount}</span>}
           {pageCount && size && <span>•</span>}

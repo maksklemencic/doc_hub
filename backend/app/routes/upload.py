@@ -14,9 +14,14 @@ from ..errors.file_errors import EmptyFileError, FileSaveError
 from ..errors.metadata_extractor_errors import MetadataExtractorError
 from ..errors.qdrant_errors import VectorStoreError
 from ..errors.web_scraper_errors import ContentExtractionError, InvalidURLError, URLFetchError
-from ..models.upload import Base64UploadRequest, UploadResponse, WebDocumentUploadRequest
+from ..errors.youtube_errors import (
+    InvalidVideoURLError,
+    TranscriptNotAvailableError,
+    YouTubeAPIError,
+)
+from ..models.upload import Base64UploadRequest, UploadResponse, WebDocumentUploadRequest, YouTubeUploadRequest
 from ..agents.document_processing_agent import DocumentProcessingAgent
-from ..services import db_handler, document_processor, embedding, file_service, metadata_extractor, qdrant_client, web_scraper
+from ..services import db_handler, document_processor, embedding, file_service, metadata_extractor, qdrant_client, web_scraper, youtube_service
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
@@ -146,20 +151,6 @@ async def upload_base64(
             language = "unknown"
             quality_score = None
             used_vision = False
-
-        # Save text variants (raw, cleaned, markdown)
-        logger.debug(f"Saving text variants")
-        try:
-            raw_path, cleaned_path, markdown_path = file_service.save_text_variants(
-                saved_file_path,
-                raw_text,
-                cleaned_text,
-                markdown_text
-            )
-            logger.info(f"Saved text variants: raw={raw_path}, cleaned={cleaned_path}, md={markdown_path}")
-        except Exception as text_save_error:
-            logger.warning(f"Failed to save text variants: {str(text_save_error)}")
-            # Continue even if text variants fail to save
 
         # Calculate file size from saved file
         import os
@@ -378,20 +369,6 @@ async def upload_file_multipart(
             language = "unknown"
             quality_score = None
             used_vision = False
-
-        # Save text variants (raw, cleaned, markdown)
-        logger.debug(f"Saving text variants")
-        try:
-            raw_path, cleaned_path, markdown_path = file_service.save_text_variants(
-                saved_file_path,
-                raw_text,
-                cleaned_text,
-                markdown_text
-            )
-            logger.info(f"Saved text variants: raw={raw_path}, cleaned={cleaned_path}, md={markdown_path}")
-        except Exception as text_save_error:
-            logger.warning(f"Failed to save text variants: {str(text_save_error)}")
-            # Continue even if text variants fail to save
 
         # Get file size from the uploaded file
         file_size = len(contents)
@@ -644,17 +621,6 @@ Extract the complete main content with all metadata now:"""
                 used_vision = agent_result.get("used_vision", False)
                 language = agent_result.get("language", "unknown")
 
-                # Save text variants
-                try:
-                    file_service.save_text_variants(
-                        saved_file_path,
-                        raw_text,
-                        cleaned_text,
-                        markdown_text
-                    )
-                except Exception as text_error:
-                    logger.warning(f"Failed to save text variants: {str(text_error)}")
-
         except Exception as screenshot_error:
             logger.warning(f"Screenshot capture failed: {str(screenshot_error)}")
             screenshot_bytes = None
@@ -800,6 +766,178 @@ def cleanup_database_document(doc_id: uuid.UUID) -> None:
         logger.info(f"Cleaned up document {doc_id} successfully")
     else:
         logger.warning(f"Partial cleanup of document {doc_id} - DB: {db_success}, Vector: {vector_success}")
+
+@router.post(
+    "/youtube",
+    response_model=UploadResponse,
+    status_code=status.HTTP_201_CREATED,
+    tags=["upload"],
+    summary="Upload a YouTube video transcript",
+    description="Extracts transcript from a YouTube video using captions, processes it with timestamps, and stores it in the specified space.",
+    response_description="Details of the uploaded transcript including ID, name, chunk count, and video URL.",
+    responses={
+        201: {"description": "YouTube transcript successfully uploaded"},
+        400: {"description": "Bad request; Invalid URL or no transcript available"},
+        401: {"description": "Authentication required"},
+        404: {"description": "Space not found"},
+        422: {"description": "Validation error"},
+        500: {"description": "Internal server error"},
+        503: {"description": "Database or vector store unavailable"}
+    }
+)
+async def upload_youtube_video(
+    request: YouTubeUploadRequest,
+    current_user_id: uuid.UUID = Depends(get_current_user)
+):
+    logger.info(f"Starting YouTube video upload for user {current_user_id}, URL: {request.url}")
+
+    doc_id = None
+    saved_file_path = None
+
+    try:
+        # FIRST: Validate space ownership before any processing
+        logger.debug(f"Validating space {request.space_id} ownership for user {current_user_id}")
+        db_handler.validate_space_ownership(request.space_id, current_user_id)
+
+        # Extract transcript from YouTube
+        logger.debug(f"Extracting transcript from YouTube video: {request.url}")
+        pages, yt_metadata = youtube_service.get_youtube_transcript_pages(
+            url=request.url,
+            segment_duration=request.segment_duration,
+            languages=request.languages or ['en']
+        )
+
+        # Generate filename from video title
+        video_id = yt_metadata['video_id']
+        video_title = yt_metadata.get('title', f'YouTube Video {video_id}')
+
+        # Sanitize title for filename (remove invalid characters)
+        safe_title = "".join(c for c in video_title if c.isalnum() or c in (' ', '-', '_')).strip()
+        safe_title = safe_title[:100]  # Limit length
+
+        if not safe_title:
+            safe_title = f"youtube_{video_id}"
+
+        filename = safe_title  # No .txt extension for YouTube videos
+
+        # No file saving for YouTube - only process in memory
+        saved_file_path = None
+        file_size = 0
+
+        # Add document to database
+        logger.debug(f"Adding YouTube document to database")
+        doc_id = db_handler.add_document(
+            filename=filename,
+            file_path="",  # Empty path for YouTube
+            mime_type="text/youtube",  # Custom MIME type for YouTube transcripts
+            uploaded_by=current_user_id,
+            space_id=request.space_id,
+            file_size=file_size
+        )
+
+        # Standardized metadata schema
+        metadata = {
+            # Basic metadata
+            "document_id": str(doc_id),
+            "filename": filename,
+            "mime_type": "text/youtube",
+            "user_id": str(current_user_id),
+            "space_id": str(request.space_id),
+
+            # Processing metadata
+            "language": yt_metadata.get('transcript_language', 'unknown'),
+            "quality_score": 0.0,
+            "used_vision": False,
+
+            # YouTube-specific metadata
+            "url": request.url,
+            "video_id": yt_metadata['video_id'],
+            "video_title": yt_metadata.get('title', ''),
+            "channel": yt_metadata.get('channel', ''),
+            "duration": yt_metadata.get('duration', ''),
+            "transcript_language": yt_metadata.get('transcript_language', 'unknown'),
+
+            # Web fields (for YouTube, using video metadata)
+            "title": yt_metadata.get('title', ''),
+            "author": yt_metadata.get('channel', ''),
+            "date": "",
+            "sitename": "YouTube",
+        }
+
+        logger.debug(f"Creating embeddings and storing in vector database")
+        chunks = save_to_vector_db(pages, metadata)
+
+        logger.info(f"Successfully uploaded YouTube video {request.url} for user {current_user_id}")
+        return UploadResponse(
+            status="success",
+            document_id=doc_id,
+            document_name=filename,
+            chunk_count=len(chunks),
+            url=request.url
+        )
+
+    except NotFoundError as e:
+        logger.warning(f"Space not found for {request.url}: {str(e)}")
+        if saved_file_path:
+            cleanup_file(saved_file_path)
+        if doc_id:
+            cleanup_database_document(doc_id)
+        raise HTTPException(status_code=404, detail=e.message)
+
+    except PermissionError as e:
+        logger.warning(f"Permission denied for {request.url}: {str(e)}")
+        if saved_file_path:
+            cleanup_file(saved_file_path)
+        if doc_id:
+            cleanup_database_document(doc_id)
+        raise HTTPException(status_code=403, detail=e.message)
+
+    except InvalidVideoURLError as e:
+        logger.warning(f"Invalid YouTube URL: {str(e)}")
+        if saved_file_path:
+            cleanup_file(saved_file_path)
+        if doc_id:
+            cleanup_database_document(doc_id)
+        raise HTTPException(status_code=400, detail=e.message)
+
+    except TranscriptNotAvailableError as e:
+        logger.warning(f"Transcript not available: {str(e)}")
+        if saved_file_path:
+            cleanup_file(saved_file_path)
+        if doc_id:
+            cleanup_database_document(doc_id)
+        raise HTTPException(status_code=400, detail=e.message)
+
+    except YouTubeAPIError as e:
+        logger.error(f"YouTube API error: {str(e)}")
+        if saved_file_path:
+            cleanup_file(saved_file_path)
+        if doc_id:
+            cleanup_database_document(doc_id)
+        raise HTTPException(status_code=400, detail=e.message)
+
+    except DatabaseError as e:
+        logger.error(f"Database error for {request.url}: {str(e)}")
+        if saved_file_path:
+            cleanup_file(saved_file_path)
+        raise HTTPException(status_code=503, detail=f"Database error: {e.message}")
+
+    except (EmbeddingError, ChunkingError, MetadataExtractorError, VectorStoreError) as e:
+        logger.error(f"Vector processing error for {request.url}: {str(e)}")
+        if saved_file_path:
+            cleanup_file(saved_file_path)
+        if doc_id:
+            cleanup_database_document(doc_id)
+        raise HTTPException(status_code=500, detail=f"Vector processing failed: {e.message}")
+
+    except Exception as e:
+        logger.error(f"Unexpected error uploading YouTube video {request.url}: {str(e)}")
+        if saved_file_path:
+            cleanup_file(saved_file_path)
+        if doc_id:
+            cleanup_database_document(doc_id)
+        raise HTTPException(status_code=500, detail="An unexpected error occurred during upload")
+
 
 def save_to_vector_db(pages: list[(int, str)], init_metadata: dict):
     """
