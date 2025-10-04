@@ -59,6 +59,8 @@ const getDocumentIcon = (type: DocumentType) => {
   switch (type) {
     case DocumentType.pdf:
       return <FileText className="w-6 h-6 text-gray-600" />
+    case DocumentType.word:
+      return <FileText className="w-6 h-6 text-blue-600" />
     case DocumentType.video:
       return <Video className="w-6 h-6 text-gray-600" />
     case DocumentType.audio:
@@ -81,6 +83,8 @@ const getTypeBadge = (type: DocumentType) => {
   switch (type) {
     case DocumentType.pdf:
       return { text: 'PDF', className: 'bg-amber-100 text-amber-700 border-amber-200' }
+    case DocumentType.word:
+      return { text: 'WORD', className: 'bg-blue-100 text-blue-700 border-blue-200' }
     case DocumentType.video:
       return { text: 'Video', className: 'bg-purple-100 text-purple-700 border-purple-200' }
     case DocumentType.audio:

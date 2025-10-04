@@ -1,44 +1,35 @@
-# 📄 Documents Hub
+<div align="center">
 
-Documents Hub is a powerful and intuitive application designed to streamline the management and exploration of your documents. With Documents Hub, you can effortlessly upload your documents, engage in intelligent conversations with them, and efficiently manage your document repository.
+# 📚 Documents Hub
 
-At its core, Documents Hub leverages cutting-edge technologies to provide a seamless user experience. The backend is built with FastAPI, a modern and high-performance Python web framework. For intelligent document analysis and chat capabilities, the application integrates with Ollama, a powerful large language model (LLM). Vector storage and retrieval are handled by Qdrant, a highly efficient and scalable vector database.
+*A document management application with conversational search capabilities*
 
-## Features
+</div>
 
-*   **Document Upload**: Easily upload your documents in various formats.
-*   **Intelligent Chat**: Engage in natural language conversations with your documents to extract information and gain insights.
-*   **Document Management**: Organize and manage your documents in a user-friendly interface.
-*   **Dockerized Environment**: The entire application is containerized with Docker, ensuring easy setup and deployment.
+---
 
+## What it does
 
-## Running docker
-    docker compose -f docker-compose.dev.yaml up --build
+Documents Hub enables document upload, processing, and retrieval through natural language queries. The application extracts text from various document formats, indexes the content in a vector database, and uses language models to answer questions based on the document content.
 
-### Dev
-    docker-compose -f docker-compose.dev.yaml --env-file .env.dev up
-    
-    docker-compose -f docker-compose.dev.yaml --env-file .env.dev down
-    docker compose -f docker-compose.dev.yaml --env-file .env.dev build --no-cache backend
+## 📄 Supported Document Types
 
-### Prod
-    docker-compose -f docker-compose.yaml --env-file .env up -d
+- **PDF files** - Text extraction with automatic OCR fallback for scanned documents
+- **Word documents** (.docx, .doc) - Full text and table content extraction
+- **Images** (PNG, JPG, etc.) - OCR-based text extraction using Tesseract
 
-### Check what's in the Docker volume:
-    docker-compose -f docker-compose.dev.yaml exec ollama ollama list
-    # Should show your qwen:7b model
+## 🔍 How it works
 
-### Test model with curl:
-    curl -X POST http://localhost:11434/api/generate \
-     -H "Content-Type: application/json" \
-     -d '{"model": "qwen:7b", "prompt": "Hello!", "stream": false}'
+1. **Document Processing**: Uploaded files are parsed and text is extracted using format-specific handlers
+2. **OCR Support**: Scanned PDFs and images are processed with OCR to extract readable text
+3. **Text Chunking**: Extracted text is split into semantic chunks for efficient retrieval
+4. **Vector Indexing**: Document chunks are embedded and stored in Qdrant vector database
+5. **Conversational Search**: Natural language queries retrieve relevant chunks and generate contextual answers
 
+## Technology Stack
 
-## Backend
-Docs are avaiable at: http://localhost:8000/docs#/
-
-## Tests
-docker-compose -f docker-compose.test.yaml up --build --abort-on-container-exit
-
-## Check Qdrant Database
-http://localhost:6333/dashboard
+- **Backend**: FastAPI
+- **Language Model**: Groq for document analysis and question answering
+- **Vector Database**: Qdrant for semantic search
+- **OCR**: Tesseract and PyMuPDF for text extraction
+- **Deployment**: Docker containerization

@@ -5,7 +5,6 @@ import { useState, useEffect } from 'react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { ScrollArea } from '@/components/ui/scroll-area'
-import { useAuth } from '@/hooks/use-auth'
 import { useRouter, usePathname } from 'next/navigation'
 import {
   FileText,
@@ -71,7 +70,6 @@ const spaceIconColors = [
 const STORAGE_KEY = 'sidebar-pinned'
 
 export function Sidebar({ className }: SidebarProps) {
-  const { user, logout } = useAuth()
   const router = useRouter()
   const pathname = usePathname()
 
@@ -93,7 +91,6 @@ export function Sidebar({ className }: SidebarProps) {
   const [newSpaceName, setNewSpaceName] = useState('')
   const [editingSpaceId, setEditingSpaceId] = useState<string | null>(null)
   const [editingSpaceName, setEditingSpaceName] = useState('')
-  const [isLoggingOut, setIsLoggingOut] = useState(false)
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
   const [spaceToDelete, setSpaceToDelete] = useState<any>(null)
 
@@ -191,12 +188,6 @@ export function Sidebar({ className }: SidebarProps) {
       setEditingSpaceName('')
     }
     router.push(`/spaces/${spaceId}`)
-  }
-
-  const handleLogout = async () => {
-    setIsLoggingOut(true)
-    await new Promise(resolve => setTimeout(resolve, 300))
-    logout()
   }
 
   return (
@@ -523,15 +514,13 @@ export function Sidebar({ className }: SidebarProps) {
             "w-full text-foreground hover:text-foreground hover:bg-muted",
             isExpanded ? "justify-start" : "justify-center p-2"
           )}
-          onClick={handleLogout}
-          disabled={isLoggingOut}
+          onClick={() => {
+            // TODO: Open settings dialog/page
+            console.log('Settings clicked')
+          }}
           title={!isExpanded ? "Settings" : undefined}
         >
-          {isLoggingOut ? (
-            <Spinner size="sm" className={cn(isExpanded && "mr-2")} />
-          ) : (
-            <Settings className={cn("h-4 w-4", isExpanded && "mr-2")} />
-          )}
+          <Settings className={cn("h-4 w-4", isExpanded && "mr-2")} />
           {isExpanded && "Settings"}
         </Button>
       </div>

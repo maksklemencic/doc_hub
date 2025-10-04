@@ -2,15 +2,13 @@
 
 import { useState, useRef, useEffect } from 'react'
 import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
 import { ScrollArea } from '@/components/ui/scroll-area'
-import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { Spinner } from '@/components/ui/spinner'
 import { useAuth } from '@/hooks/use-auth'
 import { useMessages, useCreateMessage } from '@/hooks/use-messages'
 import { MessageResponse } from '@/lib/api'
+import { QueryBar } from './query-bar'
 import {
-  Send,
   Sparkles,
   Square,
   Edit3,
@@ -118,11 +116,13 @@ export function SpaceChat({ spaceId, spaceName, className, chatState = 'visible'
     // 1. We have an initial message
     // 2. We haven't sent this exact message before
     // 3. We're not already sending a message
+    // 4. Messages have finished loading (important for context!)
     if (
       initialMessage &&
       !initialMessageSentRef.current &&
       processedInitialMessageRef.current !== initialMessage &&
-      !createMessageMutation.isPending
+      !createMessageMutation.isPending &&
+      !isLoadingMessages
     ) {
       initialMessageSentRef.current = true
       processedInitialMessageRef.current = initialMessage
@@ -136,7 +136,7 @@ export function SpaceChat({ spaceId, spaceName, className, chatState = 'visible'
         initialMessageSentRef.current = false
       })
     }
-  }, [initialMessage, createMessageMutation])
+  }, [initialMessage, createMessageMutation, isLoadingMessages])
 
   // Auto-focus input when typing
   useEffect(() => {
@@ -252,10 +252,11 @@ export function SpaceChat({ spaceId, spaceName, className, chatState = 'visible'
         </div>
       )}
 
-      {/* Messages */}
+      {/* Messages - Centered container for wide layouts */}
       <div className="flex-1 overflow-hidden">
-        <ScrollArea ref={scrollAreaRef} className="h-full p-4">
-          <div className="space-y-4">
+        <ScrollArea ref={scrollAreaRef} className="h-full">
+          <div className="p-4 flex justify-center">
+            <div className="space-y-4 w-full" style={{ maxWidth: 'min(100%, 800px)' }}>
           {messages.map((message: ChatMessage) => {
             if (message.role === 'user') {
               // User messages with edit functionality
@@ -298,29 +299,21 @@ export function SpaceChat({ spaceId, spaceName, className, chatState = 'visible'
                     ) : (
                       // Display mode
                       <>
+                        {/* Edit button - positioned outside bubble, top right */}
+                        <button
+                          onClick={() => handleStartEdit(message.id, message.content)}
+                          className="absolute -top-5 right-0 text-xs text-muted-foreground hover:text-foreground opacity-0 group-hover:opacity-100 transition-opacity duration-200"
+                        >
+                          Edit
+                        </button>
+
                         <p className="text-sm">{message.content}</p>
                         <p className="text-xs opacity-70 mt-1">
                           {formatTime(message.timestamp)}
                         </p>
-
-                        {/* Edit button - only visible on hover */}
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => handleStartEdit(message.id, message.content)}
-                          className="absolute top-1 right-1 h-7 w-7 p-0 opacity-0 group-hover:opacity-100 transition-opacity duration-200"
-                        >
-                          <Edit3 className="w-3 h-3" />
-                        </Button>
                       </>
                     )}
                   </div>
-                  <Avatar className="w-8 h-8 flex-shrink-0">
-                    <AvatarImage src={user?.picture} alt={user?.name || 'User'} />
-                    <AvatarFallback className="bg-primary/10 text-primary text-sm font-medium">
-                      {user?.name?.charAt(0) || user?.email?.charAt(0) || 'U'}
-                    </AvatarFallback>
-                  </Avatar>
                 </div>
               )
             } else {
@@ -392,33 +385,23 @@ export function SpaceChat({ spaceId, spaceName, className, chatState = 'visible'
               </div>
             </div>
           )}
+            </div>
           </div>
         </ScrollArea>
       </div>
 
-      {/* Input */}
-      <div className="p-4 border-t bg-background">
-        <div className="flex gap-2">
-          <Input
-            ref={inputRef}
-            value={inputValue}
-            onChange={(e) => setInputValue(e.target.value)}
-            onKeyPress={handleKeyPress}
-            placeholder="Ask about documents in this space..."
-            className="flex-1 bg-white"
-            disabled={isLoading}
-          />
-          <Button 
-            onClick={handleSend}
-            disabled={!inputValue.trim() || isLoading}
-            size="sm"
-          >
-            <Send className="w-4 h-4" />
-          </Button>
-        </div>
-        <p className="text-xs text-muted-foreground mt-2">
-          Press Enter to send, Shift+Enter for new line
-        </p>
+      {/* Input - Claude AI style, centered for wide layouts */}
+      <div className="p-4 bg-background flex justify-center">
+        <QueryBar
+          value={inputValue}
+          onChange={setInputValue}
+          onSend={handleSend}
+          contextText={`All documents in ${spaceName}`}
+          disabled={isLoading}
+          variant="default"
+          className="relative bg-white border border-border rounded-2xl shadow-sm hover:shadow-md transition-shadow w-full max-w-[min(100%,1200px)]"
+          style={{ width: 'min(100%, 800px)' }}
+        />
       </div>
     </div>
   )

@@ -1,15 +1,15 @@
 'use client'
 
 import { useState } from 'react'
-import { Sparkles, Send, FileText, MessageSquare } from 'lucide-react'
-import { Input } from '@/components/ui/input'
-import { Button } from '@/components/ui/button'
+import { Sparkles } from 'lucide-react'
+import { QueryBar } from './query-bar'
 import { cn } from '@/lib/utils'
 
 interface MiniAIChatProps {
   contextText: string
   onSend: (message: string) => void
   onOpenChat: () => void
+  onOpenInPane?: (pane: 'left' | 'right') => void
   isMinimized?: boolean
   onExpand?: () => void
 }
@@ -18,6 +18,7 @@ export function MiniAIChat({
   contextText,
   onSend,
   onOpenChat,
+  onOpenInPane,
   isMinimized = false,
   onExpand,
 }: MiniAIChatProps) {
@@ -48,59 +49,33 @@ export function MiniAIChat({
 
   const showExpanded = isHovered || !isMinimized || isManuallyExpanded
 
-  return (
+  const chatContent = (
     <div
       className={cn(
-        'fixed bottom-4 right-4 z-50 bg-card border border-border rounded-lg shadow-xl transition-all duration-200 cursor-pointer',
-        showExpanded ? 'w-96' : 'w-12 h-12'
+        'fixed bottom-4 right-4 z-50 transition-all duration-200',
+        showExpanded ? 'w-[450px] cursor-default' : 'w-12 h-12 cursor-pointer'
       )}
       onMouseEnter={() => setIsHovered(true)}
       onMouseLeave={() => !isManuallyExpanded && setIsHovered(false)}
       onClick={() => !showExpanded && handleExpand()}
     >
       {showExpanded ? (
-        <div className="p-3 space-y-3" onClick={(e) => e.stopPropagation()}>
-          {/* Context */}
-          <div className="flex items-center justify-between gap-2">
-            <div className="flex items-center gap-1.5 flex-1 min-w-0">
-              <span className="text-xs text-muted-foreground">Context:</span>
-              <span className="text-xs font-medium text-foreground truncate">{contextText}</span>
-            </div>
-            <Button
-              variant="ghost"
-              size="sm"
-              className="h-7 px-2 flex-shrink-0"
-              onClick={handleOpenChat}
-              title="Open chat"
-            >
-              <MessageSquare className="h-3.5 w-3.5" />
-            </Button>
-          </div>
-
-          {/* Input */}
-          <div className="flex items-center gap-2">
-            <Input
-              placeholder="Ask about your documents..."
-              value={message}
-              onChange={(e) => setMessage(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter' && !e.shiftKey) {
-                  e.preventDefault()
-                  handleSend()
-                }
-              }}
-              className="flex-1 text-sm"
-            />
-            <Button size="icon" className="h-9 w-9 flex-shrink-0" onClick={handleSend}>
-              <Send className="h-4 w-4" />
-            </Button>
-          </div>
-        </div>
+        <QueryBar
+          value={message}
+          onChange={setMessage}
+          onSend={handleSend}
+          contextText={contextText}
+          variant="mini"
+          onOpenInPane={onOpenInPane}
+          className="relative bg-white border border-border rounded-2xl shadow-xl hover:shadow-2xl transition-shadow"
+        />
       ) : (
-        <div className="h-full w-full flex items-center justify-center">
+        <div className="h-full w-full flex items-center justify-center bg-white border border-border rounded-2xl shadow-xl">
           <Sparkles className="h-5 w-5 text-primary animate-pulse" />
         </div>
       )}
     </div>
   )
+
+  return chatContent
 }

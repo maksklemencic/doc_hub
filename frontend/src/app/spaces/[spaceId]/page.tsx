@@ -1197,6 +1197,20 @@ export default function SpacePage() {
       return documentsContent
     }
 
+    // AI chat tab
+    if (activeTab.type === 'ai-chat') {
+      return (
+        <SpaceChat
+          spaceId={spaceId}
+          spaceName={spaceName}
+          chatState={chatState}
+          onChatStateChange={setChatState}
+          initialMessage={activeTab.initialMessage}
+          hideHeader={true}
+        />
+      )
+    }
+
     // Document preview tab
     const document = documents.find(d => d.id === activeTab.id)
     if (document) {
@@ -1263,11 +1277,27 @@ export default function SpacePage() {
         >
           {renderLeftContent()}
         </SplitPaneView>
-        {rightTabs.length === 0 && (
+        {rightTabs.length === 0 && !tabs.some(t => t.type === 'ai-chat') && (
           <MiniAIChat
             contextText={`All in ${spaceName}`}
             onSend={handleMiniChatSend}
             onOpenChat={() => handleOpenChat()}
+            onOpenInPane={(pane) => {
+              const chatId = `ai-chat-${Date.now()}`
+              const newTab = {
+                id: chatId,
+                title: 'AI Chat',
+                type: 'ai-chat' as any,
+                isActive: true,
+                closable: true,
+              }
+
+              if (pane === 'left') {
+                setTabs([...tabs.map((t) => ({ ...t, isActive: false })), newTab])
+              } else {
+                setRightTabs([...rightTabs.map((t) => ({ ...t, isActive: false })), newTab])
+              }
+            }}
           />
         )}
       </div>
