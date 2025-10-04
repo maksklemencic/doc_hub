@@ -1,6 +1,6 @@
 <div align="center">
 
-# 📚 Documents Hub
+# 📄 Documents Hub
 
 *A document management application with conversational search capabilities*
 
