@@ -380,9 +380,13 @@ def get_paginated_messages(user_id: uuid.UUID, space_id: uuid.UUID, limit: int, 
                 logger.warning(f"Space {space_id} not found or user {user_id} not authorized.")
                 raise NotFoundError("Space", str(space_id))
 
-            query = session.query(Message).filter(Message.space_id == space_id, Message.user_id == user_id)
+            query = session.query(Message).filter(Message.space_id == space_id, Message.user_id == user_id).order_by(Message.created_at.desc())
             total_count = query.count()
-            messages = query.offset(offset).limit(limit).all()
+            
+            messages_newest_first = query.offset(offset).limit(limit).all()
+
+            messages = messages_newest_first[::-1] # <--- This is the key reversal
+
             logger.info(f"Successfully fetched {len(messages)} messages for user {user_id} in space {space_id}")
             return messages, total_count
         except exc.OperationalError as e:

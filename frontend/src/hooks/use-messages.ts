@@ -1,4 +1,4 @@
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { useMutation, useQuery, useQueryClient, useInfiniteQuery } from '@tanstack/react-query'
 import { useRef } from 'react'
 import toast from 'react-hot-toast'
 import {
@@ -15,6 +15,12 @@ import {
   ErrorEvent
 } from '@/lib/api'
 import { useAuth } from './use-auth'
+
+// Type for infinite query data structure
+type InfiniteMessagesData = {
+  pages: GetMessagesResponse[]
+  pageParams: number[]
+}
 
 // Query key factory for messages
 export const messagesKeys = {
@@ -38,6 +44,28 @@ export function useMessages(spaceId: string, limit = 50, offset = 0) {
     enabled: isAuthenticated && !!spaceId, // Only fetch when authenticated and spaceId exists
     staleTime: 1 * 60 * 1000, // Consider data stale after 1 minute
     gcTime: 3 * 60 * 1000, // Keep in cache for 3 minutes
+  })
+}
+
+// Custom hook for infinite scroll loading of messages (newest first)
+export function useMessagesInfinite(spaceId: string, pageSize = 10) {
+  const { isAuthenticated } = useAuth()
+
+  return useInfiniteQuery({
+    queryKey: messagesKeys.list(spaceId, 'infinite'),
+    queryFn: async ({ pageParam = 0 }) => {
+      const response = await messagesApi.getMessages(spaceId, pageSize, pageParam)
+      return response
+    },
+    getNextPageParam: (lastPage, allPages) => {
+      const loadedCount = allPages.reduce((sum, page) => sum + page.messages.length, 0)
+      const hasMore = loadedCount < lastPage.pagination.total_count
+      return hasMore ? loadedCount : undefined
+    },
+    enabled: isAuthenticated && !!spaceId,
+    staleTime: 1 * 60 * 1000,
+    gcTime: 3 * 60 * 1000,
+    initialPageParam: 0,
   })
 }
 
@@ -76,6 +104,7 @@ export function useCreateMessage(spaceId: string) {
 
               // Replace the optimistic user message with the real one from backend
               // This message will hold both the user query AND the streaming AI response
+              // Update both regular and infinite query caches
               queryClient.setQueryData<GetMessagesResponse>(messagesKeys.list(spaceId), (old) => {
                 if (!old) return old
 
@@ -102,6 +131,36 @@ export function useCreateMessage(spaceId: string) {
                   // Don't change pagination count - we're just replacing, not adding
                 }
               })
+
+              // Also update infinite query cache
+              queryClient.setQueryData<InfiniteMessagesData>(messagesKeys.list(spaceId, 'infinite'), (old) => {
+                if (!old) return old
+
+                return {
+                  ...old,
+                  pages: old.pages.map((page, index) => {
+                    // Only update the first page (newest messages)
+                    if (index === 0) {
+                      return {
+                        ...page,
+                        messages: page.messages.map((msg) =>
+                          msg.id.startsWith('temp-user-')
+                            ? {
+                                id: startEvent.message_id,
+                                space_id: spaceId,
+                                user_id: msg.user_id,
+                                content: startEvent.content,
+                                response: '',
+                                created_at: new Date().toISOString()
+                              }
+                            : msg
+                        )
+                      }
+                    }
+                    return page
+                  })
+                }
+              })
               break
             }
 
@@ -121,6 +180,28 @@ export function useCreateMessage(spaceId: string) {
                         ? { ...msg, response: streamingContent }
                         : msg
                     )
+                  }
+                })
+
+                // Also update infinite query cache
+                queryClient.setQueryData<InfiniteMessagesData>(messagesKeys.list(spaceId, 'infinite'), (old) => {
+                  if (!old) return old
+
+                  return {
+                    ...old,
+                    pages: old.pages.map((page, index) => {
+                      if (index === 0) {
+                        return {
+                          ...page,
+                          messages: page.messages.map((msg) =>
+                            msg.id === tempAssistantId
+                              ? { ...msg, response: streamingContent }
+                              : msg
+                          )
+                        }
+                      }
+                      return page
+                    })
                   }
                 })
               }
@@ -145,6 +226,31 @@ export function useCreateMessage(spaceId: string) {
                           }
                         : msg
                     )
+                  }
+                })
+
+                // Also update infinite query cache
+                queryClient.setQueryData<InfiniteMessagesData>(messagesKeys.list(spaceId, 'infinite'), (old) => {
+                  if (!old) return old
+
+                  return {
+                    ...old,
+                    pages: old.pages.map((page, index) => {
+                      if (index === 0) {
+                        return {
+                          ...page,
+                          messages: page.messages.map((msg) =>
+                            msg.id === tempAssistantId
+                              ? {
+                                  ...msg,
+                                  response: completeEvent.final_response
+                                }
+                              : msg
+                          )
+                        }
+                      }
+                      return page
+                    })
                   }
                 })
               }
@@ -173,6 +279,31 @@ export function useCreateMessage(spaceId: string) {
                     )
                   }
                 })
+
+                // Also update infinite query cache
+                queryClient.setQueryData<InfiniteMessagesData>(messagesKeys.list(spaceId, 'infinite'), (old) => {
+                  if (!old) return old
+
+                  return {
+                    ...old,
+                    pages: old.pages.map((page, index) => {
+                      if (index === 0) {
+                        return {
+                          ...page,
+                          messages: page.messages.map((msg) =>
+                            msg.id === tempAssistantId
+                              ? {
+                                  ...msg,
+                                  response: errorEvent.partial_response
+                                }
+                              : msg
+                          )
+                        }
+                      }
+                      return page
+                    })
+                  }
+                })
               }
 
               reject(new Error(errorEvent.error))
@@ -198,6 +329,31 @@ export function useCreateMessage(spaceId: string) {
                   )
                 }
               })
+
+              // Also update infinite query cache
+              queryClient.setQueryData<InfiniteMessagesData>(messagesKeys.list(spaceId, 'infinite'), (old) => {
+                if (!old) return old
+
+                return {
+                  ...old,
+                  pages: old.pages.map((page, index) => {
+                    if (index === 0) {
+                      return {
+                        ...page,
+                        messages: page.messages.map((msg) =>
+                          msg.id === tempAssistantId
+                            ? {
+                                ...msg,
+                                response: streamingContent
+                              }
+                            : msg
+                        )
+                      }
+                    }
+                    return page
+                  })
+                }
+              })
             }
 
             // Don't treat abort as an error - just resolve
@@ -212,6 +368,7 @@ export function useCreateMessage(spaceId: string) {
     // Optimistic update - only add user message (backend creates the real one)
     onMutate: async (newMessage) => {
       await queryClient.cancelQueries({ queryKey: messagesKeys.list(spaceId) })
+      await queryClient.cancelQueries({ queryKey: messagesKeys.list(spaceId, 'infinite') })
 
       const previousMessages = queryClient.getQueryData<GetMessagesResponse>(messagesKeys.list(spaceId))
 
@@ -243,6 +400,35 @@ export function useCreateMessage(spaceId: string) {
         }
       })
 
+      // Also add to infinite query cache (first page only)
+      queryClient.setQueryData<InfiniteMessagesData>(messagesKeys.list(spaceId, 'infinite'), (old) => {
+        if (!old) return {
+          pages: [{
+            messages: [optimisticUserMessage],
+            pagination: { limit: 10, offset: 0, total_count: 1 }
+          }],
+          pageParams: [0]
+        }
+
+        return {
+          ...old,
+          pages: old.pages.map((page, index) => {
+            // Add to first page (newest messages)
+            if (index === 0) {
+              return {
+                ...page,
+                messages: [...page.messages, optimisticUserMessage],
+                pagination: {
+                  ...page.pagination,
+                  total_count: page.pagination.total_count + 1
+                }
+              }
+            }
+            return page
+          })
+        }
+      })
+
       return { previousMessages, optimisticUserMessage, streamingAssistantMessage: null }
     },
 
@@ -265,6 +451,7 @@ export function useCreateMessage(spaceId: string) {
 
       if (error) {
         queryClient.invalidateQueries({ queryKey: messagesKeys.list(spaceId) })
+        queryClient.invalidateQueries({ queryKey: messagesKeys.list(spaceId, 'infinite') })
       }
     },
   })

@@ -1,11 +1,11 @@
 'use client'
 
-import { useState, useRef, useEffect } from 'react'
+import { useState, useRef, useEffect, useCallback } from 'react'
 import { Button } from '@/components/ui/button'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { Spinner } from '@/components/ui/spinner'
 import { useAuth } from '@/hooks/use-auth'
-import { useMessages, useCreateMessage } from '@/hooks/use-messages'
+import { useMessagesInfinite, useCreateMessage } from '@/hooks/use-messages'
 import { MessageResponse } from '@/lib/api'
 import { QueryBar } from './query-bar'
 import {
@@ -56,14 +56,30 @@ export function SpaceChat({ spaceId, spaceName, className, chatState = 'visible'
   const [editingMessageId, setEditingMessageId] = useState<string | null>(null)
   const [editValue, setEditValue] = useState('')
 
-  // Fetch messages and mutation hooks
-  const { data: messagesData, isLoading: isLoadingMessages, error } = useMessages(spaceId)
+  // Fetch messages with infinite scroll and mutation hooks
+  const {
+    data: infiniteData,
+    isLoading: isLoadingMessages,
+    fetchNextPage,
+    hasNextPage,
+    isFetchingNextPage,
+    error
+  } = useMessagesInfinite(spaceId, 20)
   const createMessageMutation = useCreateMessage(spaceId)
 
+  // Flatten pages into messages array (newest messages are in first page)
+  // const backendMessages = infiniteData?.pages.flatMap(page => page.messages) ?? []
+
+  const backendMessages = infiniteData?.pages
+  // 1. Create a shallow copy and reverse the order of the pages array.
+  .slice()
+  .reverse() 
+  // 2. Flatten the reversed array.
+  .flatMap(page => page.messages) ?? []
 
   // Transform backend messages to chat format
-  const messages: ChatMessage[] = messagesData?.messages ?
-    messagesData.messages.flatMap((msg, index) => {
+  const messages: ChatMessage[] = backendMessages.length > 0 ?
+    backendMessages.flatMap((msg, index) => {
       const chatMessages: ChatMessage[] = []
 
       // Add user message (from content field)
@@ -106,8 +122,64 @@ export function SpaceChat({ spaceId, spaceName, className, chatState = 'visible'
     }
   }
 
+  // Track if we're loading more messages to preserve scroll position
+  const isLoadingMoreRef = useRef(false)
+  const previousMessageCountRef = useRef(0)
+  const previousScrollHeightRef = useRef(0)
+
+  // Handle scroll to load older messages - attach listener to viewport
   useEffect(() => {
-    scrollToBottom()
+    const scrollContainer = scrollAreaRef.current?.querySelector('[data-radix-scroll-area-viewport]')
+    if (!scrollContainer) return
+
+    const handleScroll = (event: Event) => {
+      const target = event.target as HTMLDivElement
+      const scrollTop = target.scrollTop
+
+      // Load more when scrolled near top (within 100px)
+      if (scrollTop < 100 && hasNextPage && !isFetchingNextPage) {
+        isLoadingMoreRef.current = true
+        previousScrollHeightRef.current = scrollContainer.scrollHeight
+        fetchNextPage()
+      }
+    }
+
+    scrollContainer.addEventListener('scroll', handleScroll)
+    return () => scrollContainer.removeEventListener('scroll', handleScroll)
+  }, [hasNextPage, isFetchingNextPage, fetchNextPage])
+
+  // Preserve scroll position when loading older messages
+  useEffect(() => {
+    const scrollContainer = scrollAreaRef.current?.querySelector('[data-radix-scroll-area-viewport]')
+    if (!scrollContainer || !isLoadingMoreRef.current) return
+
+    const currentScrollHeight = scrollContainer.scrollHeight
+    const previousScrollHeight = previousScrollHeightRef.current
+    const scrollDiff = currentScrollHeight - previousScrollHeight
+
+    if (scrollDiff > 0) {
+      scrollContainer.scrollTop += scrollDiff
+    }
+  }, [messages])
+
+  // Only scroll to bottom for new messages, not when loading older ones
+  useEffect(() => {
+    const currentMessageCount = messages.length
+    const previousMessageCount = previousMessageCountRef.current
+
+    // Only scroll to bottom if:
+    // 1. First load (previousCount is 0)
+    // 2. New messages were added at the end (not loading older messages)
+    if (previousMessageCount === 0 || (currentMessageCount > previousMessageCount && !isLoadingMoreRef.current)) {
+      scrollToBottom()
+    }
+
+    // Reset the loading more flag after messages update
+    if (isLoadingMoreRef.current && currentMessageCount > previousMessageCount) {
+      isLoadingMoreRef.current = false
+    }
+
+    previousMessageCountRef.current = currentMessageCount
   }, [messages])
 
   // Send initial message if provided - using ref to prevent double sends
@@ -257,6 +329,13 @@ export function SpaceChat({ spaceId, spaceName, className, chatState = 'visible'
         <ScrollArea ref={scrollAreaRef} className="h-full">
           <div className="p-4 flex justify-center">
             <div className="space-y-4 w-full" style={{ maxWidth: 'min(100%, 800px)' }}>
+          {/* Loading indicator for older messages */}
+          {isFetchingNextPage && (
+            <div className="flex justify-center py-2">
+              <Spinner size="sm" />
+            </div>
+          )}
+
           {messages.map((message: ChatMessage) => {
             if (message.role === 'user') {
               // User messages with edit functionality
