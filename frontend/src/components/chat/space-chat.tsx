@@ -13,7 +13,8 @@ import {
   Square,
   Edit3,
   Check,
-  X as XIcon
+  X as XIcon,
+  Copy
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import ReactMarkdown from 'react-markdown'
@@ -55,6 +56,7 @@ export function SpaceChat({ spaceId, spaceName, className, chatState = 'visible'
   const [messageContexts, setMessageContexts] = useState<Record<string, string>>({})
   const [editingMessageId, setEditingMessageId] = useState<string | null>(null)
   const [editValue, setEditValue] = useState('')
+  const [copiedMessageId, setCopiedMessageId] = useState<string | null>(null)
 
   // Fetch messages with infinite scroll and mutation hooks
   const {
@@ -271,11 +273,37 @@ export function SpaceChat({ spaceId, spaceName, className, chatState = 'visible'
 
   const formatTime = (timestamp: string) => {
     const date = new Date(timestamp)
-    return date.toLocaleTimeString('en-US', {
+    const now = new Date()
+    const yesterday = new Date(now)
+    yesterday.setDate(yesterday.getDate() - 1)
+
+    const isToday = date.toDateString() === now.toDateString()
+    const isYesterday = date.toDateString() === yesterday.toDateString()
+    const isThisWeek = (now.getTime() - date.getTime()) < 7 * 24 * 60 * 60 * 1000
+
+    // Get user locale, default to European format if not available
+    const userLocale = typeof navigator !== 'undefined' ? navigator.language : 'de-DE'
+
+    const timeStr = date.toLocaleTimeString(userLocale, {
       hour: '2-digit',
       minute: '2-digit',
       hour12: false
     })
+
+    if (isToday) {
+      return timeStr
+    } else if (isYesterday) {
+      return `Yesterday, ${timeStr}`
+    } else if (isThisWeek) {
+      const dayName = date.toLocaleDateString(userLocale, { weekday: 'long' })
+      return `${dayName}, ${timeStr}`
+    } else {
+      // European format DD.MM.YYYY
+      const day = String(date.getDate()).padStart(2, '0')
+      const month = String(date.getMonth() + 1).padStart(2, '0')
+      const year = date.getFullYear()
+      return `${day}.${month}.${year}, ${timeStr}`
+    }
   }
 
   // Edit message handlers
@@ -307,6 +335,17 @@ export function SpaceChat({ spaceId, spaceName, className, chatState = 'visible'
     } catch (error) {
       setEditingMessageId(messageId)
       setEditValue(editValue)
+    }
+  }
+
+  // Copy message content
+  const handleCopyMessage = async (messageId: string, content: string) => {
+    try {
+      await navigator.clipboard.writeText(content)
+      setCopiedMessageId(messageId)
+      setTimeout(() => setCopiedMessageId(null), 2000)
+    } catch (error) {
+      console.error('Failed to copy:', error)
     }
   }
 
@@ -378,10 +417,10 @@ export function SpaceChat({ spaceId, spaceName, className, chatState = 'visible'
                     ) : (
                       // Display mode
                       <>
-                        {/* Edit button - positioned outside bubble, top right */}
+                        {/* Edit button - positioned outside bubble, top right with outline */}
                         <button
                           onClick={() => handleStartEdit(message.id, message.content)}
-                          className="absolute -top-5 right-0 text-xs text-muted-foreground hover:text-foreground opacity-0 group-hover:opacity-100 transition-opacity duration-200"
+                          className="absolute -top-6 right-0 text-xs text-muted-foreground hover:text-foreground opacity-0 group-hover:opacity-100 transition-all duration-200 px-2 py-1 rounded group-hover:outline group-hover:outline-1 group-hover:outline-border"
                         >
                           Edit
                         </button>
@@ -398,7 +437,7 @@ export function SpaceChat({ spaceId, spaceName, className, chatState = 'visible'
             } else {
               // AI messages: clean full-width layout with padding
               return (
-                <div key={message.id} className="w-full space-y-4">
+                <div key={message.id} className="w-full space-y-2 group">
                   {/* AI Response */}
                   <div className="w-full px-4">
                     <article className="prose prose-sm max-w-none prose-p:my-2 prose-p:leading-relaxed prose-headings:font-semibold prose-h1:text-lg prose-h2:text-base prose-h3:text-sm prose-ul:my-2 prose-ol:my-2 prose-li:my-0.5 prose-strong:font-bold prose-strong:text-gray-900 prose-code:bg-gray-100 prose-code:text-gray-900 prose-code:px-1 prose-code:py-0.5 prose-code:rounded prose-code:text-xs prose-pre:bg-gray-900 prose-pre:text-gray-100 prose-pre:p-3 prose-pre:rounded prose-pre:text-xs">
@@ -406,6 +445,27 @@ export function SpaceChat({ spaceId, spaceName, className, chatState = 'visible'
                         {message.content}
                       </ReactMarkdown>
                     </article>
+                  </div>
+
+                  {/* Copy button - below content, left aligned */}
+                  <div className="w-full px-4">
+                    <button
+                      onClick={() => handleCopyMessage(message.id, message.content)}
+                      className="opacity-0 group-hover:opacity-100 transition-opacity duration-200 px-2 py-1 rounded hover:bg-gray-100 text-xs text-muted-foreground hover:text-foreground flex items-center gap-1"
+                      title="Copy message"
+                    >
+                      {copiedMessageId === message.id ? (
+                        <>
+                          <Check className="w-3 h-3 text-green-600" />
+                          <span className="text-green-600">Copied</span>
+                        </>
+                      ) : (
+                        <>
+                          <Copy className="w-3 h-3" />
+                          <span>Copy</span>
+                        </>
+                      )}
+                    </button>
                   </div>
 
                   {/* Context Section */}

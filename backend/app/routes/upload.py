@@ -653,7 +653,8 @@ Extract the complete main content with all metadata now:"""
             mime_type="text/html",  # Always store as web document type, regardless of screenshot
             uploaded_by=current_user_id,
             space_id=request.space_id,
-            file_size=file_size
+            file_size=file_size,
+            url=request.url
         )
 
         # Standardized metadata schema (always includes all fields with defaults)
@@ -832,7 +833,8 @@ async def upload_youtube_video(
             mime_type="text/youtube",  # Custom MIME type for YouTube transcripts
             uploaded_by=current_user_id,
             space_id=request.space_id,
-            file_size=file_size
+            file_size=file_size,
+            url=request.url
         )
 
         # Standardized metadata schema

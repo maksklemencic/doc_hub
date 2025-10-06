@@ -42,7 +42,12 @@ def create_space(
     current_user_id: uuid.UUID = Depends(get_current_user)
 ):
     try:
-        db_space = db_handler.create_space(current_user_id, request.name)
+        db_space = db_handler.create_space(
+            current_user_id,
+            request.name,
+            request.icon,
+            request.icon_color
+        )
         return db_space
     except ConflictError as e:
         logger.error(f"Conflict creating space '{request.name}' for user {current_user_id}: {e.message}")
@@ -110,12 +115,19 @@ def get_spaces(
     }
 )
 def update_space(
-    request: UpdateSpaceRequest, 
+    request: UpdateSpaceRequest,
     space_id: uuid.UUID,
     current_user_id: uuid.UUID = Depends(get_current_user)
 ):
     try:
-        space = db_handler.update_space(current_user_id, space_id, request.name)
+        space = db_handler.update_space(
+            current_user_id,
+            space_id,
+            request.name,
+            request.icon,
+            request.icon_color,
+            request.display_order
+        )
         return space
     except PermissionError as e:
         logger.warning(f"Permission denied for user {current_user_id} to update space {space_id}")

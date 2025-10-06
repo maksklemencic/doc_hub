@@ -30,6 +30,7 @@ interface SplitPaneViewProps {
   onTabReorderLeft?: (tabId: string, newIndex: number) => void
   onTabReorderRight?: (tabId: string, newIndex: number) => void
   onTabDragBetweenPanes?: (tabId: string, fromPane: 'left' | 'right', toPane: 'left' | 'right') => void
+  onPanelResize?: () => void
   children: React.ReactNode
   rightContent?: React.ReactNode
 }
@@ -44,6 +45,7 @@ export function SplitPaneView({
   onTabReorderLeft,
   onTabReorderRight,
   onTabDragBetweenPanes,
+  onPanelResize,
   children,
   rightContent,
 }: SplitPaneViewProps) {
@@ -181,7 +183,7 @@ export function SplitPaneView({
       <div ref={containerRef} className="flex-1 flex flex-col overflow-hidden relative">
         {hasSplit ? (
           <ResizablePanelGroup direction="horizontal">
-            <ResizablePanel defaultSize={50} minSize={30}>
+            <ResizablePanel defaultSize={50} minSize={30} onResize={onPanelResize}>
               <div className="h-full flex flex-col">
                 <TabBar
                   tabs={leftTabs}
@@ -198,7 +200,7 @@ export function SplitPaneView({
 
             <ResizableHandle withHandle />
 
-            <ResizablePanel defaultSize={50} minSize={30}>
+            <ResizablePanel defaultSize={50} minSize={30} onResize={onPanelResize}>
               <div className="h-full flex flex-col">
                 <TabBar
                   tabs={rightTabs}

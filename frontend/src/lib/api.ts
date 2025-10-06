@@ -4,6 +4,9 @@ const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
 export interface SpaceResponse {
   id: string
   name: string
+  icon?: string
+  icon_color?: string
+  display_order?: number
   created_at?: string
   updated_at?: string
 }
@@ -21,10 +24,15 @@ export interface GetSpacesResponse {
 
 export interface CreateSpaceRequest {
   name: string
+  icon: string
+  icon_color: string
 }
 
 export interface UpdateSpaceRequest {
-  name: string
+  name?: string
+  icon?: string
+  icon_color?: string
+  display_order?: number
 }
 
 // Documents API types

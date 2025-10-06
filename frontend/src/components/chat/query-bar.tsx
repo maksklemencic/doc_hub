@@ -1,7 +1,7 @@
 'use client'
 
 import { useRef, useEffect } from 'react'
-import { Search, Send, MoreVertical, PanelLeft, PanelRight } from 'lucide-react'
+import { Search, Send, MoreVertical, PanelLeft, PanelRight, FileText, FolderOpen, X } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import {
@@ -9,7 +9,13 @@ import {
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
+  DropdownMenuSeparator,
 } from '@/components/ui/dropdown-menu'
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from '@/components/ui/popover'
 import {
   ContextMenu,
   ContextMenuContent,
@@ -26,6 +32,9 @@ interface QueryBarProps {
   disabled?: boolean
   variant?: 'default' | 'mini'
   onOpenInPane?: (pane: 'left' | 'right') => void
+  onContextChange?: (type: 'all-space' | 'open-tabs' | 'active-tab' | 'clear') => void
+  selectedDocuments?: Array<{ id: string; filename: string }>
+  onRemoveDocument?: (docId: string) => void
   className?: string
   style?: React.CSSProperties
 }
@@ -39,6 +48,9 @@ export function QueryBar({
   disabled = false,
   variant = 'default',
   onOpenInPane,
+  onContextChange,
+  selectedDocuments = [],
+  onRemoveDocument,
   className,
   style,
 }: QueryBarProps) {
@@ -120,9 +132,99 @@ export function QueryBar({
       <div className="flex items-center justify-between px-3 pb-2 pt-1 border-t border-border/50">
         <div className="flex items-center gap-2 text-xs">
           <span className="text-muted-foreground">Context:</span>
-          <Badge variant="secondary" className="bg-primary/10 text-primary border-primary/20 hover:bg-primary/20">
-            {contextText}
-          </Badge>
+          <Popover>
+            <PopoverTrigger asChild>
+              <Badge
+                variant="secondary"
+                className="bg-primary/10 text-primary border-primary/20 hover:bg-primary/20 cursor-pointer transition-colors"
+              >
+                {contextText}
+              </Badge>
+            </PopoverTrigger>
+            <PopoverContent className="w-80 p-0" align="start">
+              <div className="p-3 border-b">
+                <h4 className="font-medium text-sm">Chat Context</h4>
+                <p className="text-xs text-muted-foreground mt-1">
+                  Select which documents to include in your chat
+                </p>
+              </div>
+              <div className="p-2">
+                {onContextChange && (
+                  <div className="space-y-1 mb-2">
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="w-full justify-start text-sm font-normal"
+                      onClick={() => onContextChange('all-space')}
+                    >
+                      <FolderOpen className="mr-2 h-4 w-4" />
+                      All documents in space
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="w-full justify-start text-sm font-normal"
+                      onClick={() => onContextChange('open-tabs')}
+                    >
+                      <FileText className="mr-2 h-4 w-4" />
+                      Open tabs only
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="w-full justify-start text-sm font-normal"
+                      onClick={() => onContextChange('active-tab')}
+                    >
+                      <FileText className="mr-2 h-4 w-4" />
+                      Active tab only
+                    </Button>
+                  </div>
+                )}
+                {selectedDocuments.length > 0 && (
+                  <>
+                    <div className="h-px bg-border my-2" />
+                    <div className="space-y-1 max-h-40 overflow-y-auto">
+                      <div className="text-xs font-medium text-muted-foreground px-2 py-1">
+                        Selected Documents ({selectedDocuments.length})
+                      </div>
+                      {selectedDocuments.map((doc) => (
+                        <div
+                          key={doc.id}
+                          className="flex items-center justify-between px-2 py-1.5 hover:bg-muted rounded-md group"
+                        >
+                          <span className="text-sm truncate flex-1" title={doc.filename}>
+                            {doc.filename}
+                          </span>
+                          {onRemoveDocument && (
+                            <button
+                              onClick={() => onRemoveDocument(doc.id)}
+                              className="opacity-0 group-hover:opacity-100 transition-opacity ml-2"
+                            >
+                              <X className="h-3.5 w-3.5 text-muted-foreground hover:text-destructive" />
+                            </button>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  </>
+                )}
+                {onContextChange && (
+                  <>
+                    <div className="h-px bg-border my-2" />
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="w-full justify-start text-sm font-normal text-destructive hover:text-destructive hover:bg-red-50"
+                      onClick={() => onContextChange('clear')}
+                    >
+                      <X className="mr-2 h-4 w-4" />
+                      Clear context
+                    </Button>
+                  </>
+                )}
+              </div>
+            </PopoverContent>
+          </Popover>
         </div>
         <div className="flex items-center gap-1">
           <button className="text-xs text-muted-foreground hover:text-foreground px-2 py-1 rounded hover:bg-muted transition-colors">

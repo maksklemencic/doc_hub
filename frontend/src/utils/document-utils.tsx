@@ -81,10 +81,6 @@ export function getTypeBadge(type: DocumentType) {
       return { text: 'Video', className: 'bg-purple-100 text-purple-700 border-purple-200' }
     case DocumentType.audio:
       return { text: 'Audio', className: 'bg-blue-100 text-blue-700 border-blue-200' }
-    case DocumentType.aiNote:
-      return { text: 'AI Note', className: 'bg-teal-100 text-teal-700 border-teal-200' }
-    case DocumentType.note:
-      return { text: 'Note', className: 'bg-purple-100 text-purple-700 border-purple-200' }
     case DocumentType.image:
       return { text: 'Image', className: 'bg-green-100 text-green-700 border-green-200' }
     case DocumentType.web:
@@ -141,4 +137,25 @@ export function formatDate(dateString: string): string {
     day: 'numeric',
     year: 'numeric'
   })
+}
+
+export function getPageCount(document: any, docType: DocumentType): string | undefined {
+  // Only show page count for PDF and Word documents
+  if (docType !== DocumentType.pdf && docType !== DocumentType.word) {
+    return undefined
+  }
+
+  // TODO: Implement page count retrieval once backend provides page_count metadata
+  // The backend needs to extract and store page_count during document processing
+  // Check if document has page_count metadata
+  // if (document.page_count && document.page_count > 0) {
+  //   return `${document.page_count} pages`
+  // }
+
+  return undefined
+}
+
+// Helper function to get file size from backend
+export function getFileSize(document: any): number {
+  return document.file_size || 0
 }

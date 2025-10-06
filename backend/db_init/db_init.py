@@ -38,6 +38,7 @@ class Document(Base):
     file_path = Column(String, nullable=False)
     mime_type = Column(String, nullable=False)
     file_size = Column(Integer, nullable=True)
+    url = Column(String, nullable=True)
     uploaded_by = Column(UUID(as_uuid=True), ForeignKey("users.id"))
     created_at = Column(TIMESTAMP, server_default=text("NOW()"))
     updated_at = Column(TIMESTAMP, server_default=text("NOW()"), onupdate=text("NOW()"))
@@ -47,9 +48,12 @@ class Space(Base):
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     name = Column(String, nullable=False)
     user_id = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=False)
+    icon = Column(String, nullable=True, default='Folder')
+    icon_color = Column(String, nullable=True, default='text-gray-600')
+    display_order = Column(Integer, nullable=True)
     created_at = Column(TIMESTAMP, server_default=text("NOW()"))
     updated_at = Column(TIMESTAMP, server_default=text("NOW()"), onupdate=text("NOW()"))
-    
+
     __table_args__ = (
         UniqueConstraint('user_id', 'name', name='unique_user_space_name'),
     )

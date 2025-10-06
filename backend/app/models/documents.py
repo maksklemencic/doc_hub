@@ -43,6 +43,7 @@ class DocumentResponse(BaseModel):
     file_path: str = Field(..., description="Path where the document is stored.")
     mime_type: str = Field(..., description="MIME type of the document.")
     file_size: Optional[int] = Field(None, description="Size of the document file in bytes.")
+    url: Optional[str] = Field(None, description="URL for web documents and YouTube videos.")
     uploaded_by: uuid.UUID = Field(..., description="Unique identifier of the user who uploaded the document.")
     space_id: uuid.UUID = Field(..., description="Unique identifier of the space the document belongs to.")
     created_at: Optional[datetime] = Field(None, description="Timestamp when the document was uploaded, in ISO 8601 format.")

@@ -1,5 +1,5 @@
 import { ReactNode } from 'react'
-import { FileText, Video, Mic, Sparkles, Edit3, Globe, FileType, Youtube } from 'lucide-react'
+import { FileText, Video, Mic, Sparkles, Edit3, Globe, FileType, Youtube, Image } from 'lucide-react'
 
 export type TabDocumentType = 'pdf' | 'word' | 'video' | 'audio' | 'ai-note' | 'user-note' | 'web' | 'youtube' | 'image' | 'other'
 export type TabType = TabDocumentType | 'documents' | 'ai-chat'
@@ -15,7 +15,7 @@ export const iconMap: Record<TabType, any> = {
   'ai-chat': Sparkles,
   web: Globe,
   youtube: Youtube,
-  image: FileText,
+  image: Image,
   other: FileText,
 }
 

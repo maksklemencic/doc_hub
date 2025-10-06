@@ -50,6 +50,9 @@ export function useCreateSpace() {
       const optimisticSpace: SpaceResponse = {
         id: `temp-${Date.now()}`, // Temporary ID
         name: newSpace.name,
+        icon: newSpace.icon,
+        icon_color: newSpace.icon_color,
+        display_order: undefined,
         created_at: new Date().toISOString(),
         updated_at: new Date().toISOString(),
       }
@@ -125,12 +128,12 @@ export function useUpdateSpace() {
 
         return old.map(space =>
           space.id === spaceId
-            ? { ...space, name: data.name, updated_at: new Date().toISOString() }
+            ? { ...space, ...data, updated_at: new Date().toISOString() } as SpaceResponse
             : space
         )
       })
 
-      return { previousSpaces, toastId, newName: data.name }
+      return { previousSpaces, toastId, newData: data }
     },
 
     onError: (err, variables, context) => {
@@ -158,7 +161,7 @@ export function useUpdateSpace() {
 
       // Show success toast
       if (context?.toastId) {
-        toast.success(`Space renamed to "${data.name}"!`, {
+        toast.success(`Space updated successfully!`, {
           id: context.toastId,
         })
       }

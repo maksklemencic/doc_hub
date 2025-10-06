@@ -3,7 +3,7 @@ import os
 import uuid
 from typing import List, Optional
 
-from sqlalchemy import create_engine, exc, or_
+from sqlalchemy import create_engine, exc, or_, func
 from sqlalchemy.orm import sessionmaker
 
 from ..errors.database_errors import ConflictError, DatabaseError, NotFoundError, PermissionError
@@ -87,8 +87,9 @@ def add_document(
     mime_type: str,
     uploaded_by: uuid.UUID,
     space_id: uuid.UUID,
-    file_size: Optional[int] = None) -> uuid.UUID:
-    
+    file_size: Optional[int] = None,
+    url: Optional[str] = None) -> uuid.UUID:
+
     logger.info(f"Adding document {filename} to space {space_id} for user {uploaded_by}")
     with SessionLocal() as session:
         try:
@@ -97,6 +98,7 @@ def add_document(
                 file_path=file_path,
                 mime_type=mime_type,
                 file_size=file_size,
+                url=url,
                 uploaded_by=uploaded_by,
                 space_id=space_id
             )
@@ -213,11 +215,25 @@ def validate_space_ownership(space_id: uuid.UUID, user_id: uuid.UUID) -> None:
             logger.error(f"Database error validating space {space_id}: {str(e)}")
             raise DatabaseError(f"Error validating space: {str(e)}")
 
-def create_space(user_id: uuid.UUID, name: str) -> Space:
-    logger.info(f"Creating space '{name}' for user {user_id}")
+def create_space(user_id: uuid.UUID, name: str, icon: str = 'Folder', icon_color: str = 'text-gray-600') -> Space:
+    logger.info(f"Creating space '{name}' for user {user_id} with icon '{icon}' and color '{icon_color}'")
     with SessionLocal() as session:
         try:
-            space = Space(name=name, user_id=user_id)            
+            # Get the highest display_order for this user
+            max_order = session.query(func.max(Space.display_order)).filter(
+                Space.user_id == user_id
+            ).scalar()
+
+            # Set display_order to max + 1, or 0 if no spaces exist
+            next_order = (max_order + 1) if max_order is not None else 0
+
+            space = Space(
+                name=name,
+                user_id=user_id,
+                icon=icon,
+                icon_color=icon_color,
+                display_order=next_order
+            )
             session.add(space)
             session.commit()
             session.refresh(space)
@@ -242,12 +258,16 @@ def get_paginated_spaces(user_id: uuid.UUID, limit: int, offset: int) -> List[Sp
         try:
             query = session.query(Space).filter(Space.user_id == user_id)
             total_count = query.count()
-            
+
             if total_count == 0:
                 logger.info(f"No spaces found for user {user_id}")
                 return [], 0
 
-            spaces = query.offset(offset).limit(limit).all()
+            # Order by display_order (nulls last), then by created_at
+            spaces = query.order_by(
+                Space.display_order.nulls_last(),
+                Space.created_at.asc()
+            ).offset(offset).limit(limit).all()
             logger.info(f"Successfully fetched {len(spaces)} spaces for user {user_id}")
             return spaces, total_count
         except exc.OperationalError as e:
@@ -258,26 +278,39 @@ def get_paginated_spaces(user_id: uuid.UUID, limit: int, offset: int) -> List[Sp
             raise DatabaseError(f"Error fetching spaces: {str(e)}")
     
 
-def update_space(user_id: uuid.UUID, space_id: uuid.UUID, new_name: str) -> Optional[Space]:
-    logger.info(f"Updating space {space_id} for user {user_id} to new name '{new_name}'")
-    with SessionLocal() as session:  
+def update_space(
+    user_id: uuid.UUID,
+    space_id: uuid.UUID,
+    new_name: Optional[str] = None,
+    icon: Optional[str] = None,
+    icon_color: Optional[str] = None,
+    display_order: Optional[int] = None
+) -> Optional[Space]:
+    logger.info(f"Updating space {space_id} for user {user_id}")
+    with SessionLocal() as session:
         try:
             # First check if space exists at all
             space = session.query(Space).filter(Space.id == space_id).first()
             if not space:
                 logger.warning(f"Space {space_id} not found")
                 raise NotFoundError("Space", str(space_id))
-            
+
             # Then check if user has permission to update it
             if space.user_id != user_id:
                 logger.warning(f"Permission denied for user {user_id} on space {space_id}")
                 raise PermissionError("Not authorized to update this space")
-            
-            if space:
+
+            if new_name is not None:
                 space.name = new_name
-                session.commit()
-                session.refresh(space)
-                logger.info(f"Successfully updated space {space_id} for user {user_id}")
+            if icon is not None:
+                space.icon = icon
+            if icon_color is not None:
+                space.icon_color = icon_color
+            if display_order is not None:
+                space.display_order = display_order
+            session.commit()
+            session.refresh(space)
+            logger.info(f"Successfully updated space {space_id} for user {user_id}")
             return space
         
         except exc.OperationalError as e:
@@ -318,16 +351,31 @@ def delete_space(user_id: uuid.UUID, space_id: uuid.UUID):
             if not space:
                 logger.warning(f"Space {space_id} not found")
                 raise NotFoundError("Space", str(space_id))
-            
+
             # Then check if user has permission to delete it
             if space.user_id != user_id:
                 logger.warning(f"Permission denied for user {user_id} on space {space_id}")
                 raise PermissionError("Not authorized to delete this space")
-            
+
+            # Store the display_order of the deleted space
+            deleted_order = space.display_order
+
+            # Delete the space
             session.delete(space)
+
+            # Reorder remaining spaces with higher display_order (decrement by 1)
+            if deleted_order is not None:
+                session.query(Space).filter(
+                    Space.user_id == user_id,
+                    Space.display_order > deleted_order
+                ).update(
+                    {Space.display_order: Space.display_order - 1},
+                    synchronize_session=False
+                )
+
             session.commit()
-            logger.info(f"Successfully deleted space {space_id} for user {user_id}")
-            
+            logger.info(f"Successfully deleted space {space_id} and reordered remaining spaces for user {user_id}")
+
         except exc.OperationalError as e:
             session.rollback()
             logger.error(f"Database unavailable for user {user_id}: {str(e)}")
@@ -626,6 +674,27 @@ def create_user_from_oauth(email: str, name: str, picture: str | None = None, go
             session.commit()
             session.refresh(user)
             logger.info(f"Successfully created user from OAuth with email: {email}")
+
+            # Create default "Personal" space for new user only if they don't have any spaces
+            try:
+                existing_spaces = session.query(Space).filter(Space.user_id == user.id).count()
+                if existing_spaces == 0:
+                    default_space = Space(
+                        name="Personal",
+                        user_id=user.id,
+                        icon="Folder",
+                        icon_color="text-gray-600",
+                        display_order=0
+                    )
+                    session.add(default_space)
+                    session.commit()
+                    logger.info(f"Created default 'Personal' space for user {email}")
+                else:
+                    logger.debug(f"User {email} already has {existing_spaces} space(s), skipping default space creation")
+            except exc.SQLAlchemyError:
+                # Don't fail user creation if space creation fails
+                logger.exception("Failed to create default space for user %s", email)
+
             return user
         except exc.IntegrityError as e:
             session.rollback()

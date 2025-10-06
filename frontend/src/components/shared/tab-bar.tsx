@@ -150,7 +150,6 @@ function SortableTab({
           >
             <PanelLeftOpen className="mr-2 h-4 w-4" />
             Move to Left
-            {isOnlyTab && <span className="ml-auto text-xs text-muted-foreground">(closes right pane)</span>}
           </ContextMenuItem>
         )}
         {tab.closable !== false && (

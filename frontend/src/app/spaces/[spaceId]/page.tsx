@@ -1,348 +1,29 @@
 'use client'
 
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useCallback } from 'react'
 import { useParams } from 'next/navigation'
-import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
-import { Badge } from '@/components/ui/badge'
-import { ScrollArea } from '@/components/ui/scroll-area'
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
-import { Checkbox } from '@/components/ui/checkbox'
 import { Spinner } from '@/components/ui/spinner'
-import { DocumentCard, DocumentType as DocCardType } from '@/components/documents/document-card'
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from '@/components/ui/dialog'
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuLabel,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-  DropdownMenuCheckboxItem,
-} from '@/components/ui/dropdown-menu'
-import { SpaceChat } from '@/components/chat/space-chat'
-import {
-  Plus,
-  Minus,
-  Grid3X3,
-  List,
-  FileText,
-  Image as ImageIcon,
-  FileVideo,
-  Volume2,
-  Globe,
-  MoreHorizontal,
-  Download,
-  Edit3,
-  Search,
-  MessageSquare,
-  Trash2,
-  SlidersHorizontal,
-  ArrowUpDown,
-  ChevronDown,
-  Calendar,
-  HardDrive,
-  X,
-  ChevronUp,
-  ChevronDown as ChevronDownIcon,
-  Check
-} from 'lucide-react'
-import { cn } from '@/lib/utils'
+import { FileText } from 'lucide-react'
+import { ScrollArea } from '@/components/ui/scroll-area'
 import { DocumentUpload } from '@/components/shared/document-upload'
 import { Header } from '@/components/shared/header'
 import { Tab } from '@/components/shared/tab-bar'
 import { SplitPaneView } from '@/components/layout/split-pane-view'
 import { MiniAIChat } from '@/components/chat/mini-ai-chat'
+import { SpaceChat } from '@/components/chat/space-chat'
+import { DocumentViewer } from '@/components/documents/document-viewer'
+import { DocumentsToolbar, SortBy, SortOrder } from '@/components/documents/documents-toolbar'
+import { DocumentsGrid } from '@/components/documents/documents-grid'
+import { DocumentsTable } from '@/components/documents/documents-table'
+import { DeleteConfirmationDialog } from '@/components/documents/delete-confirmation-dialog'
+import { EmptyState } from '@/components/shared/empty-state'
 import { useSpaceDocuments, useDeleteDocument, useDeleteDocumentSilent } from '@/hooks/use-documents'
-import { DocumentResponse, documentsApi } from '@/lib/api'
+import { DocumentResponse } from '@/lib/api'
 import { useSpacesContext } from '@/contexts/spaces-context'
+import { getDocumentType, DocumentType } from '@/utils/document-utils'
 import toast from 'react-hot-toast'
-import { Document, Page, pdfjs } from 'react-pdf'
-import 'react-pdf/dist/Page/AnnotationLayer.css'
-import 'react-pdf/dist/Page/TextLayer.css'
-import Image from 'next/image'
 
-// Configure PDF.js worker
-pdfjs.GlobalWorkerOptions.workerSrc = `//unpkg.com/pdfjs-dist@${pdfjs.version}/build/pdf.worker.min.mjs`
-
-// Document Viewer Component for Right Pane
-function DocumentViewer({ documentId, filename, mimeType }: { documentId: string; filename: string; mimeType?: string }) {
-  const [pdfUrl, setPdfUrl] = useState<string | null>(null)
-  const [docType, setDocType] = useState<string>('pdf')
-  const [isLoading, setIsLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
-  const [numPages, setNumPages] = useState<number>(0)
-  const [scale, setScale] = useState<number>(1.0)
-  const scrollAreaRef = useRef<HTMLDivElement>(null)
-
-  // Handle wheel zoom (Ctrl/Cmd + scroll)
-  useEffect(() => {
-   const handleWheel = (e: Event) => {
-  const wheelEvent = e as WheelEvent
-  if (wheelEvent.ctrlKey || wheelEvent.metaKey) {
-    wheelEvent.preventDefault()
-    const delta = wheelEvent.deltaY
-    const zoomChange = delta > 0 ? -0.1 : 0.1
-    setScale(prev => Math.min(2.0, Math.max(0.5, prev + zoomChange)))
-  }
-}
-
-
-    const scrollElement = scrollAreaRef.current?.querySelector('[data-radix-scroll-area-viewport]')
-
-    if (scrollElement) {
-      scrollElement.addEventListener('wheel', handleWheel, { passive: false })
-    }
-
-    return () => {
-      if (scrollElement) {
-        scrollElement.removeEventListener('wheel', handleWheel)
-      }
-    }
-  }, [])
-
-  useEffect(() => {
-    let mounted = true
-    let currentUrl: string | null = null
-
-    const loadDocument = async () => {
-      setIsLoading(true)
-      setError(null)
-
-      // Check if document type is supported for preview
-      const unsupportedTypes = ['text/youtube', 'audio/', 'video/', 'html']
-      const isUnsupported = unsupportedTypes.some(type => mimeType?.includes(type))
-
-      if (isUnsupported) {
-        if (mounted) {
-          setIsLoading(false)
-          setDocType('unsupported')
-        }
-        return
-      }
-
-      try {
-        const result = await documentsApi.getDocumentFile(documentId)
-        currentUrl = result.url
-
-        if (mounted) {
-          setPdfUrl(result.url)
-          setDocType(result.docType)
-        } else {
-          URL.revokeObjectURL(result.url)
-        }
-      } catch (err: any) {
-        console.error('Failed to load document:', err)
-        if (mounted) {
-          setError('Failed to load document')
-        }
-      } finally {
-        if (mounted) {
-          setIsLoading(false)
-        }
-      }
-    }
-
-    loadDocument()
-
-    return () => {
-      mounted = false
-      if (currentUrl) {
-        URL.revokeObjectURL(currentUrl)
-      }
-    }
-  }, [documentId, mimeType])
-
-  const onDocumentLoadSuccess = ({ numPages }: { numPages: number }) => {
-    setNumPages(numPages)
-  }
-
-  if (isLoading) {
-    return (
-      <div className="h-full flex items-center justify-center">
-        <Spinner className="mr-2" />
-        <span className="text-muted-foreground">Loading document...</span>
-      </div>
-    )
-  }
-
-  if (error) {
-    return (
-      <div className="h-full flex items-center justify-center">
-        <div className="text-center">
-          <FileText className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
-          <h3 className="text-lg font-medium mb-2">Failed to load document</h3>
-          <p className="text-muted-foreground">{error}</p>
-        </div>
-      </div>
-    )
-  }
-
-  if (docType === 'unsupported') {
-    return (
-      <div className="h-full flex items-center justify-center">
-        <div className="text-center">
-          <FileText className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
-          <h3 className="text-lg font-medium mb-2">Preview not supported</h3>
-          <p className="text-muted-foreground">
-            This document type cannot be previewed in the browser.
-          </p>
-        </div>
-      </div>
-    )
-  }
-
-  if (!pdfUrl) return null
-
-  const getScaledWidth = () => {
-    if (typeof window === 'undefined') return 600
-    const containerWidth = window.innerWidth - 100
-
-    if (scale === -1) {
-      // Fit to screen mode
-      return containerWidth
-    }
-
-    const baseWidth = Math.min(600, containerWidth)
-    return baseWidth * scale
-  }
-
-  const scaledWidth = getScaledWidth()
-
-  return (
-    <div className="h-full flex flex-col bg-background relative">
-      {/* Zoom Controls - Floating overlay on the right side */}
-      {docType !== 'image' && docType !== 'web' && (
-        <div className="absolute top-4 right-4 z-10 flex flex-col gap-1 bg-background/95 backdrop-blur-sm border border-border rounded-lg shadow-lg p-2">
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => setScale(Math.min(2.0, scale === -1 ? 1.1 : scale + 0.1))}
-            disabled={scale >= 2.0}
-            className="h-8 w-8 p-0"
-            title="Zoom in (10%)"
-          >
-            <Plus className="h-4 w-4" />
-          </Button>
-          <div className="text-xs font-medium text-center py-1 min-w-[40px]">
-            {scale === -1 ? 'Fit' : `${Math.round(scale * 100)}%`}
-          </div>
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => setScale(Math.max(0.5, scale === -1 ? 0.9 : scale - 0.1))}
-            disabled={scale <= 0.5 && scale !== -1}
-            className="h-8 w-8 p-0"
-            title="Zoom out (10%)"
-          >
-            <Minus className="h-4 w-4" />
-          </Button>
-          <div className="h-px bg-border my-1" />
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => setScale(-1)}
-            className="h-8 w-8 p-0"
-            title="Fit to screen"
-          >
-            <ArrowUpDown className="h-3.5 w-3.5" />
-          </Button>
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => setScale(1.0)}
-            className="h-8 w-8 p-0 text-xs"
-            title="Reset to 100%"
-          >
-            1:1
-          </Button>
-        </div>
-      )}
-
-      <ScrollArea className="h-full">
-        <div className="p-6 flex flex-col items-center" ref={scrollAreaRef}>
-          {docType === 'image' || docType === 'web' || mimeType?.startsWith('image/') ? (
-            <div className="w-full flex flex-col items-center justify-center">
-              <div className="relative w-full max-w-4xl">
-                <Image
-                  src={pdfUrl}
-                  alt={filename}
-                  width={0}
-                  height={0}
-                  sizes="100vw"
-                  style={{ width: '100%', height: 'auto' }}
-                  className="rounded-lg shadow-lg"
-                  unoptimized
-                />
-              </div>
-            </div>
-          ) : (
-            <Document
-              file={pdfUrl}
-              onLoadSuccess={onDocumentLoadSuccess}
-              loading={
-                <div className="flex items-center justify-center py-12">
-                  <Spinner className="mr-2" />
-                  <span className="text-muted-foreground">Loading PDF...</span>
-                </div>
-              }
-              error={
-                <div className="text-center py-12">
-                  <FileText className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
-                  <h3 className="text-lg font-medium mb-2">Failed to render document</h3>
-                </div>
-              }
-            >
-              {Array.from(new Array(numPages), (el, index) => (
-                <Page
-                  key={`page_${index + 1}`}
-                  pageNumber={index + 1}
-                  className="mb-4 shadow-lg"
-                  width={scaledWidth}
-                  renderTextLayer={true}
-                  renderAnnotationLayer={true}
-                />
-              ))}
-            </Document>
-          )}
-        </div>
-      </ScrollArea>
-    </div>
-  )
-}
-
-enum DocumentType {
-  word = 'word',
-  pdf = 'pdf',
-  image = 'image',
-  audio = 'audio',
-  video = 'video',
-  web = 'web',
-  youtube = 'youtube',
-  other = 'other'
-}
 type ViewMode = 'list' | 'grid'
-type SortBy = 'date' | 'name' | 'size'
-type SortOrder = 'asc' | 'desc'
-
-// Helper function to determine document type from mime_type
-const getDocumentType = (mimeType: string): DocumentType => {
-  if (mimeType.includes('pdf')) return DocumentType.pdf
-  if (mimeType.includes('word') || mimeType.includes('document')) return DocumentType.word
-  if (mimeType.startsWith('image/')) return DocumentType.image
-  if (mimeType.startsWith('audio/')) return DocumentType.audio
-  if (mimeType.startsWith('video/')) return DocumentType.video
-  if (mimeType.includes('youtube')) return DocumentType.youtube
-  if (mimeType.includes('html')) return DocumentType.web
-  return DocumentType.other
-}
 
 export default function SpacePage() {
   const params = useParams()
@@ -365,9 +46,11 @@ export default function SpacePage() {
   const [documentToDelete, setDocumentToDelete] = useState<string | null>(null)
   const [isDeleting, setIsDeleting] = useState(false)
   const [selectedTypes, setSelectedTypes] = useState<Set<DocumentType>>(new Set())
-  const [typeFilterSearch, setTypeFilterSearch] = useState('')
   const [sortBy, setSortBy] = useState<SortBy>('date')
   const [sortOrder, setSortOrder] = useState<SortOrder>('desc') // newest first by default
+  const [gridColumns, setGridColumns] = useState(4)
+  const gridContainerRef = useRef<HTMLDivElement>(null)
+  const documentsPaneRef = useRef<HTMLDivElement>(null)
 
   // Tab management for new UI
   const [tabs, setTabs] = useState<Tab[]>([
@@ -381,18 +64,11 @@ export default function SpacePage() {
   ])
   const [rightTabs, setRightTabs] = useState<Tab[]>([])
 
+  // Zoom state persistence per TAB ID (not document ID, so same doc in different tabs has separate zoom)
+  const [tabZoomStates, setTabZoomStates] = useState<Record<string, { scale: number; isFitToWidth: boolean }>>({})
+
   // Get documents from API response
   const documents: DocumentResponse[] = documentsData?.documents || []
-
-  // Helper function to get file size from backend
-  const getFileSize = (document: DocumentResponse): number => {
-    return document.file_size || 0
-  }
-
-  // Calculate total size of all documents
-  const getTotalSize = (): number => {
-    return documents.reduce((total, doc) => total + getFileSize(doc), 0)
-  }
 
   // Apply filtering and sorting
   const filteredAndSortedDocuments = documents
@@ -417,13 +93,12 @@ export default function SpacePage() {
           comparison = a.filename.toLowerCase().localeCompare(b.filename.toLowerCase())
           break
         case 'size':
-          comparison = getFileSize(a) - getFileSize(b)
+          comparison = (a.file_size || 0) - (b.file_size || 0)
           break
       }
 
       return sortOrder === 'asc' ? comparison : -comparison
     })
-
 
   // For backward compatibility, keep filteredDocuments
   const filteredDocuments = filteredAndSortedDocuments
@@ -442,6 +117,75 @@ export default function SpacePage() {
       }
     }
   }, [searchTerm, selectedTypes, sortBy, sortOrder]) // Re-run when any filter changes
+
+  // Function to update grid columns based on container width
+  const updateGridColumns = () => {
+    // Observe the documents pane (parent) instead of the grid itself
+    const containerToMeasure = documentsPaneRef.current || gridContainerRef.current
+
+    if (containerToMeasure) {
+      const width = containerToMeasure.offsetWidth
+
+      // Calculate optimal columns based on actual container width
+      // Account for padding: px-6 on the container = 24px each side = 48px total
+      const padding = 48
+      const availableWidth = width - padding
+
+      // Card width: ~280px minimum with gaps
+      const minCardWidth = 280
+      const gap = 16 // gap-4 in tailwind = 16px
+
+      // Calculate how many cards can fit
+      let cols = Math.floor((availableWidth + gap) / (minCardWidth + gap))
+      cols = Math.max(1, Math.min(4, cols)) // Between 1 and 4
+
+      // Only update if different to avoid unnecessary re-renders
+      if (cols !== gridColumns) {
+        setGridColumns(cols)
+      }
+    }
+  }
+
+  // Update grid columns based on container width
+  useEffect(() => {
+    // Small delay to ensure container has rendered
+    const timer = setTimeout(updateGridColumns, 100)
+
+    const resizeObserver = new ResizeObserver(() => {
+      updateGridColumns()
+    })
+
+    // Observe the documents pane (the container that actually resizes with split pane)
+    const elementToObserve = documentsPaneRef.current || gridContainerRef.current
+    if (elementToObserve) {
+      resizeObserver.observe(elementToObserve)
+    }
+
+    return () => {
+      clearTimeout(timer)
+      resizeObserver.disconnect()
+    }
+  }, [])
+
+  // Recalculate grid when split pane opens/closes
+  useEffect(() => {
+    let timerId: NodeJS.Timeout | null = null
+
+    // Use requestAnimationFrame to ensure DOM has updated
+    const rafId = requestAnimationFrame(() => {
+      updateGridColumns()
+
+      // Double-check after layout settles
+      timerId = setTimeout(() => {
+        updateGridColumns()
+      }, 50)
+    })
+
+    return () => {
+      cancelAnimationFrame(rafId)
+      if (timerId) clearTimeout(timerId)
+    }
+  }, [rightTabs.length])
 
   const handleDeleteDocument = (documentId: string) => {
     setDocumentToDelete(documentId)
@@ -516,11 +260,6 @@ export default function SpacePage() {
 
   const handleDeselectAll = () => {
     setSelectedDocuments(new Set())
-  }
-
-  const handleBulkDelete = () => {
-    if (selectedDocuments.size === 0) return
-    setDeleteDialogOpen(true)
   }
 
   const handleTypeFilter = (type: DocumentType) => {
@@ -747,298 +486,52 @@ export default function SpacePage() {
     }
   }
 
-  // Get available document types from current documents
-  const availableTypes = Array.from(new Set(documents.map(doc => getDocumentType(doc.mime_type))))
+  const handleOpenInRightPane = (document: DocumentResponse) => {
+    // Close document in left pane if open
+    const leftTab = tabs.find((t) => t.id === document.id)
+    if (leftTab) {
+      setTabs(tabs.filter((t) => t.id !== document.id))
+    }
 
-  const getTypeIcon = (type: DocumentType) => {
-    switch (type) {
-      case DocumentType.pdf: return <FileText className="h-4 w-4 text-red-600" />
-      case DocumentType.word: return <FileText className="h-4 w-4 text-blue-600" />
-      case DocumentType.image: return <ImageIcon className="h-4 w-4 text-green-600" />
-      case DocumentType.audio: return <Volume2 className="h-4 w-4 text-yellow-600" />
-      case DocumentType.video: return <FileVideo className="h-4 w-4 text-purple-600" />
-      case DocumentType.web: return <Globe className="h-4 w-4 text-indigo-600" />
-      default: return <FileText className="h-4 w-4 text-gray-600" />
+    // Open document in right pane
+    const docType = getDocumentType(document.mime_type)
+    const existingTab = rightTabs.find((t) => t.id === document.id)
+    if (existingTab) {
+      setRightTabs(rightTabs.map((tab) => ({ ...tab, isActive: tab.id === document.id })))
+    } else {
+      setRightTabs([
+        ...rightTabs.map((t) => ({ ...t, isActive: false })),
+        {
+          id: document.id,
+          title: document.filename,
+          type: docType as any,
+          isActive: true,
+          closable: true,
+        },
+      ])
     }
   }
 
-  const getTypeName = (type: DocumentType) => {
-    switch (type) {
-      case DocumentType.pdf: return 'PDF'
-      case DocumentType.word: return 'Word'
-      case DocumentType.image: return 'Image'
-      case DocumentType.audio: return 'Audio'
-      case DocumentType.video: return 'Video'
-      case DocumentType.web: return 'web'
-      default: return 'Other'
-    }
-  }
-
-  const formatFileSize = (bytes: number | null | undefined, docType?: DocumentType): string => {
-    // For web documents, show "Link" instead of size
-    if (docType === DocumentType.web) return 'Link'
-
-    // Handle invalid or missing file sizes
-    if (bytes === null || bytes === undefined) return 'Unknown'
-
-    // Convert to number if it's a string
-    const numBytes = typeof bytes === 'string' ? parseFloat(bytes) : bytes
-
-    if (isNaN(numBytes)) return 'Unknown'
-
-    // Handle zero bytes
-    if (numBytes === 0) return '0 Bytes'
-
-    const k = 1024
-    const sizes = ['Bytes', 'KB', 'MB', 'GB']
-    const i = Math.floor(Math.log(numBytes) / Math.log(k))
-    return parseFloat((numBytes / Math.pow(k, i)).toFixed(1)) + ' ' + sizes[i]
-  }
-
-  const formatDate = (dateString: string): string => {
-    const date = new Date(dateString)
-    return date.toLocaleDateString('en-US', {
-      month: 'short',
-      day: 'numeric',
-      year: 'numeric'
-    })
-  }
-
-  const getPageCount = (document: DocumentResponse, docType: DocumentType): string | undefined => {
-    // Only show page count for PDF and Word documents
-    if (docType !== DocumentType.pdf && docType !== DocumentType.word) {
-      return undefined
-    }
-
-    // Check if document has page_count metadata
-
-    // if (document.page_count && document.page_count > 0) {
-    //   return `${document.page_count} pages`
-    // }
-
-    return undefined
-  }
-
-  const getFileIcon = (type: DocumentType) => {
-    switch (type) {
-      case DocumentType.pdf:
-      case DocumentType.word:
-        return <FileText className="h-5 w-5" />
-      case DocumentType.image:
-        return <ImageIcon className="h-5 w-5" />
-      case DocumentType.audio:
-        return <Volume2 className="h-5 w-5" />
-      case DocumentType.video:
-        return <FileVideo className="h-5 w-5" />
-      case DocumentType.web:
-        return <Globe className="h-5 w-5" />
-      default:
-        return <FileText className="h-5 w-5" />
-    }
-  }
-
-  const getFileTypeColor = (type: DocumentType) => {
-    switch (type) {
-      case DocumentType.pdf:
-        return 'bg-red-100 text-red-800'
-      case DocumentType.word:
-        return 'bg-blue-100 text-blue-800'
-      case DocumentType.image:
-        return 'bg-green-100 text-green-800'
-      case DocumentType.audio:
-        return 'bg-yellow-100 text-yellow-800'
-      case DocumentType.video:
-        return 'bg-purple-100 text-purple-800'
-      case DocumentType.web:
-        return 'bg-indigo-100 text-indigo-800'
-      default:
-        return 'bg-gray-100 text-gray-800'
-    }
+  const handleAddToContext = (document: DocumentResponse) => {
+    toast.success(`Added ${document.filename} to chat context`)
   }
 
   const documentsContent = (
-    <div className="h-full flex flex-col relative min-w-0 bg-background">
+    <div ref={documentsPaneRef} className="h-full flex flex-col relative min-w-0 bg-background">
       <div className="h-full flex flex-col min-w-0">
         {documents.length > 0 && (
-          <div className="px-6 pt-4 pb-3 border-b border-border flex-shrink-0 min-w-0">
-            {/* Search and Filter Row */}
-            <div className="flex items-center gap-3">
-              {/* Search Bar */}
-              <div className="relative w-64">
-                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                <Input
-                  placeholder="Search documents..."
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                  className="pl-10 h-9 bg-white"
-                />
-              </div>
-
-              {/* Sort and Filter */}
-              <div className="flex items-center gap-2 flex-1">
-                {/* Selected documents indicator */}
-                {selectedDocuments.size > 0 && (
-                  <div className="flex items-center gap-2 px-3 py-1.5 bg-teal-50 text-teal-900 rounded-md text-sm ml-auto">
-                    <span className="font-medium">{selectedDocuments.size} selected</span>
-                    <button
-                      onClick={handleDeselectAll}
-                      className="text-teal-600 hover:text-teal-800 transition-colors"
-                      title="Clear selection"
-                    >
-                      <X className="h-4 w-4" />
-                    </button>
-                  </div>
-                )}
-              </div>
-
-              <div className="flex items-center gap-2">
-                {/* Sort Options */}
-                <DropdownMenu>
-                  <DropdownMenuTrigger asChild>
-                    <Button variant="outline" size="sm" className="h-9 bg-white">
-                      <ArrowUpDown className="h-4 w-4 mr-2" />
-                      {sortBy === 'date' ? 'Date' : sortBy === 'name' ? 'Name' : 'Size'}
-                      {sortOrder === 'asc' ? ' ↑' : ' ↓'}
-                    </Button>
-                  </DropdownMenuTrigger>
-                  <DropdownMenuContent align="end" className="w-52 p-2">
-                    <DropdownMenuLabel className="text-sm font-medium text-gray-900 px-2 py-1">
-                      Sort by
-                    </DropdownMenuLabel>
-                    <DropdownMenuSeparator className="my-2" />
-                    <div className="space-y-1">
-                      <DropdownMenuItem
-                        onClick={() => handleSort('date')}
-                        className="cursor-pointer px-2 py-2 rounded-md hover:bg-teal-50 hover:text-teal-900 transition-colors duration-150"
-                      >
-                        <div className="flex items-center justify-between w-full">
-                          <div className="flex items-center">
-                            <Calendar className="h-4 w-4 mr-3 text-gray-500" />
-                            <span className="text-sm">Date Added</span>
-                          </div>
-                          {sortBy === 'date' && (
-                            sortOrder === 'desc' ? (
-                              <ChevronDownIcon className="h-4 w-4 text-teal-600" />
-                            ) : (
-                              <ChevronUp className="h-4 w-4 text-teal-600" />
-                            )
-                          )}
-                        </div>
-                      </DropdownMenuItem>
-                      <DropdownMenuItem
-                        onClick={() => handleSort('name')}
-                        className="cursor-pointer px-2 py-2 rounded-md hover:bg-teal-50 hover:text-teal-900 transition-colors duration-150"
-                      >
-                        <div className="flex items-center justify-between w-full">
-                          <div className="flex items-center">
-                            <FileText className="h-4 w-4 mr-3 text-gray-500" />
-                            <span className="text-sm">Name</span>
-                          </div>
-                          {sortBy === 'name' && (
-                            sortOrder === 'desc' ? (
-                              <ChevronDownIcon className="h-4 w-4 text-teal-600" />
-                            ) : (
-                              <ChevronUp className="h-4 w-4 text-teal-600" />
-                            )
-                          )}
-                        </div>
-                      </DropdownMenuItem>
-                      <DropdownMenuItem
-                        onClick={() => handleSort('size')}
-                        className="cursor-pointer px-2 py-2 rounded-md hover:bg-teal-50 hover:text-teal-900 transition-colors duration-150"
-                      >
-                        <div className="flex items-center justify-between w-full">
-                          <div className="flex items-center">
-                            <HardDrive className="h-4 w-4 mr-3 text-gray-500" />
-                            <span className="text-sm">File Size</span>
-                          </div>
-                          {sortBy === 'size' && (
-                            sortOrder === 'desc' ? (
-                              <ChevronDownIcon className="h-4 w-4 text-teal-600" />
-                            ) : (
-                              <ChevronUp className="h-4 w-4 text-teal-600" />
-                            )
-                          )}
-                        </div>
-                      </DropdownMenuItem>
-                    </div>
-                  </DropdownMenuContent>
-                </DropdownMenu>
-
-                {/* Filter by Type */}
-                <DropdownMenu>
-                  <DropdownMenuTrigger asChild>
-                    <Button
-                      variant={selectedTypes.size > 0 ? "default" : "outline"}
-                      size="sm"
-                      className={selectedTypes.size > 0 ? "h-9" : "h-9 bg-white"}
-                    >
-                      <SlidersHorizontal className="h-4 w-4 mr-2" />
-                      Filter
-                      {selectedTypes.size > 0 && (
-                        <Badge variant="secondary" className="ml-2 h-5 px-1.5 bg-white/20 text-white border-0">
-                          {selectedTypes.size}
-                        </Badge>
-                      )}
-                    </Button>
-                  </DropdownMenuTrigger>
-                  <DropdownMenuContent align="end" className="w-56 p-2">
-                    <DropdownMenuLabel className="text-sm font-medium text-gray-900 px-2 py-1">
-                      Filter by Type
-                    </DropdownMenuLabel>
-                    <DropdownMenuSeparator className="my-2" />
-
-                    {/* Search Input */}
-                    <div className="px-2 pb-2">
-                      <Input
-                        placeholder="Search types..."
-                        value={typeFilterSearch}
-                        onChange={(e) => setTypeFilterSearch(e.target.value)}
-                        className="h-8 text-sm"
-                      />
-                    </div>
-
-                    <div className="space-y-1 max-h-64 overflow-y-auto">
-                      {Object.values(DocumentType)
-                        .filter((type) =>
-                          type.toLowerCase().includes(typeFilterSearch.toLowerCase())
-                        )
-                        .map((type) => {
-                          const typeColor = getFileTypeColor(type as DocumentType)
-                          const isSelected = selectedTypes.has(type as DocumentType)
-                          return (
-                            <div
-                              key={type}
-                              onClick={() => handleTypeFilter(type as DocumentType)}
-                              className="cursor-pointer px-2 py-2 rounded-md hover:bg-teal-50 transition-colors duration-150 flex items-center justify-between"
-                            >
-                              <Badge variant="secondary" className={cn("text-xs px-2 py-0.5", typeColor)}>
-                                {type.toUpperCase()}
-                              </Badge>
-                              {isSelected && (
-                                <Check className="h-4 w-4 text-teal-600" />
-                              )}
-                            </div>
-                          )
-                        })}
-                    </div>
-                    {selectedTypes.size > 0 && (
-                      <>
-                        <DropdownMenuSeparator className="my-2" />
-                        <DropdownMenuItem
-                          onClick={clearAllFilters}
-                          className="cursor-pointer px-2 py-2 rounded-md hover:bg-red-50 hover:text-red-600 transition-colors duration-150"
-                        >
-                          <X className="h-4 w-4 mr-2" />
-                          Clear All Filters
-                        </DropdownMenuItem>
-                      </>
-                    )}
-                  </DropdownMenuContent>
-                </DropdownMenu>
-              </div>
-            </div>
-          </div>
+          <DocumentsToolbar
+            searchTerm={searchTerm}
+            onSearchChange={setSearchTerm}
+            sortBy={sortBy}
+            sortOrder={sortOrder}
+            onSortChange={handleSort}
+            selectedTypes={selectedTypes}
+            onTypeFilterChange={handleTypeFilter}
+            onClearFilters={clearAllFilters}
+            selectedDocumentsCount={selectedDocuments.size}
+            onDeselectAll={handleDeselectAll}
+          />
         )}
 
         {/* Scrollable Documents Display */}
@@ -1046,178 +539,65 @@ export default function SpacePage() {
           {documents.length === 0 && !isLoading && !error ? (
             // Centered no documents message when no documents exist
             <div className="h-full flex items-center justify-center">
-              <div className="text-center">
-                <FileText className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
-                <h3 className="text-lg font-medium mb-2">No documents found</h3>
-                <p className="text-muted-foreground">
-                  Get started by adding your first document
-                </p>
-              </div>
+              <EmptyState
+                icon={FileText}
+                title="No documents found"
+                description="Get started by adding your first document"
+              />
             </div>
           ) : (
             <ScrollArea className="h-full px-6 scrollbar-thin">
               <div className="pb-6">
-              {isLoading ? (
-                <div className="flex items-center justify-center py-12">
-                  <Spinner className="mr-2" />
-                  <span className="text-muted-foreground">Loading documents...</span>
-                </div>
-              ) : error ? (
-                <div className="text-center py-12">
-                  <FileText className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
-                  <h3 className="text-lg font-medium mb-2">Failed to load documents</h3>
-                  <p className="text-muted-foreground mb-4">
-                    There was an error loading the documents for this space.
-                  </p>
-                </div>
-              ) : viewMode === 'list' ? (
-                <div className="overflow-x-auto">
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead className="w-[50px]">
-                          <Checkbox
-                            checked={selectedDocuments.size === filteredDocuments.length && filteredDocuments.length > 0}
-                            onCheckedChange={handleSelectAll}
-                          />
-                        </TableHead>
-                        <TableHead className="w-[50px]"></TableHead>
-                        <TableHead className="min-w-[200px]">Name</TableHead>
-                        <TableHead className="w-[80px]">Type</TableHead>
-                        <TableHead className="w-[100px]">Size</TableHead>
-                        <TableHead className="w-[120px]">Date Added</TableHead>
-                        <TableHead className="w-[120px]">Actions</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                  <TableBody>
-                    {filteredDocuments.map((document) => {
-                      const docType = getDocumentType(document.mime_type)
-                      return (
-                        <TableRow
-                          key={document.id}
-                          className="hover:bg-muted/50 cursor-pointer"
-                          onClick={() => handleDocumentClick(document.id)}
-                        >
-                          <TableCell onClick={(e) => e.stopPropagation()}>
-                            <Checkbox
-                              checked={selectedDocuments.has(document.id)}
-                              onCheckedChange={() => handleSelectDocument(document.id)}
-                            />
-                          </TableCell>
-                          <TableCell>
-                            <div className="text-muted-foreground">
-                              {getFileIcon(docType)}
-                            </div>
-                          </TableCell>
-                          <TableCell className="font-medium max-w-0">
-                            <div className="truncate" title={document.filename}>
-                              {document.filename}
-                            </div>
-                          </TableCell>
-                          <TableCell>
-                            <Badge variant="secondary" className={cn("text-xs", getFileTypeColor(docType))}>
-                              {docType.toUpperCase()}
-                            </Badge>
-                          </TableCell>
-                          <TableCell className="text-muted-foreground">
-                            {formatFileSize(getFileSize(document), docType)}
-                          </TableCell>
-                          <TableCell className="text-muted-foreground">
-                            {formatDate(document.created_at)}
-                          </TableCell>
-                          <TableCell onClick={(e) => e.stopPropagation()}>
-                            <div className="flex items-center gap-1">
-                              <Button variant="ghost" size="sm">
-                                <Download className="h-4 w-4" />
-                              </Button>
-                              <Button variant="ghost" size="sm">
-                                <Edit3 className="h-4 w-4" />
-                              </Button>
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                onClick={() => handleDeleteDocument(document.id)}
-                              >
-                                <Trash2 className="h-4 w-4" />
-                              </Button>
-                            </div>
-                          </TableCell>
-                        </TableRow>
-                      )
-                    })}
-                    </TableBody>
-                  </Table>
-                </div>
-              ) : (
-                // Grid View
-                <div
-                  className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 px-0 py-6"
-                  onClick={handleDeselectAll}
-                >
-                  {filteredDocuments.map((document) => {
-                    const docType = getDocumentType(document.mime_type)
-                    return (
-                      <DocumentCard
-                        key={document.id}
-                        id={document.id}
-                        filename={document.filename}
-                        type={docType as DocCardType}
-                        size={formatFileSize(getFileSize(document), docType)}
-                        timestamp={formatDate(document.created_at)}
-                        pageCount={getPageCount(document, docType)}
-                        url={document.url}
-                        isSelected={selectedDocuments.has(document.id)}
-                        onSelect={() => handleSelectDocument(document.id)}
-                        onClick={() => handleDocumentClick(document.id)}
-                        onDelete={() => handleDeleteDocument(document.id)}
-                        onOpenInRightPane={() => {
-                          // Close document in left pane if open
-                          const leftTab = tabs.find((t) => t.id === document.id)
-                          if (leftTab) {
-                            setTabs(tabs.filter((t) => t.id !== document.id))
-                          }
+                {isLoading ? (
+                  <div className="flex items-center justify-center py-12">
+                    <Spinner className="mr-2" />
+                    <span className="text-muted-foreground">Loading documents...</span>
+                  </div>
+                ) : error ? (
+                  <div className="text-center py-12">
+                    <EmptyState
+                      icon={FileText}
+                      title="Failed to load documents"
+                      description="There was an error loading the documents for this space."
+                    />
+                  </div>
+                ) : viewMode === 'list' ? (
+                  <DocumentsTable
+                    documents={filteredDocuments}
+                    selectedDocuments={selectedDocuments}
+                    onDocumentClick={handleDocumentClick}
+                    onSelectDocument={handleSelectDocument}
+                    onSelectAll={handleSelectAll}
+                    onDeleteDocument={handleDeleteDocument}
+                  />
+                ) : (
+                  <DocumentsGrid
+                    documents={filteredDocuments}
+                    selectedDocuments={selectedDocuments}
+                    gridColumns={gridColumns}
+                    onDocumentClick={handleDocumentClick}
+                    onSelectDocument={handleSelectDocument}
+                    onDeleteDocument={handleDeleteDocument}
+                    onDeselectAll={handleDeselectAll}
+                    onOpenInRightPane={handleOpenInRightPane}
+                    onAddToContext={handleAddToContext}
+                  />
+                )}
 
-                          // Open document in right pane
-                          const existingTab = rightTabs.find((t) => t.id === document.id)
-                          if (existingTab) {
-                            setRightTabs(rightTabs.map((tab) => ({ ...tab, isActive: tab.id === document.id })))
-                          } else {
-                            setRightTabs([
-                              ...rightTabs.map((t) => ({ ...t, isActive: false })),
-                              {
-                                id: document.id,
-                                title: document.filename,
-                                type: docType as any,
-                                isActive: true,
-                                closable: true,
-                              },
-                            ])
-                          }
-                        }}
-                        onAddToContext={() => {
-                          toast.success(`Added ${document.filename} to chat context`)
-                        }}
-                      />
-                    )
-                  })}
-                </div>
-              )}
-
-              {filteredDocuments.length === 0 && !isLoading && !error && searchTerm && (
-                <div className="text-center py-12">
-                  <FileText className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
-                  <h3 className="text-lg font-medium mb-2">No documents found</h3>
-                  <p className="text-muted-foreground">
-                    Try adjusting your search terms
-                  </p>
-                </div>
-              )}
-            </div>
-          </ScrollArea>
+                {filteredDocuments.length === 0 && !isLoading && !error && searchTerm && (
+                  <div className="text-center py-12">
+                    <EmptyState
+                      icon={FileText}
+                      title="No documents found"
+                      description="Try adjusting your search terms"
+                    />
+                  </div>
+                )}
+              </div>
+            </ScrollArea>
           )}
         </div>
       </div>
-      
     </div>
   )
 
@@ -1229,6 +609,14 @@ export default function SpacePage() {
       onChatStateChange={setChatState}
     />
   )
+
+  // Create stable callback for zoom state changes
+  const handleZoomStateChange = useCallback((tabId: string, state: { scale: number; isFitToWidth: boolean }) => {
+    setTabZoomStates(prev => ({
+      ...prev,
+      [tabId]: state
+    }))
+  }, [])
 
   // Render content based on active tab
   const renderLeftContent = () => {
@@ -1259,7 +647,17 @@ export default function SpacePage() {
     // Document preview tab
     const document = documents.find(d => d.id === activeTab.id)
     if (document) {
-      return <DocumentViewer documentId={document.id} filename={document.filename} mimeType={document.mime_type} />
+      const zoomKey = `left:${activeTab.id}` // Unique per pane + tab
+      return (
+        <DocumentViewer
+          key={zoomKey}
+          documentId={document.id}
+          filename={document.filename}
+          mimeType={document.mime_type}
+          zoomState={tabZoomStates[zoomKey]}
+          onZoomStateChange={(state) => handleZoomStateChange(zoomKey, state)}
+        />
+      )
     }
 
     return documentsContent
@@ -1285,7 +683,17 @@ export default function SpacePage() {
     // Document preview in right pane
     const document = documents.find(d => d.id === activeTab.id)
     if (document) {
-      return <DocumentViewer documentId={document.id} filename={document.filename} mimeType={document.mime_type} />
+      const zoomKey = `right:${activeTab.id}` // Unique per pane + tab
+      return (
+        <DocumentViewer
+          key={zoomKey}
+          documentId={document.id}
+          filename={document.filename}
+          mimeType={document.mime_type}
+          zoomState={tabZoomStates[zoomKey]}
+          onZoomStateChange={(state) => handleZoomStateChange(zoomKey, state)}
+        />
+      )
     }
 
     return (
@@ -1318,6 +726,7 @@ export default function SpacePage() {
           onTabReorderLeft={handleTabReorder('left')}
           onTabReorderRight={handleTabReorder('right')}
           onTabDragBetweenPanes={handleTabDragBetweenPanes}
+          onPanelResize={updateGridColumns}
           rightContent={rightTabs.length > 0 ? renderRightContent() : undefined}
         >
           {renderLeftContent()}
@@ -1349,52 +758,15 @@ export default function SpacePage() {
       <DocumentUpload open={isUploadOpen} onOpenChange={setIsUploadOpen} spaceId={spaceId} />
 
       {/* Delete Confirmation Dialog */}
-      <Dialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Delete Document{selectedDocuments.size > 1 || (!documentToDelete && selectedDocuments.size > 0) ? 's' : ''}</DialogTitle>
-            <DialogDescription>
-              {documentToDelete ? (
-                <>
-                  Are you sure you want to delete "<strong>{documents.find(d => d.id === documentToDelete)?.filename}</strong>"?
-                  This action cannot be undone.
-                </>
-              ) : (
-                <>
-                  Are you sure you want to delete <strong>{selectedDocuments.size} document{selectedDocuments.size > 1 ? 's' : ''}</strong>?
-                  This action cannot be undone and will permanently remove {selectedDocuments.size > 1 ? 'these documents' : 'this document'}.
-                </>
-              )}
-            </DialogDescription>
-          </DialogHeader>
-          <DialogFooter>
-            <Button
-              variant="outline"
-              onClick={handleCancelDelete}
-              disabled={isDeleting}
-            >
-              Cancel
-            </Button>
-            <Button
-              variant="destructive"
-              onClick={handleConfirmDelete}
-              disabled={isDeleting}
-            >
-              {isDeleting ? (
-                <>
-                  <Spinner size="sm" className="mr-2" />
-                  Deleting...
-                </>
-              ) : (
-                <>
-                  <Trash2 className="mr-2 h-4 w-4" />
-                  Delete {documentToDelete ? 'Document' : `${selectedDocuments.size} Document${selectedDocuments.size > 1 ? 's' : ''}`}
-                </>
-              )}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      <DeleteConfirmationDialog
+        open={deleteDialogOpen}
+        onOpenChange={setDeleteDialogOpen}
+        documentName={documentToDelete ? documents.find(d => d.id === documentToDelete)?.filename : undefined}
+        selectedCount={!documentToDelete ? selectedDocuments.size : undefined}
+        isDeleting={isDeleting}
+        onConfirm={handleConfirmDelete}
+        onCancel={handleCancelDelete}
+      />
     </>
   )
 }

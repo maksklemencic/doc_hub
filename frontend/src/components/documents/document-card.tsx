@@ -27,19 +27,8 @@ import {
   ContextMenuSeparator,
   ContextMenuTrigger,
 } from '@/components/ui/context-menu'
-
-export enum DocumentType {
-  word = 'word',
-  pdf = 'pdf',
-  image = 'image',
-  audio = 'audio',
-  video = 'video',
-  web = 'web',
-  youtube = 'youtube',
-  note = 'note',
-  aiNote = 'aiNote',
-  other = 'other'
-}
+import { DocumentType } from '@/utils/document-utils'
+import { isValidUrl } from '@/utils'
 
 interface DocumentCardProps {
   id: string
@@ -50,6 +39,7 @@ interface DocumentCardProps {
   pageCount?: string
   url?: string
   isSelected: boolean
+  selectedCount?: number
   onSelect: () => void
   onClick: () => void
   onDelete?: () => void
@@ -68,10 +58,6 @@ const getDocumentIcon = (type: DocumentType) => {
       return <Video className="w-6 h-6 text-gray-600" />
     case DocumentType.audio:
       return <Mic className="w-6 h-6 text-gray-600" />
-    case DocumentType.aiNote:
-      return <Sparkles className="w-6 h-6 text-gray-600" />
-    case DocumentType.note:
-      return <Edit3 className="w-6 h-6 text-gray-600" />
     case DocumentType.image:
       return <ImageIcon className="w-6 h-6 text-gray-600" />
     case DocumentType.web:
@@ -94,10 +80,6 @@ const getTypeBadge = (type: DocumentType) => {
       return { text: 'Video', className: 'bg-purple-100 text-purple-700 border-purple-200' }
     case DocumentType.audio:
       return { text: 'Audio', className: 'bg-blue-100 text-blue-700 border-blue-200' }
-    case DocumentType.aiNote:
-      return { text: 'AI Note', className: 'bg-teal-100 text-teal-700 border-teal-200' }
-    case DocumentType.note:
-      return { text: 'Note', className: 'bg-purple-100 text-purple-700 border-purple-200' }
     case DocumentType.image:
       return { text: 'Image', className: 'bg-green-100 text-green-700 border-green-200' }
     case DocumentType.web:
@@ -118,6 +100,7 @@ export function DocumentCard({
   pageCount,
   url,
   isSelected,
+  selectedCount = 0,
   onSelect,
   onClick,
   onDelete,
@@ -125,6 +108,9 @@ export function DocumentCard({
   onAddToContext
 }: DocumentCardProps) {
   const badge = getTypeBadge(type)
+
+  // Helper to check if document type is URL-based
+  const isUrlBasedType = type === DocumentType.youtube || type === DocumentType.web
 
   const cardContent = (
     <div
@@ -169,8 +155,8 @@ export function DocumentCard({
         <h3 className="font-medium text-sm text-gray-900 line-clamp-2 pr-16 ml-7">
           {filename}
         </h3>
-        {/* YouTube URL - shown for YouTube videos */}
-        {type === DocumentType.youtube && url && (
+        {/* URL - shown for YouTube and Web documents */}
+        {isUrlBasedType && url && isValidUrl(url) && (
           <a
             href={url}
             target="_blank"
@@ -184,8 +170,8 @@ export function DocumentCard({
         )}
         <div className="flex items-center gap-2 text-xs text-gray-500 ml-7">
           {pageCount && <span>{pageCount}</span>}
-          {pageCount && size && <span>•</span>}
-          {size && <span>{size}</span>}
+          {pageCount && size && !isUrlBasedType && <span>•</span>}
+          {size && !isUrlBasedType && <span>{size}</span>}
         </div>
         {timestamp && (
           <p className="text-xs text-gray-400 ml-7">
@@ -196,18 +182,33 @@ export function DocumentCard({
 
       {/* Quick actions - shown on hover, bottom right */}
       <div className="absolute bottom-3 right-3 flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity duration-150">
-        <Button
-          variant="ghost"
-          size="icon"
-          className="h-7 w-7 hover:bg-teal-100 hover:text-teal-600"
-          onClick={(e) => {
-            e.stopPropagation()
-            onClick()
-          }}
-          title="View"
-        >
-          <Eye className="h-3.5 w-3.5" />
-        </Button>
+        {isUrlBasedType && url ? (
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-7 w-7 hover:bg-teal-100 hover:text-teal-600"
+            onClick={(e) => {
+              e.stopPropagation()
+              window.open(url, '_blank', 'noopener,noreferrer')
+            }}
+            title="Open in New Tab"
+          >
+            <ExternalLink className="h-3.5 w-3.5" />
+          </Button>
+        ) : (
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-7 w-7 hover:bg-teal-100 hover:text-teal-600"
+            onClick={(e) => {
+              e.stopPropagation()
+              onClick()
+            }}
+            title="View"
+          >
+            <Eye className="h-3.5 w-3.5" />
+          </Button>
+        )}
         <Button
           variant="ghost"
           size="icon"
@@ -216,15 +217,6 @@ export function DocumentCard({
           title="Ask Question"
         >
           <MessageSquare className="h-3.5 w-3.5" />
-        </Button>
-        <Button
-          variant="ghost"
-          size="icon"
-          className="h-7 w-7 hover:bg-gray-100"
-          onClick={(e) => e.stopPropagation()}
-          title="Share"
-        >
-          <Share2 className="h-3.5 w-3.5" />
         </Button>
         <Button
           variant="ghost"
@@ -248,6 +240,21 @@ export function DocumentCard({
         {cardContent}
       </ContextMenuTrigger>
       <ContextMenuContent className="w-52">
+        {/* Header showing document name/type or selection count */}
+        <div className="px-2 py-1.5 text-sm font-medium text-muted-foreground border-b mb-1">
+          {selectedCount > 1 ? (
+            <span>{selectedCount} documents</span>
+          ) : (
+            <div className="flex items-center gap-2">
+              <span className="truncate" title={filename}>
+                {filename.length > 30 ? filename.substring(0, 30) + '...' : filename}
+              </span>
+              <Badge variant="secondary" className="text-xs">
+                {type.toUpperCase()}
+              </Badge>
+            </div>
+          )}
+        </div>
         <ContextMenuItem
           onClick={onClick}
           className="focus:bg-teal-50 focus:text-teal-900"
@@ -262,6 +269,15 @@ export function DocumentCard({
           >
             <PanelRightOpen className="mr-2 h-4 w-4" />
             Open in Right Pane
+          </ContextMenuItem>
+        )}
+        {isUrlBasedType && url && (
+          <ContextMenuItem
+            onClick={() => window.open(url, '_blank', 'noopener,noreferrer')}
+            className="focus:bg-teal-50 focus:text-teal-900"
+          >
+            <ExternalLink className="mr-2 h-4 w-4" />
+            Open Link in New Tab
           </ContextMenuItem>
         )}
         <ContextMenuSeparator />

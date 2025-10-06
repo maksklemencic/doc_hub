@@ -327,6 +327,69 @@ export function DocumentUpload({ open, onOpenChange, spaceId }: DocumentUploadPr
         }
     };
 
+    // Auto-paste handler when dialog is open
+    useEffect(() => {
+        if (!open) return;
+
+        const handlePaste = async (e: ClipboardEvent) => {
+            e.preventDefault();
+
+            // Handle file paste
+            const items = e.clipboardData?.items;
+            if (items) {
+                const files: File[] = [];
+                for (let i = 0; i < items.length; i++) {
+                    const item = items[i];
+                    if (item.kind === 'file') {
+                        const file = item.getAsFile();
+                        if (file) {
+                            files.push(file);
+                        }
+                    }
+                }
+                if (files.length > 0) {
+                    const newFiles: UploadItem[] = files.map((file, index) => ({
+                        id: Date.now().toString() + index,
+                        type: "file",
+                        file,
+                        name: file.name,
+                        status: "waiting" as const,
+                        progress: 0,
+                    }));
+                    setUploadItems((prev) => [...newFiles, ...prev]);
+                    setTimeout(processQueue, 100);
+                    return;
+                }
+            }
+
+            // Handle URL paste
+            const pastedText = e.clipboardData?.getData('text');
+            if (pastedText && pastedText.trim()) {
+                const trimmedUrl = pastedText.trim();
+                // Check if it looks like a URL
+                if (trimmedUrl.startsWith('http://') || trimmedUrl.startsWith('https://') || trimmedUrl.includes('youtu')) {
+                    const isYouTube = isYouTubeUrl(trimmedUrl);
+                    const urlItem: UploadItem = {
+                        id: Date.now().toString(),
+                        type: isYouTube ? "youtube" : "url",
+                        url: trimmedUrl,
+                        name: trimmedUrl,
+                        status: "waiting",
+                        progress: 0,
+                    };
+                    setUploadItems((prev) => [urlItem, ...prev]);
+                    setUrlInput("");
+                    setTimeout(processQueue, 100);
+                }
+            }
+        };
+
+        document.addEventListener('paste', handlePaste);
+        return () => {
+            document.removeEventListener('paste', handlePaste);
+        };
+    }, [open]);
+
     const getUploadIcon = (uploadItem: UploadItem) => {
         if (uploadItem.type === "youtube") {
             return (
