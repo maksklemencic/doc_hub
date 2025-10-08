@@ -27,7 +27,7 @@ type ViewMode = 'list' | 'grid'
 
 export default function SpacePage() {
   const params = useParams()
-  const { getSpaceById } = useSpacesContext()
+  const { getSpaceById, getSpaceContext, setSpaceContext } = useSpacesContext()
   const spaceId = params.spaceId as string
   const space = getSpaceById(spaceId)
   const spaceName = space?.name || 'Space'
@@ -607,6 +607,7 @@ export default function SpacePage() {
       spaceName={spaceName}
       chatState={chatState}
       onChatStateChange={setChatState}
+      documents={documents}
     />
   )
 
@@ -640,6 +641,7 @@ export default function SpacePage() {
           onChatStateChange={setChatState}
           initialMessage={activeTab.initialMessage}
           hideHeader={true}
+          documents={documents}
         />
       )
     }
@@ -676,6 +678,7 @@ export default function SpacePage() {
           onChatStateChange={setChatState}
           initialMessage={activeTab.initialMessage}
           hideHeader={true}
+          documents={documents}
         />
       )
     }
@@ -703,6 +706,7 @@ export default function SpacePage() {
         chatState={chatState}
         onChatStateChange={setChatState}
         hideHeader={true}
+        documents={documents}
       />
     )
   }
@@ -733,7 +737,6 @@ export default function SpacePage() {
         </SplitPaneView>
         {rightTabs.length === 0 && !tabs.some(t => t.type === 'ai-chat') && (
           <MiniAIChat
-            contextText={`All in ${spaceName}`}
             onSend={handleMiniChatSend}
             onOpenChat={() => handleOpenChat()}
             onOpenInPane={(pane) => {
@@ -752,6 +755,11 @@ export default function SpacePage() {
                 setRightTabs([...rightTabs.map((t) => ({ ...t, isActive: false })), newTab])
               }
             }}
+            documents={documents}
+            selectedDocumentIds={getSpaceContext(spaceId)}
+            onDocumentContextChange={(documentIds) => setSpaceContext(spaceId, documentIds)}
+            spaceName={spaceName}
+            spaceId={spaceId}
           />
         )}
       </div>

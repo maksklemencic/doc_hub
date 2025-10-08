@@ -1,14 +1,7 @@
-"""
-Document Processing Agent for the LangGraph agentic architecture.
-
-This agent handles document text extraction, cleaning, OCR error correction,
-language detection, and markdown structure detection.
-"""
-
 import logging
 import re
-import unicodedata
 from typing import Dict, Any, List, Tuple, Optional
+import base64
 
 from ..services.llm_service import get_default_llm_service
 from langdetect import detect
@@ -26,19 +19,8 @@ from ..errors.document_processor_errors import DocumentProcessorError
 
 logger = logging.getLogger(__name__)
 
-
 class DocumentProcessingAgent(BaseAgent):
-    """
-    Agent for processing documents with enhanced text cleaning and structure detection.
-
-    Capabilities:
-    - Text extraction from PDF, DOCX, images
-    - OCR error correction using LLM
-    - Language detection for proper text correction
-    - Markdown structure detection and conversion
-    - Content quality assessment
-    """
-
+   
     def __init__(self, max_retry_attempts: int = 3):
         super().__init__("document_processing", max_retry_attempts)
         # Text LLM for cleaning and conversion
@@ -50,31 +32,9 @@ class DocumentProcessingAgent(BaseAgent):
         self.logger = logging.getLogger(f"{__name__}.DocumentProcessingAgent")
 
     async def _execute_main_logic(self, input_data: Dict[str, Any]) -> Dict[str, Any]:
-        """
-        Execute document processing with enhanced cleaning and markdown conversion.
-
-        Args:
-            input_data: Dict containing:
-                - file_bytes: bytes of the file
-                - mime_type: MIME type of the file
-                - filename: optional filename
-                - enable_llm_cleaning: whether to use LLM for text cleaning
-                - enable_markdown_conversion: whether to convert to markdown
-                - enable_quality_assessment: whether to assess content quality
-
-        Returns:
-            Dict containing:
-                - raw_text: original extracted text (unprocessed)
-                - cleaned_text: cleaned text with structure preserved
-                - markdown_text: markdown-formatted version
-                - language: detected language
-                - markdown_structure: detected structure elements
-                - quality_score: optional quality assessment
-                - original_pages: original extracted pages
-        """
+        
         self.update_progress(5, "Starting document processing")
 
-        # Extract required parameters
         file_bytes = input_data.get("file_bytes")
         mime_type = input_data.get("mime_type")
         filename = input_data.get("filename", "unknown")
@@ -97,14 +57,12 @@ class DocumentProcessingAgent(BaseAgent):
         if is_pdf:
             self.update_progress(10, "Extracting PDF with vision model")
             try:
-                # Convert base64 to bytes if needed
                 if isinstance(file_bytes, str):
                     import base64 as b64
                     pdf_bytes = b64.b64decode(file_bytes)
                 else:
                     pdf_bytes = file_bytes
 
-                # Try vision extraction with optional custom prompt
                 vision_markdown, page_images = await self._extract_pdf_with_vision(
                     pdf_bytes, filename, custom_prompt=custom_vision_prompt
                 )
@@ -114,19 +72,16 @@ class DocumentProcessingAgent(BaseAgent):
                 self.logger.warning(
                     f"Vision extraction failed: {str(vision_error)}, falling back to traditional extraction"
                 )
-                vision_markdown = None  # Mark as failed
+                vision_markdown = None
 
         elif is_image:
             self.update_progress(10, "Extracting image with vision model")
             try:
-                # Convert base64 to bytes if needed
                 if isinstance(file_bytes, str):
                     import base64 as b64
                     image_bytes = b64.b64decode(file_bytes)
                 else:
                     image_bytes = file_bytes
-
-                # Try vision extraction for single image with optional custom prompt
                 vision_markdown = await self._extract_image_with_vision(
                     image_bytes, filename, custom_prompt=custom_vision_prompt
                 )
@@ -136,22 +91,18 @@ class DocumentProcessingAgent(BaseAgent):
                 self.logger.warning(
                     f"Image vision extraction failed: {str(vision_error)}, falling back to OCR"
                 )
-                vision_markdown = None  # Mark as failed
+                vision_markdown = None
 
-        # Traditional extraction (for non-PDFs or as fallback)
         self.update_progress(15, "Extracting raw text (traditional method)")
         try:
             if isinstance(file_bytes, str):
-                # Handle base64 encoded input
                 page_texts = base64_to_text(file_bytes, mime_type)
             else:
-                # Handle direct bytes input
                 page_texts = process_document_for_text(file_bytes, mime_type)
         except Exception as e:
             self.logger.error(f"Text extraction failed: {str(e)}")
             raise DocumentProcessorError(f"Text extraction failed: {str(e)}")
 
-        # Combine all pages into single text (raw text)
         raw_text = "\n\n".join([text for _, text in page_texts])
 
         self.update_progress(30, "Detecting language")
@@ -166,7 +117,6 @@ class DocumentProcessingAgent(BaseAgent):
             markdown_text = vision_markdown
             self.logger.info("Using vision-extracted markdown")
         elif enable_markdown_conversion:
-            # Traditional flow: clean text first, then convert to markdown
             if enable_llm_cleaning:
                 cleaned_text = await self._llm_enhanced_cleaning(
                     raw_text, detected_language
@@ -178,7 +128,6 @@ class DocumentProcessingAgent(BaseAgent):
                 cleaned_text, detected_language
             )
         else:
-            # No markdown conversion
             if enable_llm_cleaning:
                 cleaned_text = await self._llm_enhanced_cleaning(
                     raw_text, detected_language
@@ -207,31 +156,26 @@ class DocumentProcessingAgent(BaseAgent):
 
         self.update_progress(100, "Document processing complete")
 
-        # Create markdown pages for chunking
-        # Priority: vision markdown > LLM-converted markdown > original pages
         if vision_markdown:
-            # Best case: Use vision-extracted markdown for chunking
             markdown_pages = [(1, markdown_text)]
             self.logger.info("Using vision-extracted markdown for chunking")
         elif enable_markdown_conversion and markdown_text != raw_text:
-            # Fallback case 1: Vision failed but LLM converted to markdown successfully
             markdown_pages = [(1, markdown_text)]
             self.logger.info("Using LLM-converted markdown for chunking (vision unavailable)")
         else:
-            # Fallback case 2: No markdown available, use original pages
             markdown_pages = page_texts
             self.logger.info("Using original extracted text for chunking (no markdown conversion)")
 
         return {
             "raw_text": raw_text,
             "cleaned_text": cleaned_text,
-            "markdown_text": markdown_text,  # Unified markdown (vision or LLM-converted)
-            "used_vision": vision_markdown is not None,  # Flag to indicate vision was used
+            "markdown_text": markdown_text,
+            "used_vision": vision_markdown is not None,
             "language": detected_language,
             "markdown_structure": markdown_structure,
             "quality_score": quality_score,
-            "original_pages": page_texts,  # Original OCR/text extraction
-            "markdown_pages": markdown_pages,  # NEW: Use this for chunking (structured markdown)
+            "original_pages": page_texts,
+            "markdown_pages": markdown_pages,
             "filename": filename
         }
 
@@ -241,27 +185,15 @@ class DocumentProcessingAgent(BaseAgent):
         filename: str,
         custom_prompt: Optional[str] = None
     ) -> Tuple[str, List[Tuple[int, str]]]:
-        """
-        Extract text from PDF using vision model.
-
-        Args:
-            file_bytes: PDF file bytes
-            filename: Name of the file for logging
-            custom_prompt: Optional custom prompt for vision extraction
-
-        Returns:
-            Tuple of (combined_markdown, page_images)
-        """
+        
         self.logger.info(f"Extracting PDF with vision model: {filename}")
 
         try:
-            # Convert PDF pages to high-res images
             page_images = pdf_pages_to_images(file_bytes, dpi=300)
 
             if not page_images:
                 raise DocumentProcessorError("No pages found in PDF")
 
-            # Process pages in batches (max 5 images per request per Groq limit)
             batch_size = 5
             all_markdown_pages = []
 
@@ -274,11 +206,9 @@ class DocumentProcessingAgent(BaseAgent):
 
                 self.logger.info(f"Processing pages {page_numbers[0]}-{page_numbers[-1]} with vision model")
 
-                # Use custom prompt if provided, otherwise use default
                 if custom_prompt:
                     prompt = custom_prompt
                 else:
-                    # Create default prompt for vision model
                     prompt = f"""You are an expert document analyzer. Extract ALL text from {"this page" if len(batch) == 1 else "these pages"} and convert it to clean, well-structured markdown.
 
 Your task:
@@ -315,15 +245,13 @@ CRITICAL RULES:
 
 {"Page " + str(page_numbers[0]) + ":" if len(batch) == 1 else f"Pages {page_numbers[0]}-{page_numbers[-1]}:"}"""
 
-                # Call vision model
                 markdown_text = await self.vision_service.generate_vision_response(
                     prompt=prompt,
                     images=images,
-                    temperature=0.1,  # Low temp for accuracy
+                    temperature=0.1,
                     max_tokens=8000
                 )
 
-                # Log rate limit info after request
                 rate_limit_info = self.vision_service.get_rate_limit_info()
                 self.logger.info(
                     f"Vision model rate limits - "
@@ -333,10 +261,8 @@ CRITICAL RULES:
 
                 all_markdown_pages.append(markdown_text)
 
-            # Combine all pages
             combined_markdown = "\n\n---\n\n".join(all_markdown_pages)
 
-            # Calculate total API calls made
             num_batches = len(all_markdown_pages)
             final_rate_info = self.vision_service.get_rate_limit_info()
 
@@ -361,25 +287,12 @@ CRITICAL RULES:
         filename: str,
         custom_prompt: Optional[str] = None
     ) -> str:
-        """
-        Extract text from a single image using vision model.
-
-        Args:
-            image_bytes: Image file bytes
-            filename: Name of the file for logging
-            custom_prompt: Optional custom prompt for vision extraction
-
-        Returns:
-            Markdown-formatted text extracted from the image
-        """
+        
         self.logger.info(f"Extracting image with vision model: {filename}")
 
         try:
-            # Convert image bytes to base64 data URI
-            import base64
             img_base64 = base64.b64encode(image_bytes).decode('utf-8')
 
-            # Detect image format from bytes
             if image_bytes.startswith(b'\x89PNG'):
                 image_format = 'png'
             elif image_bytes.startswith(b'\xff\xd8\xff'):
@@ -602,7 +515,7 @@ Return only the markdown-formatted text. No explanations or meta-commentary."""
             markdown_text = await self.llm_service.generate_response(
                 prompt=prompt,
                 max_tokens=6000,
-                temperature=0.2  # Slightly higher for better formatting decisions
+                temperature=0.2
             )
 
             if markdown_text:
@@ -610,14 +523,13 @@ Return only the markdown-formatted text. No explanations or meta-commentary."""
                 return markdown_text
             else:
                 self.logger.warning("LLM returned empty response for markdown conversion")
-                return text  # Return original text if conversion fails
+                return text
 
         except Exception as e:
             self.logger.warning(f"Groq LLM markdown conversion failed: {str(e)}")
-            return text  # Return original text if conversion fails
+            return text
 
     async def _detect_markdown_structure(self, text: str) -> Dict[str, Any]:
-        """Use LLM to detect document structure and generate proper markdown."""
         try:
             prompt = f"""Analyze this document text and identify its structural elements. Return a JSON object with the following structure:
 
@@ -675,7 +587,6 @@ Return only the JSON object, no explanations."""
             return self._fallback_structure_detection(text)
 
     def _fallback_structure_detection(self, text: str) -> Dict[str, Any]:
-        """Fallback to basic structure detection if LLM fails."""
         return {
             "document_type": "other",
             "title": None,
@@ -687,7 +598,6 @@ Return only the JSON object, no explanations."""
         }
 
     async def _apply_markdown_formatting(self, text: str, structure: Dict[str, Any]) -> str:
-        """Apply markdown formatting based on detected structure."""
         if not structure["has_structure"]:
             return text
 
@@ -698,32 +608,29 @@ Return only the JSON object, no explanations."""
             line_num = i + 1
             processed_line = line
 
-            # Apply header formatting
             for header in structure["headers"]:
                 if header["line_number"] == line_num:
                     level = header["level"]
                     processed_line = f"{'#' * level} {line.strip()}"
                     break
 
-            # Apply list formatting
             for list_item in structure["lists"]:
                 if list_item["line_number"] == line_num:
-                    # Clean up existing list formatting and apply consistent markdown
+
                     cleaned = re.sub(r'^[\d\w]+[\.\)]\s*', '- ', line.strip())
                     cleaned = re.sub(r'^[-•*]\s*', '- ', cleaned)
                     processed_line = cleaned
                     break
 
-            # Apply table formatting
             for table in structure["tables"]:
                 if table["line_number"] == line_num:
-                    # Basic table formatting (pipe-separated)
+
                     if '|' in line:
-                        # Already has pipes, just clean up spacing
+
                         parts = [part.strip() for part in line.split('|')]
                         processed_line = '| ' + ' | '.join(parts) + ' |'
                     elif '\t' in line:
-                        # Convert tabs to pipes
+
                         parts = [part.strip() for part in line.split('\t')]
                         processed_line = '| ' + ' | '.join(parts) + ' |'
                     break
@@ -733,17 +640,13 @@ Return only the JSON object, no explanations."""
         return '\n'.join(processed_lines)
 
     async def _assess_content_quality(self, text: str) -> float:
-        """Assess the quality of the processed text."""
         try:
-            # Basic quality metrics
             word_count = len(text.split())
             char_count = len(text)
             line_count = len([line for line in text.split('\n') if line.strip()])
 
-            # Calculate basic quality score (0.0 to 1.0)
             quality_score = 0.0
 
-            # Word count factor (more words generally means better extraction)
             if word_count > 100:
                 quality_score += 0.3
             elif word_count > 50:
@@ -751,27 +654,23 @@ Return only the JSON object, no explanations."""
             elif word_count > 10:
                 quality_score += 0.1
 
-            # Character to word ratio (should be reasonable)
             if word_count > 0:
                 char_to_word_ratio = char_count / word_count
-                if 4 <= char_to_word_ratio <= 8:  # Good ratio
+                if 4 <= char_to_word_ratio <= 8:
                     quality_score += 0.2
-                elif 3 <= char_to_word_ratio <= 10:  # Acceptable ratio
+                elif 3 <= char_to_word_ratio <= 10:
                     quality_score += 0.1
 
-            # Line structure factor
             if line_count > 5:
                 avg_words_per_line = word_count / line_count
-                if 5 <= avg_words_per_line <= 15:  # Good line structure
+                if 5 <= avg_words_per_line <= 15:
                     quality_score += 0.2
-                elif 3 <= avg_words_per_line <= 20:  # Acceptable
+                elif 3 <= avg_words_per_line <= 20:
                     quality_score += 0.1
 
-            # Text coherence (check for repeated characters/gibberish)
             coherence_score = self._calculate_coherence_score(text)
             quality_score += coherence_score * 0.3
 
-            # Ensure score is between 0 and 1
             quality_score = max(0.0, min(1.0, quality_score))
 
             self.logger.debug(f"Quality assessment: {quality_score:.2f}")
@@ -779,14 +678,12 @@ Return only the JSON object, no explanations."""
 
         except Exception as e:
             self.logger.warning(f"Quality assessment failed: {str(e)}")
-            return 0.5  # Default score
+            return 0.5
 
     def _calculate_coherence_score(self, text: str) -> float:
-        """Calculate a simple coherence score for the text."""
         if not text:
             return 0.0
 
-        # Check for excessive repetition of characters
         char_counts = {}
         for char in text.lower():
             if char.isalpha():
@@ -798,7 +695,6 @@ Return only the JSON object, no explanations."""
         total_chars = sum(char_counts.values())
         max_char_frequency = max(char_counts.values()) / total_chars
 
-        # If any character appears more than 30% of the time, it's likely gibberish
         if max_char_frequency > 0.3:
             return 0.0
         elif max_char_frequency > 0.2:

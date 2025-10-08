@@ -6,12 +6,17 @@ import { QueryBar } from './query-bar'
 import { cn } from '@/lib/utils'
 
 interface MiniAIChatProps {
-  contextText: string
+  contextText?: string
   onSend: (message: string) => void
   onOpenChat: () => void
   onOpenInPane?: (pane: 'left' | 'right') => void
   isMinimized?: boolean
   onExpand?: () => void
+  documents?: Array<{ id: string; filename: string }>
+  selectedDocumentIds?: string[]
+  onDocumentContextChange?: (documentIds: string[]) => void
+  spaceName?: string
+  spaceId?: string
 }
 
 export function MiniAIChat({
@@ -21,6 +26,11 @@ export function MiniAIChat({
   onOpenInPane,
   isMinimized = false,
   onExpand,
+  documents = [],
+  selectedDocumentIds = [],
+  onDocumentContextChange,
+  spaceName = 'Space',
+  spaceId,
 }: MiniAIChatProps) {
   const [message, setMessage] = useState('')
   const [isHovered, setIsHovered] = useState(false)
@@ -68,6 +78,10 @@ export function MiniAIChat({
           variant="mini"
           onOpenInPane={onOpenInPane}
           className="relative bg-white border border-border rounded-2xl shadow-xl hover:shadow-2xl transition-shadow"
+          documents={documents}
+          selectedDocumentIds={selectedDocumentIds}
+          onDocumentContextChange={onDocumentContextChange}
+          spaceName={spaceName}
         />
       ) : (
         <div className="h-full w-full flex items-center justify-center bg-white border border-border rounded-2xl shadow-xl">

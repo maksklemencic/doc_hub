@@ -90,6 +90,7 @@ export interface CreateMessageRequest {
   use_context?: boolean
   only_space_documents?: boolean
   async_processing?: boolean
+  document_ids?: string[]
 }
 
 export interface MessageResponseWrapper {

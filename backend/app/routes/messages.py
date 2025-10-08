@@ -1,7 +1,7 @@
 import json
 import logging
 import uuid
-from typing import AsyncGenerator
+from typing import AsyncGenerator, Optional, List
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.responses import StreamingResponse
@@ -31,7 +31,10 @@ async def stream_message_response(
     space_id: uuid.UUID,
     user_id: uuid.UUID,
     content: str,
-    context: str
+    use_context: bool = True,
+    document_ids: Optional[List[uuid.UUID]] = None,
+    top_k: int = 5,
+    only_space_documents: bool = True
 ) -> AsyncGenerator[str, None]:
     """
     Stream message response using Server-Sent Events format.
@@ -39,6 +42,7 @@ async def stream_message_response(
     full_response = ""
     message_id = None
     rate_limit_info = None
+    context = ""
 
     try:
         # Create message record in database
@@ -59,17 +63,21 @@ async def stream_message_response(
         # Use RAG Query Agent for streaming response
         rag_agent = RAGQueryAgent()
 
-        # Prepare agent input
+        # Prepare agent input with all RAG parameters
         agent_input = {
             "query": content,
             "user_id": str(user_id),
             "space_id": str(space_id) if space_id else None,
+            "document_ids": [str(doc_id) for doc_id in document_ids] if document_ids else None,
+            "top_k": top_k,
+            "only_space_documents": only_space_documents,
             "stream_response": True
         }
 
         # Execute RAG query
         result = await rag_agent.execute(agent_input)
         response_stream = result.get("response_stream")
+        context = result.get("context", "")  # Get the context from RAG agent
 
         # Check if response_stream exists and is not None
         if not response_stream:
@@ -160,25 +168,20 @@ async def create_message(
         # FIRST: Validate space ownership before any processing
         logger.debug(f"Validating space {space_id} ownership for user {current_user_id}")
         db_handler.validate_space_ownership(space_id, current_user_id)
-        
-        # Get context for RAG
-        if request.use_context is True:
-            query_embedding = embedding.get_embeddings([request.content])[0]
 
-            top_k_chunks = qdrant_client.query_top_k(
-                query_embedding,
-                user_id=current_user_id,
-                k=request.top_k,
-                space_id=space_id if request.only_space_documents else None
-            )
+        logger.info(f"Creating message with document_ids filter: {request.document_ids}")
 
-            context = "\n".join([res.payload["text"] for res in top_k_chunks])
-        else:
-            context = "/"
-
-        # Always return streaming response
+        # Always return streaming response (RAG agent will handle context retrieval)
         return StreamingResponse(
-            stream_message_response(space_id, current_user_id, request.content, context),
+            stream_message_response(
+                space_id=space_id,
+                user_id=current_user_id,
+                content=request.content,
+                use_context=request.use_context,
+                document_ids=request.document_ids,
+                top_k=request.top_k,
+                only_space_documents=request.only_space_documents
+            ),
             media_type="text/event-stream",
             headers={
                 "Cache-Control": "no-cache",

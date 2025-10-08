@@ -19,6 +19,7 @@ import {
 import { cn } from '@/lib/utils'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
+import { useSpacesContext } from '@/contexts/spaces-context'
 
 interface ChatMessage {
   id: string
@@ -38,6 +39,7 @@ interface SpaceChatProps {
   onChatStateChange?: (state: ChatState) => void
   initialMessage?: string
   hideHeader?: boolean
+  documents?: Array<{ id: string; filename: string }>
 }
 
 // Transform backend MessageResponse to ChatMessage format
@@ -48,8 +50,9 @@ const transformMessage = (msg: MessageResponse, role: 'user' | 'assistant' = 'us
   timestamp: msg.created_at
 })
 
-export function SpaceChat({ spaceId, spaceName, className, chatState = 'visible', onChatStateChange, initialMessage, hideHeader = false }: SpaceChatProps) {
+export function SpaceChat({ spaceId, spaceName, className, chatState = 'visible', onChatStateChange, initialMessage, hideHeader = false, documents = [] }: SpaceChatProps) {
   const { user } = useAuth()
+  const { getSpaceContext, setSpaceContext } = useSpacesContext()
   const [inputValue, setInputValue] = useState('')
   const initialMessageSentRef = useRef(false)
   const processedInitialMessageRef = useRef<string | undefined>(undefined)
@@ -57,6 +60,9 @@ export function SpaceChat({ spaceId, spaceName, className, chatState = 'visible'
   const [editingMessageId, setEditingMessageId] = useState<string | null>(null)
   const [editValue, setEditValue] = useState('')
   const [copiedMessageId, setCopiedMessageId] = useState<string | null>(null)
+
+  // Get context for this space
+  const selectedDocumentIds = getSpaceContext(spaceId)
 
   // Fetch messages with infinite scroll and mutation hooks
   const {
@@ -201,11 +207,16 @@ export function SpaceChat({ spaceId, spaceName, className, chatState = 'visible'
       initialMessageSentRef.current = true
       processedInitialMessageRef.current = initialMessage
 
+      console.log('Sending message with context from documents:', selectedDocumentIds.map(id => documents.find(d => d.id === id)?.filename || id))
+      console.log('Document IDs being sent:', selectedDocumentIds)
+      console.log('Total documents in space:', documents.length)
+
       createMessageMutation.mutateAsync({
         content: initialMessage,
         use_context: true,
         only_space_documents: true,
-        top_k: 5
+        top_k: 5,
+        document_ids: selectedDocumentIds
       }).catch((error) => {
         initialMessageSentRef.current = false
       })
@@ -252,12 +263,17 @@ export function SpaceChat({ spaceId, spaceName, className, chatState = 'visible'
     const messageContent = inputValue.trim()
     setInputValue('')
 
+    console.log('Sending message with context from documents:', selectedDocumentIds.map(id => documents.find(d => d.id === id)?.filename || id))
+    console.log('Document IDs being sent:', selectedDocumentIds)
+    console.log('Total documents in space:', documents.length)
+
     try {
       await createMessageMutation.mutateAsync({
         content: messageContent,
         use_context: true,
         only_space_documents: true,
-        top_k: 5
+        top_k: 5,
+        document_ids: selectedDocumentIds
       })
     } catch (error) {
       // Error handling is done in the mutation
@@ -326,11 +342,16 @@ export function SpaceChat({ spaceId, spaceName, className, chatState = 'visible'
       setEditingMessageId(null)
       setEditValue('')
 
+      console.log('Sending message with context from documents:', selectedDocumentIds.map(id => documents.find(d => d.id === id)?.filename || id))
+      console.log('Document IDs being sent:', selectedDocumentIds)
+      console.log('Total documents in space:', documents.length)
+
       await createMessageMutation.mutateAsync({
         content: currentEditValue,
         use_context: true,
         only_space_documents: true,
-        top_k: 5
+        top_k: 5,
+        document_ids: selectedDocumentIds
       })
     } catch (error) {
       setEditingMessageId(messageId)
@@ -535,11 +556,14 @@ export function SpaceChat({ spaceId, spaceName, className, chatState = 'visible'
           value={inputValue}
           onChange={setInputValue}
           onSend={handleSend}
-          contextText={`All documents in ${spaceName}`}
           disabled={isLoading}
           variant="default"
           className="relative bg-white border border-border rounded-2xl shadow-sm hover:shadow-md transition-shadow w-full max-w-[min(100%,1200px)]"
           style={{ width: 'min(100%, 800px)' }}
+          documents={documents}
+          selectedDocumentIds={selectedDocumentIds}
+          onDocumentContextChange={(documentIds) => setSpaceContext(spaceId, documentIds)}
+          spaceName={spaceName}
         />
       </div>
     </div>

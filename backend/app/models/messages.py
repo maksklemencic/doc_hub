@@ -7,7 +7,6 @@ from pydantic import BaseModel, Field, ConfigDict
 
 from .shared import PaginationMetadata
 
-
 class MessageStatus(str, Enum):
     PENDING = "pending"
     STREAMING = "streaming"
@@ -52,6 +51,7 @@ class CreateMessageRequest(BaseModel):
     top_k: int = Field(5, ge=1, le=100, description="Number of top results to return when using context.")
     use_context: bool = Field(True, description="Whether to use context from the RAG system.")
     only_space_documents: bool = Field(True, description="Whether to restrict context to documents within the same space.")
+    document_ids: Optional[List[uuid.UUID]] = Field(None, description="Optional list of document IDs to filter context.")
 
 
 class UpdateMessageRequest(BaseModel):

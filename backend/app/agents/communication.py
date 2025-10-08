@@ -1,10 +1,3 @@
-"""
-Agent communication protocols and message handling.
-
-This module provides standardized communication patterns between agents,
-including message queuing, event handling, and data serialization.
-"""
-
 import asyncio
 import logging
 from abc import ABC, abstractmethod
@@ -18,30 +11,24 @@ logger = logging.getLogger(__name__)
 
 
 class MessageType(str, Enum):
-    """Standard message types for inter-agent communication."""
-    # Data transfer messages
     DATA_TRANSFER = "data_transfer"
     PROCESSING_REQUEST = "processing_request"
     PROCESSING_RESPONSE = "processing_response"
 
-    # Status messages
     STATUS_UPDATE = "status_update"
     PROGRESS_UPDATE = "progress_update"
     ERROR_NOTIFICATION = "error_notification"
 
-    # Control messages
     START_PROCESSING = "start_processing"
     STOP_PROCESSING = "stop_processing"
     RESET_AGENT = "reset_agent"
 
-    # Workflow messages
     WORKFLOW_START = "workflow_start"
     WORKFLOW_COMPLETE = "workflow_complete"
     WORKFLOW_FAILED = "workflow_failed"
 
 
 class MessagePriority(int, Enum):
-    """Message priority levels."""
     LOW = 1
     NORMAL = 5
     HIGH = 8
@@ -50,9 +37,7 @@ class MessagePriority(int, Enum):
 
 @dataclass
 class AgentMessage:
-    """
-    Standard message format for inter-agent communication.
-    """
+
     id: str = field(default_factory=lambda: str(uuid4()))
     sender_id: str = ""
     recipient_id: str = ""
@@ -68,7 +53,6 @@ class AgentMessage:
     metadata: Dict[str, Any] = field(default_factory=dict)
 
     def to_dict(self) -> Dict[str, Any]:
-        """Convert message to dictionary for serialization."""
         return {
             "id": self.id,
             "sender_id": self.sender_id,
@@ -87,8 +71,6 @@ class AgentMessage:
 
     @classmethod
     def from_dict(cls, data: Dict[str, Any]) -> "AgentMessage":
-        """Create message from dictionary."""
-        # Parse timestamp
         timestamp = datetime.fromisoformat(data["timestamp"].replace("Z", "+00:00"))
         expires_at = None
         if data.get("expires_at"):
@@ -113,18 +95,15 @@ class AgentMessage:
         )
 
     def is_expired(self) -> bool:
-        """Check if message has expired."""
         if not self.expires_at:
             return False
         return datetime.now(timezone.utc) > self.expires_at
 
     def can_retry(self) -> bool:
-        """Check if message can be retried."""
         return self.retry_count < self.max_retries
 
 
 class MessageHandler(ABC):
-    """Abstract base class for message handlers."""
 
     @abstractmethod
     async def handle_message(self, message: AgentMessage) -> Optional[AgentMessage]:
@@ -154,16 +133,6 @@ class MessageHandler(ABC):
 
 
 class CommunicationBus:
-    """
-    Central communication bus for agent message routing.
-
-    Provides:
-    - Message routing between agents
-    - Message queuing and delivery
-    - Priority handling
-    - Retry mechanisms
-    - Event subscriptions
-    """
 
     def __init__(self):
         self.message_queues: Dict[str, List[AgentMessage]] = {}
@@ -174,25 +143,14 @@ class CommunicationBus:
         self.logger = logging.getLogger(f"{__name__}.CommunicationBus")
 
     def register_agent(self, agent_id: str) -> None:
-        """
-        Register an agent with the communication bus.
-
-        Args:
-            agent_id: Unique agent identifier
-        """
+        
         if agent_id not in self.message_queues:
             self.message_queues[agent_id] = []
             self.message_handlers[agent_id] = []
             self.logger.info(f"Registered agent: {agent_id}")
 
     def register_handler(self, agent_id: str, handler: MessageHandler) -> None:
-        """
-        Register a message handler for an agent.
-
-        Args:
-            agent_id: Agent identifier
-            handler: Message handler instance
-        """
+        
         if agent_id not in self.message_handlers:
             self.message_handlers[agent_id] = []
 
@@ -202,13 +160,7 @@ class CommunicationBus:
     def subscribe_to_events(
         self, message_type: MessageType, callback: Callable
     ) -> None:
-        """
-        Subscribe to specific message type events.
-
-        Args:
-            message_type: Type of message to subscribe to
-            callback: Callback function to execute
-        """
+        
         if message_type not in self.event_subscribers:
             self.event_subscribers[message_type] = []
 
@@ -216,15 +168,7 @@ class CommunicationBus:
         self.logger.debug(f"Subscribed to events: {message_type.value}")
 
     async def send_message(self, message: AgentMessage) -> bool:
-        """
-        Send a message to the specified recipient.
-
-        Args:
-            message: Message to send
-
-        Returns:
-            True if message was queued successfully
-        """
+       
         if message.is_expired():
             self.logger.warning(f"Message {message.id} has expired, not sending")
             return False
@@ -234,7 +178,6 @@ class CommunicationBus:
             self.logger.error(f"Unknown recipient: {recipient_id}")
             return False
 
-        # Insert message based on priority (higher priority first)
         queue = self.message_queues[recipient_id]
         inserted = False
 
@@ -253,7 +196,6 @@ class CommunicationBus:
             f"priority: {message.priority.value})"
         )
 
-        # Notify event subscribers
         await self._notify_subscribers(message)
 
         return True
@@ -261,22 +203,12 @@ class CommunicationBus:
     async def get_messages(
         self, agent_id: str, limit: Optional[int] = None
     ) -> List[AgentMessage]:
-        """
-        Retrieve messages for an agent.
-
-        Args:
-            agent_id: Agent identifier
-            limit: Maximum number of messages to retrieve
-
-        Returns:
-            List of messages for the agent
-        """
+       
         if agent_id not in self.message_queues:
             return []
 
         queue = self.message_queues[agent_id]
 
-        # Remove expired messages
         valid_messages = [msg for msg in queue if not msg.is_expired()]
         self.message_queues[agent_id] = valid_messages
 
@@ -290,18 +222,12 @@ class CommunicationBus:
         return messages
 
     async def process_messages(self, agent_id: str) -> None:
-        """
-        Process all pending messages for an agent.
-
-        Args:
-            agent_id: Agent identifier
-        """
+       
         messages = await self.get_messages(agent_id)
         handlers = self.message_handlers.get(agent_id, [])
 
         for message in messages:
             try:
-                # Find appropriate handler
                 handler = None
                 for h in handlers:
                     if h.can_handle(message.message_type):
@@ -321,7 +247,6 @@ class CommunicationBus:
             except Exception as e:
                 self.logger.error(f"Error processing message {message.id}: {str(e)}")
 
-                # Handle retry logic
                 if message.can_retry():
                     message.retry_count += 1
                     await self.send_message(message)
@@ -329,7 +254,6 @@ class CommunicationBus:
                     self.logger.error(f"Message {message.id} exceeded max retries")
 
     async def _notify_subscribers(self, message: AgentMessage) -> None:
-        """Notify event subscribers about a message."""
         subscribers = self.event_subscribers.get(message.message_type, [])
 
         for subscriber in subscribers:
@@ -342,14 +266,12 @@ class CommunicationBus:
                 self.logger.error(f"Error in event subscriber: {str(e)}")
 
     def start_processing(self) -> None:
-        """Start background message processing."""
         if not self.running:
             self.running = True
             self.processing_task = asyncio.create_task(self._background_processor())
             self.logger.info("Started background message processing")
 
     def stop_processing(self) -> None:
-        """Stop background message processing."""
         self.running = False
         if self.processing_task:
             self.processing_task.cancel()
@@ -357,15 +279,12 @@ class CommunicationBus:
             self.logger.info("Stopped background message processing")
 
     async def _background_processor(self) -> None:
-        """Background task for processing messages."""
         while self.running:
             try:
-                # Process messages for all registered agents
                 for agent_id in self.message_queues.keys():
                     await self.process_messages(agent_id)
 
-                # Wait before next processing cycle
-                await asyncio.sleep(0.1)  # 100ms processing cycle
+                await asyncio.sleep(0.1)
 
             except asyncio.CancelledError:
                 break
@@ -374,16 +293,11 @@ class CommunicationBus:
                 await asyncio.sleep(1.0)  # Wait longer on error
 
     def get_queue_status(self) -> Dict[str, Dict[str, Any]]:
-        """
-        Get status of all message queues.
-
-        Returns:
-            Dictionary with queue status for each agent
-        """
+       
         status = {}
 
         for agent_id, queue in self.message_queues.items():
-            # Count messages by priority
+
             priority_counts = {p.name: 0 for p in MessagePriority}
             for msg in queue:
                 priority_counts[msg.priority.name] += 1
@@ -398,5 +312,4 @@ class CommunicationBus:
         return status
 
 
-# Global communication bus instance
 communication_bus = CommunicationBus()

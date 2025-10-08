@@ -55,10 +55,15 @@ def store_document(
             PointStruct(
                 id=str(uuid.uuid4()),
                 vector=embedding,
-                payload={"text": chunk, **item_metadata}
+                payload={
+                    "text": chunk,
+                    "document_id": str(item_metadata.get("document_id")),
+                    **{k: v for k, v in item_metadata.items() if k != "document_id"}
+                }
             )
             for embedding, chunk, item_metadata in zip(embeddings, chunks, metadata)
         ]
+        logger.debug(f"Storing {len(points)} points. Example payload: {points[0].payload if points else 'N/A'}")
         client.upsert(collection_name=COLLECTION_NAME, points=points)
         logger.info(f"Upserted {len(points)} points to collection {COLLECTION_NAME}")
     except Exception as e:
@@ -97,6 +102,11 @@ def query_top_k(
     k: int = 5
 ):
     _check_client_available()
+    logger.info(f"query_top_k called with:")
+    logger.info(f"  - user_id: {user_id}")
+    logger.info(f"  - space_id: {space_id}")
+    logger.info(f"  - document_ids: {document_ids} (type: {type(document_ids)})")
+    logger.info(f"  - k: {k}")
     try:
         ensure_collection()
         must_filters = [
@@ -109,13 +119,22 @@ def query_top_k(
                 match=qmodels.MatchValue(value=str(space_id))
             )
         ]
+
+        # Check if document_ids filter should be added
         if document_ids:
+            doc_id_strings = [str(doc_id) for doc_id in document_ids]
+            logger.info(f"Adding document_id filter with values: {doc_id_strings}")
             must_filters.append(
                 qmodels.FieldCondition(
                     key="document_id",
-                    match=qmodels.MatchAny(any=[str(doc_id) for doc_id in document_ids])
+                    match=qmodels.MatchAny(any=doc_id_strings)
                 )
             )
+        else:
+            logger.info(f"No document_id filter added (document_ids is {document_ids})")
+
+        logger.info(f"Final filter structure: {must_filters}")
+
         results = client.search(
             collection_name=COLLECTION_NAME,
             query_vector=query_vector,
@@ -123,10 +142,10 @@ def query_top_k(
             with_payload=True,
             query_filter=qmodels.Filter(must=must_filters)
         )
-        logger.info(
-            f"Retrieved {len(results)} results for query in collection "
-            f"{COLLECTION_NAME}"
-        )
+
+        result_doc_ids = [res.payload.get('document_id') for res in results]
+        logger.info(f"Search returned {len(results)} results from document_ids: {result_doc_ids}")
+
         return results
     except Exception as e:
         logger.error(f"Failed to search in {COLLECTION_NAME}: {str(e)}")
@@ -219,12 +238,26 @@ def search_documents(
         must_filters = []
         if filter_dict:
             for key, value in filter_dict.items():
-                must_filters.append(
-                    qmodels.FieldCondition(
-                        key=key,
-                        match=qmodels.MatchValue(value=str(value))
+                # Special handling for document_ids (list of IDs)
+                if key == "document_ids" and isinstance(value, list):
+                    if value:  # Only add filter if list is not empty
+                        logger.info(f"Adding document_ids filter: {value}")
+                        must_filters.append(
+                            qmodels.FieldCondition(
+                                key="document_id",
+                                match=qmodels.MatchAny(any=[str(doc_id) for doc_id in value])
+                            )
+                        )
+                else:
+                    # Standard single-value filter
+                    must_filters.append(
+                        qmodels.FieldCondition(
+                            key=key,
+                            match=qmodels.MatchValue(value=str(value))
+                        )
                     )
-                )
+
+        logger.info(f"search_documents filter structure: {must_filters}")
 
         query_filter = None
         if must_filters:
@@ -241,7 +274,9 @@ def search_documents(
 
         # Process results to match expected format
         processed_results = []
+        result_doc_ids = set()
         for result in results:
+            result_doc_ids.add(result.payload.get("document_id"))
             processed_result = {
                 "text": result.payload.get("text", ""),
                 "score": result.score,
@@ -249,7 +284,7 @@ def search_documents(
             }
             processed_results.append(processed_result)
 
-        logger.info(f"Found {len(processed_results)} search results")
+        logger.info(f"search_documents found {len(processed_results)} results from document_ids: {result_doc_ids}")
         return processed_results
 
     except Exception as e:

@@ -1,10 +1,3 @@
-"""
-Indexing Agent for the LangGraph agentic architecture.
-
-This agent handles structure-aware chunking, multilingual embeddings,
-and enhanced Qdrant storage with chunk relationships.
-"""
-
 import logging
 import os
 from typing import Dict, Any, List, Optional
@@ -17,51 +10,20 @@ from ..errors.qdrant_errors import VectorStoreError
 
 logger = logging.getLogger(__name__)
 
-
 class IndexingAgent(BaseAgent):
-    """
-    Agent for processing documents with enhanced chunking and indexing.
-
-    Capabilities:
-    - Structure-aware chunking with markdown detection
-    - Multilingual embedding generation
-    - Enhanced Qdrant storage with relationships
-    - Progress tracking and status reporting
-    - Chunk relationship mapping
-    """
 
     def __init__(self, max_retry_attempts: int = 3):
         super().__init__("indexing", max_retry_attempts)
         self.logger = logging.getLogger(f"{__name__}.IndexingAgent")
 
-        # Configuration from environment
         self.max_chunk_size = int(os.getenv("MAX_CHUNK_SIZE", "1000"))
         self.min_chunk_size = int(os.getenv("MIN_CHUNK_SIZE", "100"))
         self.overlap_size = int(os.getenv("CHUNK_OVERLAP_SIZE", "100"))
 
     async def _execute_main_logic(self, input_data: Dict[str, Any]) -> Dict[str, Any]:
-        """
-        Execute indexing with enhanced chunking and embedding.
-
-        Args:
-            input_data: Dict containing:
-                - processed_text: cleaned text from Document Processing Agent
-                - language: detected language
-                - markdown_structure: detected structure elements
-                - document_metadata: metadata about the document
-                - original_pages: optional original page data
-
-        Returns:
-            Dict containing:
-                - chunks: list of chunk texts
-                - embeddings: list of embedding vectors
-                - chunk_metadata: enhanced metadata for each chunk
-                - stored_successfully: boolean indicating storage success
-                - chunk_relationships: mapping of chunk relationships
-        """
+        
         self.update_progress(5, "Starting indexing process")
 
-        # Extract required parameters
         processed_text = input_data.get("processed_text")
         language = input_data.get("language", "unknown")
         markdown_structure = input_data.get("markdown_structure", {})
@@ -140,9 +102,7 @@ class IndexingAgent(BaseAgent):
         language: str,
         markdown_structure: Dict[str, Any]
     ) -> tuple:
-        """Perform enhanced chunking with markdown awareness."""
 
-        # Prepare base metadata for chunking
         base_metadata = {
             "document_id": document_metadata.get("document_id", ""),
             "filename": document_metadata.get("filename", ""),
@@ -153,7 +113,6 @@ class IndexingAgent(BaseAgent):
             "has_markdown_structure": markdown_structure.get("has_structure", False)
         }
 
-        # Use enhanced chunking service
         chunk_texts, page_numbers, chunk_metadata_list = chunk_pages_with_markdown_chunker(
             pages=pages,
             base_metadata=base_metadata,
@@ -169,9 +128,7 @@ class IndexingAgent(BaseAgent):
         return chunk_texts, page_numbers, chunk_metadata_list
 
     async def _generate_embeddings(self, chunk_texts: List[str]) -> List[List[float]]:
-        """Generate embeddings using the multilingual model."""
         try:
-            # Use existing embedding service (will be updated in Task 2.3)
             embeddings = embedding.get_embeddings(chunks=chunk_texts)
 
             self.logger.info(f"Generated {len(embeddings)} embeddings")
@@ -187,12 +144,10 @@ class IndexingAgent(BaseAgent):
         page_numbers: List[int],
         document_metadata: Dict[str, Any]
     ) -> List[Dict[str, Any]]:
-        """Prepare enhanced metadata for vector storage."""
         enhanced_metadata = []
 
         for i, chunk_meta in enumerate(chunk_metadata_list):
             metadata = {
-                # Original metadata fields
                 "document_id": chunk_meta.document_id,
                 "filename": chunk_meta.filename,
                 "mime_type": chunk_meta.mime_type,
@@ -215,6 +170,7 @@ class IndexingAgent(BaseAgent):
                 # Additional document metadata
                 **document_metadata
             }
+            self.logger.debug(f"Preparing metadata for chunk with document_id: {chunk_meta.document_id}")
             enhanced_metadata.append(metadata)
 
         return enhanced_metadata
@@ -226,16 +182,13 @@ class IndexingAgent(BaseAgent):
         metadata: List[Dict[str, Any]],
         chunk_metadata_list: List[ChunkMetadata]
     ) -> bool:
-        """Store chunks with enhanced metadata in vector database."""
         try:
-            # Use existing qdrant client (will be enhanced in Task 2.3)
             qdrant_client.store_document(
                 embeddings=embeddings,
                 chunks=chunk_texts,
                 metadata=metadata
             )
 
-            # Log enhanced storage information
             structure_info = self._analyze_chunk_structure(chunk_metadata_list)
             self.logger.info(
                 f"Successfully stored {len(chunk_texts)} chunks with enhanced metadata. "
@@ -249,7 +202,6 @@ class IndexingAgent(BaseAgent):
             return False
 
     def _analyze_chunk_structure(self, chunk_metadata_list: List[ChunkMetadata]) -> Dict[str, Any]:
-        """Analyze the structure of stored chunks for logging."""
         if not chunk_metadata_list:
             return {}
 
@@ -258,16 +210,13 @@ class IndexingAgent(BaseAgent):
         relationships_count = 0
 
         for chunk_meta in chunk_metadata_list:
-            # Count section types
             section_type = chunk_meta.section_type.value
             section_types[section_type] = section_types.get(section_type, 0) + 1
 
-            # Count markdown levels
             if chunk_meta.markdown_level > 0:
                 level = f"H{chunk_meta.markdown_level}"
                 markdown_levels[level] = markdown_levels.get(level, 0) + 1
 
-            # Count relationships
             relationships_count += len(chunk_meta.related_chunk_ids)
 
         avg_density = sum(c.content_density_score for c in chunk_metadata_list) / len(chunk_metadata_list)
@@ -280,7 +229,6 @@ class IndexingAgent(BaseAgent):
         }
 
     def _create_relationship_mapping(self, chunk_metadata_list: List[ChunkMetadata]) -> Dict[str, Any]:
-        """Create a mapping of chunk relationships."""
         relationships = {}
 
         for chunk_meta in chunk_metadata_list:

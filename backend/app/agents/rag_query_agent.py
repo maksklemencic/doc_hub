@@ -1,15 +1,6 @@
-"""
-RAG Query Agent for the LangGraph agentic architecture.
-
-This agent handles intelligent query processing, context-aware chunk retrieval,
-enhanced context assembly, and streaming response generation.
-"""
-
-import asyncio
 import logging
 import os
 from typing import Dict, Any, List, Optional, AsyncGenerator
-
 
 from .base_agent import BaseAgent
 from ..services import embedding, qdrant_client
@@ -22,64 +13,29 @@ logger = logging.getLogger(__name__)
 
 
 class RAGQueryAgent(BaseAgent):
-    """
-    Agent for processing RAG queries with enhanced context assembly.
-
-    Capabilities:
-    - Intelligent query embedding and retrieval
-    - Context-aware chunk selection with relationships
-    - Enhanced prompt engineering for better responses
-    - Streaming response capabilities
-    - Parent heading inclusion for context
-    - Cross-reference resolution in retrieved chunks
-    """
-
     def __init__(self, max_retry_attempts: int = 3):
         super().__init__("rag_query", max_retry_attempts)
         self.logger = logging.getLogger(f"{__name__}.RAGQueryAgent")
 
-        # Configuration
         self.llm_service = get_default_llm_service()
         self.max_context_length = int(os.getenv("MAX_CONTEXT_LENGTH", "8000"))
         self.top_k = int(os.getenv("DEFAULT_TOP_K", "10"))
 
     async def _execute_main_logic(self, input_data: Dict[str, Any]) -> Dict[str, Any]:
-        """
-        Execute RAG query with enhanced context assembly.
-
-        Args:
-            input_data: Dict containing:
-                - query: user query string
-                - user_id: user identifier
-                - space_id: space identifier
-                - top_k: number of chunks to retrieve (default: 10)
-                - only_space_documents: whether to limit to space documents
-                - include_relationships: whether to include related chunks
-                - stream_response: whether to stream the response
-
-        Returns:
-            Dict containing:
-                - response: generated response text (if not streaming)
-                - retrieved_chunks: list of retrieved chunks
-                - context: assembled context
-                - query_embedding: query embedding vector
-                - streaming: whether response is streaming
-        """
         self.update_progress(5, "Starting RAG query processing")
 
-        # Extract parameters
         query = input_data.get("query")
         user_id = input_data.get("user_id")
         space_id = input_data.get("space_id")
         top_k = input_data.get("top_k", self.top_k)
         only_space_documents = input_data.get("only_space_documents", True)
+        document_ids = input_data.get("document_ids")
         include_relationships = input_data.get("include_relationships", True)
         stream_response = input_data.get("stream_response", False)
 
         if not query or not user_id:
             raise ValueError("query and user_id are required")
 
-        # Now we can safely assert these are not None
         assert isinstance(query, str), "query must be a string"
         assert isinstance(user_id, str), "user_id must be a string"
 
@@ -100,7 +56,7 @@ class RAGQueryAgent(BaseAgent):
         self.update_progress(30, "Retrieving relevant chunks")
         try:
             retrieved_chunks = await self._retrieve_chunks(
-                query_embedding, user_id, space_id, top_k, only_space_documents
+                query_embedding, user_id, space_id, top_k, only_space_documents, document_ids
             )
         except Exception as e:
             self.logger.error(f"Chunk retrieval failed: {str(e)}")
@@ -124,7 +80,6 @@ class RAGQueryAgent(BaseAgent):
         # Step 5: Generate response
         self.update_progress(80, "Generating response")
         if stream_response:
-            # Return streaming response - create the generator here
             self.update_progress(100, "RAG query processing complete")
             return {
                 "response_stream": self._generate_streaming_response(query, context),
@@ -135,7 +90,6 @@ class RAGQueryAgent(BaseAgent):
                 "total_chunks_retrieved": len(retrieved_chunks)
             }
         else:
-            # Generate non-streaming response
             try:
                 response = await self._generate_response(query, context)
             except Exception as e:
@@ -153,9 +107,7 @@ class RAGQueryAgent(BaseAgent):
             }
 
     async def _generate_query_embedding(self, query: str) -> List[float]:
-        """Generate embedding for the query."""
         try:
-            # Use enhanced embedding service
             query_embedding = embedding.get_query_embedding(query)
 
             self.logger.debug(
@@ -173,25 +125,26 @@ class RAGQueryAgent(BaseAgent):
         user_id: str,
         space_id: Optional[str],
         top_k: int,
-        only_space_documents: bool
+        only_space_documents: bool,
+        document_ids: Optional[List[str]] = None
     ) -> List[Dict[str, Any]]:
-        """Retrieve relevant chunks from vector store."""
         try:
-            # Build query filter
             query_filter = {"user_id": user_id}
             if only_space_documents and space_id:
                 query_filter["space_id"] = space_id
 
-            # Retrieve from vector store
+            if document_ids:
+                query_filter["document_ids"] = document_ids
+                self.logger.info(f"Filtering by document_ids: {document_ids}")
+
             search_results = qdrant_client.search_documents(
                 query_embedding=query_embedding,
-                top_k=top_k * 2,  # Retrieve more for better filtering
+                top_k=top_k * 2,
                 filter_dict=query_filter
             )
 
-            # Process results to include metadata
             processed_results = []
-            for result in search_results[:top_k]:  # Take top_k after processing
+            for result in search_results[:top_k]:
                 metadata = result.get("metadata") or {}
                 chunk_data = {
                     "text": result.get("text") or "",
@@ -207,10 +160,20 @@ class RAGQueryAgent(BaseAgent):
                 }
                 processed_results.append(chunk_data)
 
+            doc_ids_retrieved = set(r.get("document_id") for r in processed_results if r.get("document_id"))
             self.logger.info(
-                f"Retrieved {len(processed_results)} chunks "
+                f"Retrieved {len(processed_results)} chunks from {len(doc_ids_retrieved)} document(s) "
                 f"(scores: {[round(r['score'], 3) for r in processed_results[:5]]})"
             )
+            self.logger.info(f"Document IDs in retrieved chunks: {doc_ids_retrieved}")
+
+            for i, result in enumerate(processed_results[:3]):
+                text_preview = result.get("text", "")[:150].replace("\n", " ")
+                self.logger.info(
+                    f"  Chunk {i+1}: doc_id={result.get('document_id')}, "
+                    f"score={round(result.get('score', 0), 3)}, "
+                    f"text='{text_preview}...'"
+                )
 
             return processed_results
 
@@ -222,7 +185,6 @@ class RAGQueryAgent(BaseAgent):
         self,
         chunks: List[Dict[str, Any]]
     ) -> List[Dict[str, Any]]:
-        """Enhance context by including related chunks."""
         enhanced_chunks = []
         processed_chunk_ids = {
             chunk.get("chunk_id") for chunk in chunks
@@ -232,12 +194,9 @@ class RAGQueryAgent(BaseAgent):
         for chunk in chunks:
             related_ids = chunk.get("related_chunk_ids") or []
 
-            # Get related chunks that aren't already included
             for related_id in related_ids:
                 if related_id not in processed_chunk_ids:
                     try:
-                        # Retrieve related chunk (simplified - in real implementation,
-                        # you'd batch these requests)
                         related_chunk = await self._get_chunk_by_id(related_id)
                         if related_chunk:
                             enhanced_chunks.append(related_chunk)
@@ -251,11 +210,7 @@ class RAGQueryAgent(BaseAgent):
         return enhanced_chunks
 
     async def _get_chunk_by_id(self, chunk_id: str) -> Optional[Dict[str, Any]]:
-        """Retrieve a specific chunk by ID."""
-        # This is a simplified implementation
-        # In practice, you'd have a direct lookup method in qdrant_client
         try:
-            # For now, return None - this would need to be implemented in qdrant_client
             return None
         except Exception:
             return None
@@ -265,15 +220,13 @@ class RAGQueryAgent(BaseAgent):
         chunks: List[Dict[str, Any]],
         query: str
     ) -> str:
-        """Assemble optimized context from chunks."""
         if not chunks:
             return ""
 
         context_parts = []
         current_length = 0
-        max_context_length = self.max_context_length - len(query) - 500  # Reserve space
+        max_context_length = self.max_context_length - len(query) - 500
 
-        # Sort chunks by score (highest first)
         sorted_chunks = sorted(chunks, key=lambda x: x.get("score", 0), reverse=True)
 
         for chunk in sorted_chunks:
@@ -281,13 +234,11 @@ class RAGQueryAgent(BaseAgent):
             if not chunk_text:
                 continue
 
-            # Add parent heading context if available
             parent_headings = chunk.get("parent_headings") or []
             if parent_headings:
                 heading_context = " > ".join(str(h) for h in parent_headings)
                 chunk_text = f"[Context: {heading_context}]\\n{chunk_text}"
 
-            # Check if adding this chunk would exceed context limit
             if current_length + len(chunk_text) > max_context_length:
                 break
 
@@ -301,10 +252,23 @@ class RAGQueryAgent(BaseAgent):
             f"({current_length} characters)"
         )
 
+        self.logger.debug(f"Context preview (first 500 chars): {assembled_context[:500]}...")
+
+        doc_ids_in_context = set()
+        for chunk in context_parts:
+            if isinstance(chunk, str):
+                continue
+        for chunk in chunks:
+            doc_id = chunk.get("document_id")
+            if doc_id:
+                doc_ids_in_context.add(doc_id)
+
+        if doc_ids_in_context:
+            self.logger.info(f"Context includes chunks from document IDs: {doc_ids_in_context}")
+
         return assembled_context
 
     async def _generate_response(self, query: str, context: str) -> str:
-        """Generate non-streaming response using Groq."""
         prompt = self._create_enhanced_prompt(query, context)
 
         try:
@@ -332,13 +296,7 @@ class RAGQueryAgent(BaseAgent):
         query: str,
         context: str
     ) -> AsyncGenerator[tuple[str, Optional[Dict[str, Any]]], None]:
-        """
-        Generate streaming response using Groq.
-
-        Yields:
-            Tuple of (content_chunk, rate_limit_info)
-            rate_limit_info is only included in the final chunk, None otherwise
-        """
+        
         prompt = self._create_enhanced_prompt(query, context)
 
         try:
@@ -359,28 +317,36 @@ class RAGQueryAgent(BaseAgent):
             raise Exception(f"Groq streaming failed: {str(e)}")
 
     def _create_enhanced_prompt(self, query: str, context: str) -> str:
-        """Create enhanced prompt with better engineering."""
         prompt_template = """<|im_start|>system
-You are a highly knowledgeable assistant that provides clear, concise, and accurate answers.
+You are a document assistant that answers questions STRICTLY based on the provided text.
 
-**Core Rules:**
-1. Answer directly - never mention "the context", "the provided information", "the documents", or "sections"
-2. Write as if you naturally know this information
-3. Be concise and get straight to the point
-4. Use markdown formatting: **bold** for emphasis, headers for structure, bullet points and numbered lists
-5. If information is insufficient, say "I don't have enough information about that" without mentioning context or documents
-6. Never reference sections, pages, or document structure
-7. Structure your response clearly with headers and lists when appropriate
+**ABSOLUTE RULES - NO EXCEPTIONS:**
+1. You can ONLY answer if the answer is explicitly stated in the text below
+2. DO NOT use any external knowledge, training data, or general knowledge
+3. If the answer is not clearly found in the text below, you MUST respond: "I don't have information about that in the provided documents"
+4. Never make assumptions, inferences, or educated guesses beyond what is explicitly written
+5. Answer directly without mentioning "the text", "the context", "the documents", or "according to"
+6. Use markdown formatting for clarity
+7. Do NOT include a title or heading at the start, or any extra commentary — just output the answer itself.
+
 
 <|im_end|>
 <|im_start|>user
-Here is relevant information:
+TEXT TO USE FOR ANSWERING:
 
 {context}
 
-Question: {query}
+---
 
-Provide a clear, direct answer using markdown formatting.
+QUESTION: {query}
+
+INSTRUCTIONS: Answer ONLY if the answer is explicitly found in the text above. If not found, say "I don't have information about that in the provided documents."
 <|im_end|>"""
 
-        return prompt_template.format(context=context, query=query)
+        formatted_prompt = prompt_template.format(context=context, query=query)
+
+        self.logger.info(f"=== CONTEXT SENT TO LLM (length: {len(context)} chars) ===")
+        self.logger.info(f"Context preview: {context[:800]}..." if len(context) > 800 else f"Full context: {context}")
+        self.logger.info(f"=== END CONTEXT ===")
+
+        return formatted_prompt

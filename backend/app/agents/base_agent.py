@@ -1,7 +1,3 @@
-"""
-Base agent class providing common functionality for all agents in the system.
-"""
-
 import asyncio
 import logging
 import uuid
@@ -15,7 +11,6 @@ logger = logging.getLogger(__name__)
 
 
 class AgentStatus(str, Enum):
-    """Agent execution status."""
     IDLE = "idle"
     RUNNING = "running"
     COMPLETED = "completed"
@@ -25,7 +20,6 @@ class AgentStatus(str, Enum):
 
 @dataclass
 class AgentState:
-    """Represents the current state of an agent."""
     agent_id: str
     agent_type: str
     status: AgentStatus = AgentStatus.IDLE
@@ -41,7 +35,6 @@ class AgentState:
 
 @dataclass
 class AgentMessage:
-    """Message format for agent communication."""
     sender_id: str
     recipient_id: str
     message_type: str
@@ -51,16 +44,7 @@ class AgentMessage:
 
 
 class BaseAgent(ABC):
-    """
-    Base class for all agents in the system.
 
-    Provides common functionality like:
-    - State management
-    - Error handling
-    - Logging
-    - Progress tracking
-    - Inter-agent communication
-    """
 
     def __init__(self, agent_type: str, max_retry_attempts: int = 3):
         self.agent_id = str(uuid.uuid4())
@@ -71,15 +55,7 @@ class BaseAgent(ABC):
         self.message_queue: List[AgentMessage] = []
 
     async def execute(self, input_data: Dict[str, Any]) -> Dict[str, Any]:
-        """
-        Execute the agent with retry logic and error handling.
-
-        Args:
-            input_data: Input data for the agent
-
-        Returns:
-            Dict containing the agent's results
-        """
+       
         self._start_execution()
 
         for attempt in range(self.max_retry_attempts):
@@ -89,7 +65,6 @@ class BaseAgent(ABC):
                     f"{attempt + 1}/{self.max_retry_attempts}"
                 )
 
-                # Execute the main agent logic
                 result = await self._execute_main_logic(input_data)
 
                 self._complete_execution(result)
@@ -99,15 +74,11 @@ class BaseAgent(ABC):
                 self.logger.error(f"Execution attempt {attempt + 1} failed: {str(e)}")
 
                 if attempt == self.max_retry_attempts - 1:
-                    # Final attempt failed
                     self._fail_execution(str(e))
                     raise
 
-                # Wait before retry with exponential backoff
                 await asyncio.sleep(2 ** attempt)
 
-        # This should never be reached due to the raise in the final attempt
-        # but added for type checking
         raise RuntimeError("All retry attempts failed")
 
     @abstractmethod
@@ -124,14 +95,12 @@ class BaseAgent(ABC):
         pass
 
     def _start_execution(self) -> None:
-        """Mark the start of agent execution."""
         self.state.status = AgentStatus.RUNNING
         self.state.started_at = datetime.now(timezone.utc)
         self.state.progress = 0.0
         self.logger.info(f"Agent {self.agent_id} ({self.agent_type}) started execution")
 
     def _complete_execution(self, results: Dict[str, Any]) -> None:
-        """Mark successful completion of agent execution."""
         self.state.status = AgentStatus.COMPLETED
         self.state.completed_at = datetime.now(timezone.utc)
         self.state.progress = 100.0
@@ -139,7 +108,6 @@ class BaseAgent(ABC):
         self.logger.info(f"Agent {self.agent_id} completed successfully")
 
     def _fail_execution(self, error_message: str) -> None:
-        """Mark failed execution with error details."""
         self.state.status = AgentStatus.FAILED
         self.state.completed_at = datetime.now(timezone.utc)
         self.state.error_message = error_message
@@ -148,13 +116,7 @@ class BaseAgent(ABC):
     def update_progress(
         self, progress: float, current_task: Optional[str] = None
     ) -> None:
-        """
-        Update the agent's progress.
-
-        Args:
-            progress: Progress percentage (0-100)
-            current_task: Optional description of current task
-        """
+        
         self.state.progress = max(0.0, min(100.0, progress))
         if current_task:
             self.state.current_task = current_task
@@ -166,14 +128,7 @@ class BaseAgent(ABC):
     def send_message(
         self, recipient_id: str, message_type: str, payload: Dict[str, Any]
     ) -> None:
-        """
-        Send a message to another agent.
-
-        Args:
-            recipient_id: Target agent ID
-            message_type: Type of message
-            payload: Message data
-        """
+        
         message = AgentMessage(
             sender_id=self.agent_id,
             recipient_id=recipient_id,
@@ -181,29 +136,18 @@ class BaseAgent(ABC):
             payload=payload
         )
 
-        # In a real implementation, this would use a message broker
-        # For now, we'll store it in the agent's queue
+       
         self.message_queue.append(message)
         self.logger.debug(f"Sent message to {recipient_id}: {message_type}")
 
     def receive_messages(self) -> List[AgentMessage]:
-        """
-        Retrieve all pending messages for this agent.
-
-        Returns:
-            List of pending messages
-        """
+        
         messages = self.message_queue.copy()
         self.message_queue.clear()
         return messages
 
     def get_state(self) -> Dict[str, Any]:
-        """
-        Get the current state of the agent.
-
-        Returns:
-            Dict representation of agent state
-        """
+        
         return {
             "agent_id": self.state.agent_id,
             "agent_type": self.state.agent_type,
@@ -223,12 +167,7 @@ class BaseAgent(ABC):
         }
 
     def get_execution_duration(self) -> Optional[float]:
-        """
-        Calculate execution duration in seconds.
-
-        Returns:
-            Duration in seconds, or None if not completed
-        """
+       
         if not self.state.started_at:
             return None
 
@@ -237,12 +176,7 @@ class BaseAgent(ABC):
         return duration.total_seconds()
 
     def cancel(self) -> bool:
-        """
-        Cancel the agent execution if possible.
-
-        Returns:
-            True if cancellation was successful
-        """
+        
         if self.state.status in [AgentStatus.IDLE, AgentStatus.RUNNING]:
             self.state.status = AgentStatus.CANCELLED
             self.state.completed_at = datetime.now(timezone.utc)
