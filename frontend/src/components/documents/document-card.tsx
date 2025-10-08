@@ -12,7 +12,7 @@ import {
   Image as ImageIcon,
   Globe,
   Eye,
-  MessageSquare,
+  Target,
   Share2,
   Trash2,
   ExternalLink,
@@ -27,6 +27,11 @@ import {
   ContextMenuSeparator,
   ContextMenuTrigger,
 } from '@/components/ui/context-menu'
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from '@/components/ui/tooltip'
 import { DocumentType } from '@/utils/document-utils'
 import { isValidUrl } from '@/utils'
 
@@ -43,8 +48,12 @@ interface DocumentCardProps {
   onSelect: () => void
   onClick: () => void
   onDelete?: () => void
+  onDeleteSelected?: () => void
+  onBulkOpen?: () => void
+  onBulkOpenInRightPane?: () => void
+  onBulkAddToContext?: () => void
   onOpenInRightPane?: () => void
-  onAddToContext?: () => void
+  onAddToContext?: (documentId: string) => void
 }
 
 // Get icon for document type - small size for card
@@ -104,6 +113,10 @@ export function DocumentCard({
   onSelect,
   onClick,
   onDelete,
+  onDeleteSelected,
+  onBulkOpen,
+  onBulkOpenInRightPane,
+  onBulkAddToContext,
   onOpenInRightPane,
   onAddToContext
 }: DocumentCardProps) {
@@ -183,53 +196,80 @@ export function DocumentCard({
       {/* Quick actions - shown on hover, bottom right */}
       <div className="absolute bottom-3 right-3 flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity duration-150">
         {isUrlBasedType && url ? (
-          <Button
-            variant="ghost"
-            size="icon"
-            className="h-7 w-7 hover:bg-teal-100 hover:text-teal-600"
-            onClick={(e) => {
-              e.stopPropagation()
-              window.open(url, '_blank', 'noopener,noreferrer')
-            }}
-            title="Open in New Tab"
-          >
-            <ExternalLink className="h-3.5 w-3.5" />
-          </Button>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-7 w-7 hover:bg-teal-100 hover:text-teal-600"
+                onClick={(e) => {
+                  e.stopPropagation()
+                  window.open(url, '_blank', 'noopener,noreferrer')
+                }}
+              >
+                <ExternalLink className="h-3.5 w-3.5" />
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent>
+              <p>Open in new tab</p>
+            </TooltipContent>
+          </Tooltip>
         ) : (
-          <Button
-            variant="ghost"
-            size="icon"
-            className="h-7 w-7 hover:bg-teal-100 hover:text-teal-600"
-            onClick={(e) => {
-              e.stopPropagation()
-              onClick()
-            }}
-            title="View"
-          >
-            <Eye className="h-3.5 w-3.5" />
-          </Button>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-7 w-7 hover:bg-teal-100 hover:text-teal-600"
+                onClick={(e) => {
+                  e.stopPropagation()
+                  onClick()
+                }}
+              >
+                <Eye className="h-3.5 w-3.5" />
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent>
+              <p>View document</p>
+            </TooltipContent>
+          </Tooltip>
         )}
-        <Button
-          variant="ghost"
-          size="icon"
-          className="h-7 w-7 hover:bg-teal-100 hover:text-teal-600"
-          onClick={(e) => e.stopPropagation()}
-          title="Ask Question"
-        >
-          <MessageSquare className="h-3.5 w-3.5" />
-        </Button>
-        <Button
-          variant="ghost"
-          size="icon"
-          className="h-7 w-7 hover:bg-red-100 hover:text-red-600"
-          onClick={(e) => {
-            e.stopPropagation()
-            onDelete?.()
-          }}
-          title="Delete"
-        >
-          <Trash2 className="h-3.5 w-3.5" />
-        </Button>
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-7 w-7 hover:bg-teal-100 hover:text-teal-600"
+              onClick={(e) => {
+                e.stopPropagation()
+                onAddToContext?.(id)
+              }}
+            >
+              <Target className="h-3.5 w-3.5" />
+            </Button>
+          </TooltipTrigger>
+          <TooltipContent>
+            <p>Add to chat context</p>
+          </TooltipContent>
+        </Tooltip>
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-7 w-7 hover:bg-red-100 hover:text-red-600"
+              onClick={(e) => {
+                e.stopPropagation()
+                onDelete?.()
+              }}
+            >
+              <Trash2 className="h-3.5 w-3.5" />
+            </Button>
+          </TooltipTrigger>
+          <TooltipContent>
+            <p>Delete document</p>
+          </TooltipContent>
+        </Tooltip>
       </div>
     </div>
   )
@@ -239,7 +279,7 @@ export function DocumentCard({
       <ContextMenuTrigger asChild>
         {cardContent}
       </ContextMenuTrigger>
-      <ContextMenuContent className="w-52">
+      <ContextMenuContent className="w-60">
         {/* Header showing document name/type or selection count */}
         <div className="px-2 py-1.5 text-sm font-medium text-muted-foreground border-b mb-1">
           {selectedCount > 1 ? (
@@ -255,55 +295,89 @@ export function DocumentCard({
             </div>
           )}
         </div>
-        <ContextMenuItem
-          onClick={onClick}
-          className="focus:bg-teal-50 focus:text-teal-900"
-        >
-          <ExternalLink className="mr-2 h-4 w-4" />
-          Open
-        </ContextMenuItem>
-        {onOpenInRightPane && (
-          <ContextMenuItem
-            onClick={onOpenInRightPane}
-            className="focus:bg-teal-50 focus:text-teal-900"
-          >
-            <PanelRightOpen className="mr-2 h-4 w-4" />
-            Open in Right Pane
-          </ContextMenuItem>
-        )}
-        {isUrlBasedType && url && (
-          <ContextMenuItem
-            onClick={() => window.open(url, '_blank', 'noopener,noreferrer')}
-            className="focus:bg-teal-50 focus:text-teal-900"
-          >
-            <ExternalLink className="mr-2 h-4 w-4" />
-            Open Link in New Tab
-          </ContextMenuItem>
-        )}
-        <ContextMenuSeparator />
-        {onAddToContext && (
+        {selectedCount > 1 ? (
           <>
             <ContextMenuItem
-              onClick={onAddToContext}
+              onClick={onBulkOpen}
               className="focus:bg-teal-50 focus:text-teal-900"
             >
-              <MessageSquare className="mr-2 h-4 w-4" />
-              Add to Chat Context
+              <ExternalLink className="mr-2 h-4 w-4" />
+              Open Selected Documents
+            </ContextMenuItem>
+            <ContextMenuItem
+              onClick={onBulkOpenInRightPane}
+              className="focus:bg-teal-50 focus:text-teal-900"
+            >
+              <Eye className="mr-2 h-4 w-4" />
+              Open Selected in Right Pane
             </ContextMenuItem>
             <ContextMenuSeparator />
+            <ContextMenuItem
+              onClick={onBulkAddToContext}
+              className="focus:bg-teal-50 focus:text-teal-900"
+            >
+              <Target className="mr-2 h-4 w-4" />
+              Add Selected to Chat Context
+            </ContextMenuItem>
+            <ContextMenuSeparator />
+            <ContextMenuItem
+              onClick={() => onDeleteSelected?.()}
+              className="text-destructive focus:bg-red-50 focus:text-destructive"
+            >
+              <Trash2 className="mr-2 h-4 w-4" />
+              Delete Selected Documents
+            </ContextMenuItem>
           </>
-        )}
-        {onDelete && (
-          <ContextMenuItem
-            onClick={(e) => {
-              e.stopPropagation()
-              onDelete()
-            }}
-            className="text-destructive focus:bg-red-50 focus:text-destructive"
-          >
-            <Trash2 className="mr-2 h-4 w-4" />
-            Delete
-          </ContextMenuItem>
+        ) : (
+          <>
+            <ContextMenuItem
+              onClick={onClick}
+              className="focus:bg-teal-50 focus:text-teal-900"
+            >
+              <ExternalLink className="mr-2 h-4 w-4" />
+              Open
+            </ContextMenuItem>
+            {onOpenInRightPane && (
+              <ContextMenuItem
+                onClick={onOpenInRightPane}
+                className="focus:bg-teal-50 focus:text-teal-900"
+              >
+                <PanelRightOpen className="mr-2 h-4 w-4" />
+                Open in Right Pane
+              </ContextMenuItem>
+            )}
+            {isUrlBasedType && url && (
+              <ContextMenuItem
+                onClick={() => window.open(url, '_blank', 'noopener,noreferrer')}
+                className="focus:bg-teal-50 focus:text-teal-900"
+              >
+                <ExternalLink className="mr-2 h-4 w-4" />
+                Open Link in New Tab
+              </ContextMenuItem>
+            )}
+            <ContextMenuSeparator />
+            {onAddToContext && (
+              <>
+                <ContextMenuItem
+                  onClick={() => onAddToContext?.(id)}
+                  className="focus:bg-teal-50 focus:text-teal-900"
+                >
+                  <Target className="mr-2 h-4 w-4" />
+                  Add to Chat Context
+                </ContextMenuItem>
+                <ContextMenuSeparator />
+              </>
+            )}
+            {onDelete && (
+              <ContextMenuItem
+                onClick={() => onDelete()}
+                className="text-destructive focus:bg-red-50 focus:text-destructive"
+              >
+                <Trash2 className="mr-2 h-4 w-4" />
+                Delete
+              </ContextMenuItem>
+            )}
+          </>
         )}
       </ContextMenuContent>
     </ContextMenu>

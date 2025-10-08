@@ -9,9 +9,13 @@ interface DocumentsGridProps {
   onDocumentClick: (documentId: string) => void
   onSelectDocument: (documentId: string) => void
   onDeleteDocument: (documentId: string) => void
+  onDeleteSelected?: () => void
+  onBulkOpen?: () => void
+  onBulkOpenInRightPane?: () => void
+  onBulkAddToContext?: () => void
   onDeselectAll: () => void
   onOpenInRightPane: (document: DocumentResponse) => void
-  onAddToContext: (document: DocumentResponse) => void
+  onAddToContext: (documentId: string) => void
 }
 
 export function DocumentsGrid({
@@ -21,6 +25,10 @@ export function DocumentsGrid({
   onDocumentClick,
   onSelectDocument,
   onDeleteDocument,
+  onDeleteSelected,
+  onBulkOpen,
+  onBulkOpenInRightPane,
+  onBulkAddToContext,
   onDeselectAll,
   onOpenInRightPane,
   onAddToContext,
@@ -48,8 +56,9 @@ export function DocumentsGrid({
             onSelect={() => onSelectDocument(document.id)}
             onClick={() => onDocumentClick(document.id)}
             onDelete={() => onDeleteDocument(document.id)}
+            onDeleteSelected={onDeleteSelected}
             onOpenInRightPane={() => onOpenInRightPane(document)}
-            onAddToContext={() => onAddToContext(document)}
+            onAddToContext={() => onAddToContext(document.id)}
           />
         )
       })}

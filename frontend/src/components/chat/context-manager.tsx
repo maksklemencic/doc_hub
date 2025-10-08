@@ -69,18 +69,9 @@ export function ContextManager({
   return (
     <TooltipProvider>
       <div className="flex flex-col overflow-hidden">
-      {/* Header with Chat Context and Use All button - Fixed */}
-      <div className="p-3 border-b flex items-center justify-between gap-2 flex-shrink-0">
+      {/* Header with Chat Context only - Fixed */}
+      <div className="p-3 border-b flex-shrink-0">
         <h4 className="font-medium text-sm">Chat Context</h4>
-        <Button
-          variant={isAllSelected ? "default" : "outline"}
-          size="sm"
-          className="text-xs h-7"
-          onClick={handleAddAll}
-        >
-          {isAllSelected && <Check className="mr-1 h-3 w-3" />}
-          Use all ({documents.length})
-        </Button>
       </div>
 
       {/* Document List Toggle - Fixed */}

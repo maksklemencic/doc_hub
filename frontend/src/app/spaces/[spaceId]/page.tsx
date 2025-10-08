@@ -275,33 +275,37 @@ export default function SpacePage() {
         setDocumentToDelete(null)
       }
     } else {
-      // Bulk delete - close dialog immediately and show promise toast
+      // Bulk delete - show dialog with confirmation
+      setIsDeleting(true)
       const count = selectedDocuments.size
       const selectedIds = Array.from(selectedDocuments)
 
-      setDeleteDialogOpen(false)
-      setDocumentToDelete(null)
-      setSelectedDocuments(new Set())
-
-      // Use promise toast for bulk operations
-      toast.promise(
-        Promise.all(
+      try {
+        await Promise.all(
           selectedIds.map(docId =>
             deleteDocumentSilentMutation.mutateAsync(docId)
           )
-        ),
-        {
-          loading: `Deleting ${count} document${count > 1 ? 's' : ''}...`,
-          success: `${count} document${count > 1 ? 's' : ''} deleted successfully`,
-          error: 'Failed to delete documents. Please try again.',
-        }
-      )
+        )
+        toast.success(`${count} document${count > 1 ? 's' : ''} deleted successfully`)
+      } catch (error) {
+        console.error('Failed to delete documents:', error)
+        toast.error('Failed to delete documents. Please try again.')
+      } finally {
+        setIsDeleting(false)
+        setDeleteDialogOpen(false)
+        setSelectedDocuments(new Set())
+      }
     }
   }
 
   const handleCancelDelete = () => {
     setDeleteDialogOpen(false)
     setDocumentToDelete(null)
+  }
+
+  // Handle bulk delete - open dialog first
+  const handleBulkDelete = () => {
+    setDeleteDialogOpen(true)
   }
 
   const handleSelectDocument = (documentId: string) => {
@@ -578,8 +582,68 @@ export default function SpacePage() {
     }
   }
 
-  const handleAddToContext = (document: DocumentResponse) => {
-    toast.success(`Added ${document.filename} to chat context`)
+  const handleAddToContext = (documentId: string) => {
+    setSpaceContext(spaceId, [documentId])
+    const document = documents.find(d => d.id === documentId)
+    toast.success(`Set chat context to ${document?.filename || 'document'}`)
+  }
+
+  // Bulk open selected documents in tabs - open ALL selected documents that aren't already open
+  const handleBulkOpen = () => {
+    const selectedIds = Array.from(selectedDocuments)
+
+    setTabs(currentTabs => {
+      let updatedTabs = currentTabs
+
+      selectedIds.forEach((docId) => {
+        const document = documents.find((d) => d.id === docId)
+        if (!document) return
+
+        // Check if document already has a tab open in left pane
+        const existingTabIndex = updatedTabs.findIndex((t) => t.id === docId)
+        if (existingTabIndex !== -1) {
+          // If already open, just activate it
+          updatedTabs = updatedTabs.map((tab, index) =>
+            index === existingTabIndex
+              ? { ...tab, isActive: true }
+              : { ...tab, isActive: false }
+          )
+        } else {
+          // Create new tab
+          const docType = getDocumentType(document.mime_type)
+          updatedTabs = [
+            ...updatedTabs.map((t) => ({ ...t, isActive: false })),
+            {
+              id: docId,
+              title: document.filename,
+              type: docType as any,
+              isActive: true,
+              closable: true,
+            },
+          ]
+        }
+      })
+
+      return updatedTabs
+    })
+  }
+
+  // Bulk open selected documents in right pane
+  const handleBulkOpenInRightPane = () => {
+    const selectedIds = Array.from(selectedDocuments)
+    selectedIds.forEach((docId, index) => {
+      setTimeout(() => {
+        const doc = documents.find(d => d.id === docId)
+        if (doc) handleOpenInRightPane(doc)
+      }, index * 50)
+    })
+  }
+
+  // Bulk add selected documents to chat context
+  const handleBulkAddToContext = () => {
+    const selectedIds = Array.from(selectedDocuments)
+    setSpaceContext(spaceId, selectedIds)
+    toast.success(`Added ${selectedIds.length} documents to chat context`)
   }
 
   const documentsContent = (
@@ -635,6 +699,11 @@ export default function SpacePage() {
                     onSelectDocument={handleSelectDocument}
                     onSelectAll={handleSelectAll}
                     onDeleteDocument={handleDeleteDocument}
+                    onDeleteSelected={handleBulkDelete}
+                    onBulkOpen={handleBulkOpen}
+                    onBulkOpenInRightPane={handleBulkOpenInRightPane}
+                    onBulkAddToContext={handleBulkAddToContext}
+                    onAddToContext={handleAddToContext}
                   />
                 ) : (
                   <DocumentsGrid
@@ -644,6 +713,10 @@ export default function SpacePage() {
                     onDocumentClick={handleDocumentClick}
                     onSelectDocument={handleSelectDocument}
                     onDeleteDocument={handleDeleteDocument}
+                    onDeleteSelected={handleBulkDelete}
+                    onBulkOpen={handleBulkOpen}
+                    onBulkOpenInRightPane={handleBulkOpenInRightPane}
+                    onBulkAddToContext={handleBulkAddToContext}
                     onDeselectAll={handleDeselectAll}
                     onOpenInRightPane={handleOpenInRightPane}
                     onAddToContext={handleAddToContext}

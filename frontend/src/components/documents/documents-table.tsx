@@ -1,6 +1,11 @@
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Checkbox } from '@/components/ui/checkbox'
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from '@/components/ui/tooltip'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import {
   ContextMenu,
@@ -9,7 +14,7 @@ import {
   ContextMenuSeparator,
   ContextMenuTrigger,
 } from '@/components/ui/context-menu'
-import { Eye, ExternalLink, MessageSquare, Trash2 } from 'lucide-react'
+import { Eye, ExternalLink, Target, Trash2 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { DocumentResponse } from '@/lib/api'
 import {
@@ -29,6 +34,10 @@ interface DocumentsTableProps {
   onSelectDocument: (documentId: string) => void
   onSelectAll: () => void
   onDeleteDocument: (documentId: string) => void
+  onDeleteSelected?: () => void
+  onBulkOpen?: () => void
+  onBulkOpenInRightPane?: () => void
+  onBulkAddToContext?: () => void
   onAddToContext?: (documentId: string) => void
 }
 
@@ -39,6 +48,10 @@ export function DocumentsTable({
   onSelectDocument,
   onSelectAll,
   onDeleteDocument,
+  onDeleteSelected,
+  onBulkOpen,
+  onBulkOpenInRightPane,
+  onBulkAddToContext,
   onAddToContext,
 }: DocumentsTableProps) {
   return (
@@ -104,42 +117,66 @@ export function DocumentsTable({
                   <div className="flex items-center gap-1">
                     {/* Open or Open Link button */}
                     {(docType === DocumentType.youtube || docType === DocumentType.web) && document.url ? (
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => window.open(document.url, '_blank', 'noopener,noreferrer')}
-                        title="Open Link"
-                      >
-                        <ExternalLink className="h-4 w-4" />
-                      </Button>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => window.open(document.url, '_blank', 'noopener,noreferrer')}
+                          >
+                            <ExternalLink className="h-4 w-4" />
+                          </Button>
+                        </TooltipTrigger>
+                        <TooltipContent>
+                          <p>Open in new tab</p>
+                        </TooltipContent>
+                      </Tooltip>
                     ) : (
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => onDocumentClick(document.id)}
-                        title="Open"
-                      >
-                        <Eye className="h-4 w-4" />
-                      </Button>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => onDocumentClick(document.id)}
+                          >
+                            <Eye className="h-4 w-4" />
+                          </Button>
+                        </TooltipTrigger>
+                        <TooltipContent>
+                          <p>View document</p>
+                        </TooltipContent>
+                      </Tooltip>
                     )}
                     {/* Add to Context button */}
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => onAddToContext?.(document.id)}
-                      title="Add to Chat Context"
-                    >
-                      <MessageSquare className="h-4 w-4" />
-                    </Button>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => onAddToContext?.(document.id)}
+                        >
+                          <Target className="h-4 w-4" />
+                        </Button>
+                      </TooltipTrigger>
+                      <TooltipContent>
+                        <p>Add to chat context</p>
+                      </TooltipContent>
+                    </Tooltip>
                     {/* Delete button */}
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => onDeleteDocument(document.id)}
-                      title="Delete"
-                    >
-                      <Trash2 className="h-4 w-4" />
-                    </Button>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => onDeleteDocument(document.id)}
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </TooltipTrigger>
+                      <TooltipContent>
+                        <p>Delete document</p>
+                      </TooltipContent>
+                    </Tooltip>
                   </div>
                 </TableCell>
               </TableRow>
@@ -150,7 +187,7 @@ export function DocumentsTable({
                 <ContextMenuTrigger asChild>
                   {tableRow}
                 </ContextMenuTrigger>
-                <ContextMenuContent className="w-52">
+                <ContextMenuContent className="w-60">
                   {/* Header showing document name/type or selection count */}
                   <div className="px-2 py-1.5 text-sm font-medium text-muted-foreground border-b mb-1">
                     {selectedDocuments.size > 1 ? (
@@ -164,38 +201,75 @@ export function DocumentsTable({
                       </div>
                     )}
                   </div>
-                  <ContextMenuItem
-                    onClick={() => onDocumentClick(document.id)}
-                    className="focus:bg-teal-50 focus:text-teal-900"
-                  >
-                    <ExternalLink className="mr-2 h-4 w-4" />
-                    Open
-                  </ContextMenuItem>
-                  {(docType === DocumentType.youtube || docType === DocumentType.web) && document.url && (
-                    <ContextMenuItem
-                      onClick={() => window.open(document.url, '_blank', 'noopener,noreferrer')}
-                      className="focus:bg-teal-50 focus:text-teal-900"
-                    >
-                      <ExternalLink className="mr-2 h-4 w-4" />
-                      Open Link in New Tab
-                    </ContextMenuItem>
+                  {selectedDocuments.size > 1 ? (
+                    <>
+                      <ContextMenuItem
+                        onClick={onBulkOpen}
+                        className="focus:bg-teal-50 focus:text-teal-900"
+                      >
+                        <ExternalLink className="mr-2 h-4 w-4" />
+                        Open Selected Documents
+                      </ContextMenuItem>
+                      <ContextMenuItem
+                        onClick={onBulkOpenInRightPane}
+                        className="focus:bg-teal-50 focus:text-teal-900"
+                      >
+                        <Eye className="mr-2 h-4 w-4" />
+                        Open Selected in Right Pane
+                      </ContextMenuItem>
+                      <ContextMenuSeparator />
+                      <ContextMenuItem
+                        onClick={onBulkAddToContext}
+                        className="focus:bg-teal-50 focus:text-teal-900"
+                      >
+                        <Target className="mr-2 h-4 w-4" />
+                        Add Selected to Chat Context
+                      </ContextMenuItem>
+                      <ContextMenuSeparator />
+                      <ContextMenuItem
+                        onClick={() => onDeleteSelected?.()}
+                        className="text-destructive focus:bg-red-50 focus:text-destructive"
+                      >
+                        <Trash2 className="mr-2 h-4 w-4" />
+                        Delete Selected Documents
+                      </ContextMenuItem>
+                    </>
+                  ) : (
+                    <>
+                      <ContextMenuItem
+                        onClick={() => onDocumentClick(document.id)}
+                        className="focus:bg-teal-50 focus:text-teal-900"
+                      >
+                        <ExternalLink className="mr-2 h-4 w-4" />
+                        Open
+                      </ContextMenuItem>
+                      {(docType === DocumentType.youtube || docType === DocumentType.web) && document.url && (
+                        <ContextMenuItem
+                          onClick={() => window.open(document.url, '_blank', 'noopener,noreferrer')}
+                          className="focus:bg-teal-50 focus:text-teal-900"
+                        >
+                          <ExternalLink className="mr-2 h-4 w-4" />
+                          Open Link in New Tab
+                        </ContextMenuItem>
+                      )}
+                      <ContextMenuSeparator />
+                      <ContextMenuItem
+                        onClick={() => onAddToContext?.(document.id)}
+                        className="focus:bg-teal-50 focus:text-teal-900"
+                      >
+                        <Target className="mr-2 h-4 w-4" />
+                        Add to Chat Context
+                      </ContextMenuItem>
+                      <ContextMenuSeparator />
+                      <ContextMenuItem
+                        onClick={() => onDeleteDocument(document.id)}
+                        className="text-destructive focus:bg-red-50 focus:text-destructive"
+                      >
+                        <Trash2 className="mr-2 h-4 w-4" />
+                        Delete
+                      </ContextMenuItem>
+                    </>
                   )}
-                  <ContextMenuSeparator />
-                  <ContextMenuItem
-                    onClick={() => onAddToContext?.(document.id)}
-                    className="focus:bg-teal-50 focus:text-teal-900"
-                  >
-                    <MessageSquare className="mr-2 h-4 w-4" />
-                    Add to Chat Context
-                  </ContextMenuItem>
-                  <ContextMenuSeparator />
-                  <ContextMenuItem
-                    onClick={() => onDeleteDocument(document.id)}
-                    className="text-destructive focus:bg-red-50 focus:text-destructive"
-                  >
-                    <Trash2 className="mr-2 h-4 w-4" />
-                    Delete
-                  </ContextMenuItem>
                 </ContextMenuContent>
               </ContextMenu>
             )

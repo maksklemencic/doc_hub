@@ -226,6 +226,16 @@ export function QueryBar({
           >
             {getContextText()}
           </Badge>
+          {onDocumentContextChange && documents.length > 0 && (selectedDocumentIds.length === 0 ? false : selectedDocumentIds.length !== documents.length) && (
+            <Button
+              variant="outline"
+              size="sm"
+              className="text-xs h-[22px] px-2"
+              onClick={() => onDocumentContextChange([])}
+            >
+              Use all ({documents.length})
+            </Button>
+          )}
         </div>
 
       {/* Custom positioned popover - positioned relative to query bar container */}
