@@ -4,7 +4,7 @@ import uuid
 from pathlib import Path
 from urllib.parse import urlparse
 
-from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile, status
+from fastapi import APIRouter, Depends, File, Form, HTTPException, Request, UploadFile, status
 
 from ..dependencies.auth import get_current_user
 from ..errors.database_errors import DatabaseError, NotFoundError, PermissionError

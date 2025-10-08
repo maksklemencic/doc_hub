@@ -1,12 +1,13 @@
 'use client'
 
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useMemo } from 'react'
 import { Button } from '@/components/ui/button'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { Spinner } from '@/components/ui/spinner'
 import { Input } from '@/components/ui/input'
 import { Plus, Minus, ArrowUpDown, FileText } from 'lucide-react'
 import { documentsApi } from '@/lib/api'
+import { SpaceStorage } from '@/utils/localStorage'
 import { Document, Page, pdfjs } from 'react-pdf'
 import 'react-pdf/dist/Page/AnnotationLayer.css'
 import 'react-pdf/dist/Page/TextLayer.css'
@@ -48,6 +49,38 @@ export function DocumentViewer({
   useEffect(() => {
     onZoomStateChangeRef.current = onZoomStateChange
   }, [onZoomStateChange])
+
+  // Load zoom state from localStorage on mount
+  useEffect(() => {
+    const storedZoom = SpaceStorage.get<{ scale: number; isFitToWidth: boolean }>(documentId, 'zoom')
+    if (storedZoom && !zoomState) { // Only use stored zoom if no explicit zoomState prop
+      setScale(storedZoom.scale)
+      setIsFitToWidth(storedZoom.isFitToWidth)
+      setManualZoomInput(storedZoom.isFitToWidth ? 'Fit' : Math.round(storedZoom.scale * 100).toString())
+    }
+  }, [documentId, zoomState])
+
+  // Debounced save to localStorage
+  const debouncedSaveZoom = useMemo(
+    () => {
+      let timeoutId: NodeJS.Timeout
+      return () => {
+        clearTimeout(timeoutId)
+        timeoutId = setTimeout(() => {
+          const zoomData = { scale, isFitToWidth }
+          SpaceStorage.set(documentId, 'zoom', zoomData)
+        }, 300)
+      }
+    },
+    [documentId, scale, isFitToWidth]
+  )
+
+  // Save zoom changes to localStorage (only when not using explicit zoomState prop)
+  useEffect(() => {
+    if (!zoomState) {
+      debouncedSaveZoom()
+    }
+  }, [scale, isFitToWidth, zoomState, debouncedSaveZoom])
 
   // Track container width with ResizeObserver - run after pdfUrl loads
   useEffect(() => {

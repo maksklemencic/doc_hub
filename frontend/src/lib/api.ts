@@ -355,7 +355,7 @@ export const documentsApi = {
 // Upload API
 export const uploadApi = {
   // Upload file via multipart form data
-  uploadFile: async (file: File, spaceId: string): Promise<UploadResponse> => {
+  uploadFile: async (file: File, spaceId: string, signal?: AbortSignal): Promise<UploadResponse> => {
     const formData = new FormData()
     formData.append('file', file)
     formData.append('space_id', spaceId)
@@ -370,6 +370,7 @@ export const uploadApi = {
         ...(token && { Authorization: `Bearer ${token}` }),
       },
       body: formData,
+      signal,
     })
 
     if (!response.ok) {
@@ -390,18 +391,20 @@ export const uploadApi = {
   },
 
   // Upload web document from URL
-  uploadWebDocument: async (request: WebDocumentUploadRequest): Promise<UploadResponse> => {
+  uploadWebDocument: async (request: WebDocumentUploadRequest, signal?: AbortSignal): Promise<UploadResponse> => {
     return apiRequest<UploadResponse>('/upload/web', {
       method: 'POST',
       body: JSON.stringify(request),
+      signal,
     })
   },
 
   // Upload YouTube video transcript
-  uploadYouTubeVideo: async (request: YouTubeUploadRequest): Promise<UploadResponse> => {
+  uploadYouTubeVideo: async (request: YouTubeUploadRequest, signal?: AbortSignal): Promise<UploadResponse> => {
     return apiRequest<UploadResponse>('/upload/youtube', {
       method: 'POST',
       body: JSON.stringify(request),
+      signal,
     })
   },
 }

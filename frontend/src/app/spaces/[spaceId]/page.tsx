@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useRef, useCallback } from 'react'
+import { useState, useEffect, useRef, useCallback, useMemo } from 'react'
 import { useParams } from 'next/navigation'
 import { Spinner } from '@/components/ui/spinner'
 import { FileText } from 'lucide-react'
@@ -21,6 +21,7 @@ import { useSpaceDocuments, useDeleteDocument, useDeleteDocumentSilent } from '@
 import { DocumentResponse } from '@/lib/api'
 import { useSpacesContext } from '@/contexts/spaces-context'
 import { getDocumentType, DocumentType } from '@/utils/document-utils'
+import { SpaceStorage } from '@/utils/localStorage'
 import toast from 'react-hot-toast'
 
 type ViewMode = 'list' | 'grid'
@@ -37,7 +38,9 @@ export default function SpacePage() {
   const deleteDocumentMutation = useDeleteDocument()
   const deleteDocumentSilentMutation = useDeleteDocumentSilent()
 
-  const [viewMode, setViewMode] = useState<ViewMode>('grid')
+  const [viewMode, setViewMode] = useState<ViewMode>(() => {
+    return SpaceStorage.get<ViewMode>(spaceId, 'viewMode') ?? 'grid'
+  })
   const [searchTerm, setSearchTerm] = useState('')
   const [isUploadOpen, setIsUploadOpen] = useState(false)
   const [chatState, setChatState] = useState<'visible' | 'hidden' | 'fullscreen'>('visible')
@@ -52,7 +55,54 @@ export default function SpacePage() {
   const gridContainerRef = useRef<HTMLDivElement>(null)
   const documentsPaneRef = useRef<HTMLDivElement>(null)
 
-  // Tab management for new UI
+  // Tab persistence types
+  interface PersistentTabState {
+    leftTabs: Omit<Tab, 'isActive'>[]
+    rightTabs: Omit<Tab, 'isActive'>[]
+    leftActiveId: string | null
+    rightActiveId: string | null
+  }
+
+  // Helper function to validate stored tabs against current documents
+  const validateStoredTabs = useCallback((storedTabs: Omit<Tab, 'isActive'>[], currentDocuments: DocumentResponse[]): Omit<Tab, 'isActive'>[] => {
+    return storedTabs.filter(tab => {
+      // Keep special tabs (documents, ai-chat)
+      if (tab.id === 'documents' || tab.type === 'ai-chat') {
+        return true
+      }
+
+      // For document tabs, verify document still exists
+      const documentExists = currentDocuments.some(doc => doc.id === tab.id)
+      if (!documentExists) {
+        console.info(`Removing stale tab: ${tab.title} (document deleted)`)
+      }
+
+      return documentExists
+    }).map(tab => {
+      // Update document tab titles if filename changed, but keep as documents (can't search IDs)
+      if (tab.id !== 'documents' && tab.type !== 'ai-chat') {
+        // We'll validate document existence above, so this is safe
+        // const currentDoc = currentDocuments.find(doc => doc.id === tab.id)
+        // if (currentDoc && currentDoc.filename !== tab.title) {
+        //   return {...tab, title: currentDoc.filename}
+        // }
+      }
+      return tab
+    })
+  }, [])
+
+  // Helper function to restore tabs with active state
+  const restoreTabsWithActiveState = useCallback((tabs: Omit<Tab, 'isActive'>[], activeId: string | null): Tab[] => {
+    return tabs.map(tab => ({
+      ...tab,
+      isActive: tab.id === activeId
+    }))
+  }, [])
+
+  // Get documents from API response
+  const documents: DocumentResponse[] = documentsData?.documents || []
+
+  // Tab management for new UI with persistence
   const [tabs, setTabs] = useState<Tab[]>([
     {
       id: 'documents',
@@ -62,13 +112,29 @@ export default function SpacePage() {
       closable: false,
     },
   ])
+
   const [rightTabs, setRightTabs] = useState<Tab[]>([])
+
+  // Restore tabs from localStorage after documents load
+  useEffect(() => {
+    if (documents.length === 0) return // Wait for documents to load
+
+    const storedTabs = SpaceStorage.get<PersistentTabState>(spaceId, 'tabs')
+    if (storedTabs) {
+      // Validate tabs against current documents
+      const validLeftTabs = validateStoredTabs(storedTabs.leftTabs, documents)
+      const validRightTabs = validateStoredTabs(storedTabs.rightTabs, documents)
+
+      // Restore tabs with proper active state
+      const tabsWithActiveState = restoreTabsWithActiveState(validLeftTabs, storedTabs.leftActiveId || 'documents')
+
+      setTabs([{ id: 'documents', title: 'Documents', type: 'documents', isActive: storedTabs.leftActiveId === 'documents', closable: false }, ...tabsWithActiveState])
+      setRightTabs(restoreTabsWithActiveState(validRightTabs, storedTabs.rightActiveId))
+    }
+  }, [spaceId, documents, validateStoredTabs, restoreTabsWithActiveState])
 
   // Zoom state persistence per TAB ID (not document ID, so same doc in different tabs has separate zoom)
   const [tabZoomStates, setTabZoomStates] = useState<Record<string, { scale: number; isFitToWidth: boolean }>>({})
-
-  // Get documents from API response
-  const documents: DocumentResponse[] = documentsData?.documents || []
 
   // Apply filtering and sorting
   const filteredAndSortedDocuments = documents
@@ -618,6 +684,67 @@ export default function SpacePage() {
       [tabId]: state
     }))
   }, [])
+
+  // Persist view mode changes
+  useEffect(() => {
+    SpaceStorage.set(spaceId, 'viewMode', viewMode)
+  }, [spaceId, viewMode])
+
+  // Debounced save for tab state
+  const debouncedSaveTabs = useMemo(
+    () => {
+      let timeoutId: NodeJS.Timeout
+      return () => {
+        clearTimeout(timeoutId)
+        timeoutId = setTimeout(() => {
+          const leftActiveId = tabs.find(t => t.isActive)?.id || null
+          const rightActiveId = rightTabs.find(t => t.isActive)?.id || null
+
+          const persistentState: PersistentTabState = {
+            leftTabs: tabs
+              .filter(t => t.id !== 'documents') // Don't persist the documents tab
+              .map(t => ({ id: t.id, title: t.title, type: t.type, closable: t.closable })),
+            rightTabs: rightTabs.map(t => ({ id: t.id, title: t.title, type: t.type, closable: t.closable })),
+            leftActiveId,
+            rightActiveId
+          }
+
+          SpaceStorage.set(spaceId, 'tabs', persistentState)
+        }, 500)
+      }
+    },
+    [spaceId, tabs, rightTabs]
+  )
+
+  // Save tab changes to localStorage
+  useEffect(() => {
+    debouncedSaveTabs()
+  }, [tabs, rightTabs, debouncedSaveTabs])
+
+  // Handle document deletion cleanup - remove from tabs and localStorage
+  useEffect(() => {
+    const documentIds = new Set(documents.map(d => d.id))
+
+    // Clean up left tabs
+    const cleanedLeftTabs = tabs.filter(tab => {
+      if (tab.id === 'documents' || tab.type === 'ai-chat') return true
+      return documentIds.has(tab.id)
+    })
+
+    // Clean up right tabs
+    const cleanedRightTabs = rightTabs.filter(tab => {
+      if (tab.type === 'ai-chat') return true
+      return documentIds.has(tab.id)
+    })
+
+    // Update state if necessary
+    if (cleanedLeftTabs.length !== tabs.length) {
+      setTabs(cleanedLeftTabs)
+    }
+    if (cleanedRightTabs.length !== rightTabs.length) {
+      setRightTabs(cleanedRightTabs)
+    }
+  }, [documents])
 
   // Render content based on active tab
   const renderLeftContent = () => {

@@ -36,10 +36,11 @@ interface UploadItem {
     file?: File;
     url?: string;
     name: string;
-    status: "pending" | "uploading" | "completed" | "error" | "waiting";
+    status: "pending" | "uploading" | "completed" | "error" | "waiting" | "cancelled";
     progress: number;
     error?: string;
     documentId?: string;
+    abortController?: AbortController;
 }
 
 interface DocumentUploadProps {
@@ -162,10 +163,13 @@ export function DocumentUpload({ open, onOpenChange, spaceId }: DocumentUploadPr
 
         uploadingIds.current.add(uploadItem.id);
 
+        // Create AbortController for this upload
+        const abortController = new AbortController();
+
         setUploadItems((prev) =>
             prev.map((f) =>
                 f.id === uploadItem.id
-                    ? { ...f, status: "uploading", progress: 0 }
+                    ? { ...f, status: "uploading", progress: 0, abortController }
                     : f
             )
         );
@@ -174,12 +178,13 @@ export function DocumentUpload({ open, onOpenChange, spaceId }: DocumentUploadPr
             const response = await uploadFileMutation.mutateAsync({
                 file: uploadItem.file,
                 spaceId,
+                signal: abortController.signal,
             });
 
             setUploadItems((prev) =>
                 prev.map((f) =>
                     f.id === uploadItem.id
-                        ? { ...f, status: "completed", progress: 100, documentId: response.document_id }
+                        ? { ...f, status: "completed", progress: 100, documentId: response.document_id, abortController: undefined }
                         : f
                 )
             );
@@ -188,6 +193,13 @@ export function DocumentUpload({ open, onOpenChange, spaceId }: DocumentUploadPr
 
             setTimeout(processQueue, 200);
         } catch (error) {
+            // Silently ignore abort errors - they're expected when cancelling
+            if (error instanceof Error && (error.name === 'AbortError' || error.message.includes('aborted'))) {
+                uploadingIds.current.delete(uploadItem.id);
+                setTimeout(processQueue, 200);
+                return;
+            }
+
             setUploadItems((prev) =>
                 prev.map((f) =>
                     f.id === uploadItem.id
@@ -195,6 +207,7 @@ export function DocumentUpload({ open, onOpenChange, spaceId }: DocumentUploadPr
                               ...f,
                               status: "error",
                               error: error instanceof Error ? error.message : "Upload failed",
+                              abortController: undefined,
                           }
                         : f
                 )
@@ -218,6 +231,28 @@ export function DocumentUpload({ open, onOpenChange, spaceId }: DocumentUploadPr
 
     const removeUploadItem = (itemId: string) => {
         setUploadItems((prev) => prev.filter((item) => item.id !== itemId));
+    };
+
+    const cancelUpload = (uploadItem: UploadItem) => {
+        // Abort the request if it has an AbortController
+        if (uploadItem.abortController) {
+            uploadItem.abortController.abort();
+        }
+
+        // Mark as cancelled
+        setUploadItems((prev) =>
+            prev.map((item) =>
+                item.id === uploadItem.id
+                    ? { ...item, status: "cancelled", error: "Upload cancelled" }
+                    : item
+            )
+        );
+
+        // Remove from uploading set
+        uploadingIds.current.delete(uploadItem.id);
+
+        // Process next in queue
+        setTimeout(processQueue, 200);
     };
 
     const handleDeleteUploadedDocument = async (uploadItem: UploadItem) => {
@@ -264,10 +299,13 @@ export function DocumentUpload({ open, onOpenChange, spaceId }: DocumentUploadPr
 
         uploadingIds.current.add(uploadItem.id);
 
+        // Create AbortController for this upload
+        const abortController = new AbortController();
+
         setUploadItems((prev) =>
             prev.map((f) =>
                 f.id === uploadItem.id
-                    ? { ...f, status: "uploading", progress: 0 }
+                    ? { ...f, status: "uploading", progress: 0, abortController }
                     : f
             )
         );
@@ -282,19 +320,21 @@ export function DocumentUpload({ open, onOpenChange, spaceId }: DocumentUploadPr
                     space_id: spaceId,
                     segment_duration: 60,
                     languages: ['en'],
+                    signal: abortController.signal,
                 });
             } else {
                 // Regular web document upload
                 response = await uploadWebDocumentMutation.mutateAsync({
                     url: uploadItem.url,
                     space_id: spaceId,
+                    signal: abortController.signal,
                 });
             }
 
             setUploadItems((prev) =>
                 prev.map((f) =>
                     f.id === uploadItem.id
-                        ? { ...f, status: "completed", progress: 100, documentId: response.document_id }
+                        ? { ...f, status: "completed", progress: 100, documentId: response.document_id, abortController: undefined }
                         : f
                 )
             );
@@ -303,6 +343,13 @@ export function DocumentUpload({ open, onOpenChange, spaceId }: DocumentUploadPr
 
             setTimeout(processQueue, 200);
         } catch (error) {
+            // Silently ignore abort errors - they're expected when cancelling
+            if (error instanceof Error && (error.name === 'AbortError' || error.message.includes('aborted'))) {
+                uploadingIds.current.delete(uploadItem.id);
+                setTimeout(processQueue, 200);
+                return;
+            }
+
             setUploadItems((prev) =>
                 prev.map((f) =>
                     f.id === uploadItem.id
@@ -310,6 +357,7 @@ export function DocumentUpload({ open, onOpenChange, spaceId }: DocumentUploadPr
                               ...f,
                               status: "error",
                               error: error instanceof Error ? error.message : "Upload failed",
+                              abortController: undefined,
                           }
                         : f
                 )
@@ -508,9 +556,17 @@ export function DocumentUpload({ open, onOpenChange, spaceId }: DocumentUploadPr
                                                 {uploadItem.name}
                                             </p>
                                             <button
-                                                onClick={() => uploadItem.status === "completed" && uploadItem.documentId ? handleDeleteUploadedDocument(uploadItem) : removeUploadItem(uploadItem.id)}
-                                                className="text-gray-400 hover:text-gray-600 flex-shrink-0 ml-2"
-                                                disabled={uploadItem.status === "uploading"}
+                                                onClick={() => {
+                                                    if (uploadItem.status === "completed" && uploadItem.documentId) {
+                                                        handleDeleteUploadedDocument(uploadItem);
+                                                    } else if (uploadItem.status === "uploading" || uploadItem.status === "pending") {
+                                                        cancelUpload(uploadItem);
+                                                    } else {
+                                                        removeUploadItem(uploadItem.id);
+                                                    }
+                                                }}
+                                                className="text-gray-400 hover:text-red-600 flex-shrink-0 ml-2 transition-colors"
+                                                title={uploadItem.status === "uploading" || uploadItem.status === "pending" ? "Cancel upload" : uploadItem.status === "completed" ? "Delete document" : "Remove"}
                                             >
                                                 {uploadItem.status === "completed" ? (
                                                     <Trash2 className="w-4 h-4" />
@@ -562,6 +618,12 @@ export function DocumentUpload({ open, onOpenChange, spaceId }: DocumentUploadPr
                                                 <div className="flex items-center gap-1 text-red-600">
                                                     <AlertCircle className="w-3 h-3" />
                                                     <span>Failed</span>
+                                                </div>
+                                            )}
+                                            {uploadItem.status === "cancelled" && (
+                                                <div className="flex items-center gap-1 text-orange-600">
+                                                    <X className="w-3 h-3" />
+                                                    <span>Cancelled</span>
                                                 </div>
                                             )}
                                         </div>

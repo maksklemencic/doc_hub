@@ -20,7 +20,6 @@ try:
 except Exception as e:
     logger.error(f"Failed to initialize Qdrant client: {str(e)}")
     client = None
-    # Don't raise error, just log it
 
 COLLECTION_NAME = "documents"
 
