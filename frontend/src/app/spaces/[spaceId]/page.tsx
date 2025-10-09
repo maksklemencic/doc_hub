@@ -20,7 +20,7 @@ import { EmptyState } from '@/components/shared/empty-state'
 import { useSpaceDocuments, useDeleteDocument, useDeleteDocumentSilent } from '@/hooks/use-documents'
 import { DocumentResponse } from '@/lib/api'
 import { useSpacesContext } from '@/contexts/spaces-context'
-import { getDocumentType, DocumentType } from '@/utils/document-utils'
+import { getDocumentType, DocumentType, getFileSize } from '@/utils/document-utils'
 import { SpaceStorage } from '@/utils/localStorage'
 import toast from 'react-hot-toast'
 
@@ -159,7 +159,9 @@ export default function SpacePage() {
           comparison = a.filename.toLowerCase().localeCompare(b.filename.toLowerCase())
           break
         case 'size':
-          comparison = (a.file_size || 0) - (b.file_size || 0)
+          const aSize = getFileSize(a, getDocumentType(a.mime_type))
+          const bSize = getFileSize(b, getDocumentType(b.mime_type))
+          comparison = aSize - bSize
           break
       }
 
@@ -582,6 +584,13 @@ export default function SpacePage() {
     }
   }
 
+  const handleOpenInRightPaneById = (documentId: string) => {
+    const document = documents.find(d => d.id === documentId)
+    if (document) {
+      handleOpenInRightPane(document)
+    }
+  }
+
   const handleAddToContext = (documentId: string) => {
     setSpaceContext(spaceId, [documentId])
     const document = documents.find(d => d.id === documentId)
@@ -646,6 +655,79 @@ export default function SpacePage() {
     toast.success(`Added ${selectedIds.length} documents to chat context`)
   }
 
+  // Bulk download selected documents - skip web-based ones
+  const handleBulkDownload = async () => {
+    const selectedIds = Array.from(selectedDocuments)
+
+    // Filter out web-based documents (they have URLs instead of downloadable files)
+    const downloadableDocuments = documents.filter(doc => {
+      const docType = getDocumentType(doc.mime_type)
+      return !(docType === DocumentType.youtube || docType === DocumentType.web) && selectedIds.includes(doc.id)
+    })
+
+    if (downloadableDocuments.length === 0) {
+      toast.error('No downloadable documents selected. Web and YouTube documents cannot be downloaded.')
+      return
+    }
+
+    let successCount = 0
+    let failedCount = 0
+
+    // Download documents sequentially to avoid overwhelming the browser
+    for (const doc of downloadableDocuments) {
+      try {
+        const token = typeof window !== 'undefined' ? localStorage.getItem('access_token') : null
+        const baseUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
+        const downloadUrl = `${baseUrl}/documents/view/${doc.id}`
+
+        const response = await fetch(downloadUrl, {
+          headers: {
+            ...(token && { Authorization: `Bearer ${token}` }),
+          },
+        })
+
+        if (!response.ok) {
+          throw new Error(`Download failed: ${response.status} ${response.statusText}`)
+        }
+
+        const blob = await response.blob()
+        const contentDisposition = response.headers.get('content-disposition')
+        const filename = contentDisposition
+          ? contentDisposition.split('filename=')[1]?.replace(/"/g, '') || doc.filename
+          : doc.filename
+
+        // Create blob URL and trigger download
+        const blobUrl = URL.createObjectURL(blob)
+        const link = document.createElement('a')
+        link.href = blobUrl
+        link.download = filename
+        document.body.appendChild(link)
+        link.click()
+        document.body.removeChild(link)
+
+        // Clean up the blob URL after download
+        URL.revokeObjectURL(blobUrl)
+
+        successCount++
+
+        // Small delay between downloads to prevent browser issues
+        await new Promise(resolve => setTimeout(resolve, 100))
+      } catch (error) {
+        console.error(`Failed to download ${doc.filename}:`, error)
+        failedCount++
+      }
+    }
+
+    // Show success/error message
+    if (successCount === downloadableDocuments.length) {
+      toast.success(`Downloaded ${successCount} document${successCount > 1 ? 's' : ''} successfully`)
+    } else if (successCount > 0) {
+      toast.error(`Downloaded ${successCount} document${successCount > 1 ? 's' : ''}, ${failedCount} failed`)
+    } else {
+      toast.error('Failed to download documents. Please try again.')
+    }
+  }
+
   const documentsContent = (
     <div ref={documentsPaneRef} className="h-full flex flex-col relative min-w-0 bg-background">
       <div className="h-full flex flex-col min-w-0">
@@ -703,6 +785,8 @@ export default function SpacePage() {
                     onBulkOpen={handleBulkOpen}
                     onBulkOpenInRightPane={handleBulkOpenInRightPane}
                     onBulkAddToContext={handleBulkAddToContext}
+                    onBulkDownload={handleBulkDownload}
+                    onOpenInRightPane={handleOpenInRightPaneById}
                     onAddToContext={handleAddToContext}
                   />
                 ) : (
@@ -717,6 +801,7 @@ export default function SpacePage() {
                     onBulkOpen={handleBulkOpen}
                     onBulkOpenInRightPane={handleBulkOpenInRightPane}
                     onBulkAddToContext={handleBulkAddToContext}
+                    onBulkDownload={handleBulkDownload}
                     onDeselectAll={handleDeselectAll}
                     onOpenInRightPane={handleOpenInRightPane}
                     onAddToContext={handleAddToContext}

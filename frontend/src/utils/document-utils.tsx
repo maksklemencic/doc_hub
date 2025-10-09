@@ -1,5 +1,5 @@
 import { ReactNode } from 'react'
-import { FileText, Image as ImageIcon, Volume2, FileVideo, Globe, Youtube } from 'lucide-react'
+import { FileText, Image as ImageIcon, Mic, Video, Globe, Youtube } from 'lucide-react'
 
 export enum DocumentType {
   word = 'word',
@@ -34,9 +34,9 @@ export function getTypeIcon(type: DocumentType, size: 'sm' | 'md' = 'sm'): React
     case DocumentType.image:
       return <ImageIcon className={`${className} text-green-600`} />
     case DocumentType.audio:
-      return <Volume2 className={`${className} text-yellow-600`} />
+      return <Mic className={`${className} text-yellow-600`} />
     case DocumentType.video:
-      return <FileVideo className={`${className} text-purple-600`} />
+      return <Video className={`${className} text-purple-600`} />
     case DocumentType.web:
       return <Globe className={`${className} text-indigo-600`} />
     case DocumentType.youtube:
@@ -48,6 +48,56 @@ export function getTypeIcon(type: DocumentType, size: 'sm' | 'md' = 'sm'): React
 
 export function getFileIcon(type: DocumentType): ReactNode {
   return getTypeIcon(type, 'md')
+}
+
+// Get icon for document type - styled like document cards (with rounded border and shadow)
+export function getDocumentIcon(type: DocumentType): ReactNode {
+  switch (type) {
+    case DocumentType.pdf:
+      return (
+        <div className="p-2 rounded-lg border-2 border-red-300 shadow-sm shadow-red-200">
+          <FileText className="w-6 h-6 text-red-600" />
+        </div>
+      )
+    case DocumentType.word:
+      return (
+        <div className="p-2 rounded-lg border-2 border-blue-300 shadow-sm shadow-blue-200">
+          <FileText className="w-6 h-6 text-blue-600" />
+        </div>
+      )
+    case DocumentType.video:
+      return (
+        <div className="p-2 rounded-lg border-2 border-purple-300 shadow-sm shadow-purple-200">
+          <Video className="w-6 h-6 text-purple-600" />
+        </div>
+      )
+    case DocumentType.audio:
+      return (
+        <div className="p-2 rounded-lg border-2 border-yellow-300 shadow-sm shadow-yellow-200">
+          <Mic className="w-6 h-6 text-yellow-600" />
+        </div>
+      )
+    case DocumentType.image:
+      return (
+        <div className="p-2 rounded-lg border-2 border-green-300 shadow-sm shadow-green-200">
+          <ImageIcon className="w-6 h-6 text-green-600" />
+        </div>
+      )
+    case DocumentType.web:
+      return (
+        <div className="p-2 rounded-lg border-2 border-indigo-300 shadow-sm shadow-indigo-200">
+          <Globe className="w-6 h-6 text-indigo-600" />
+        </div>
+      )
+    case DocumentType.youtube:
+      return (
+        <div className="p-2 rounded-lg border-2 border-red-300 shadow-sm shadow-red-200">
+          <Youtube className="w-6 h-6 text-red-600" />
+        </div>
+      )
+    default:
+      return <FileText className="w-6 h-6 text-gray-600" />
+  }
 }
 
 export function getTypeName(type: DocumentType): string {
@@ -74,19 +124,19 @@ export function getTypeName(type: DocumentType): string {
 export function getTypeBadge(type: DocumentType) {
   switch (type) {
     case DocumentType.pdf:
-      return { text: 'PDF', className: 'bg-amber-100 text-amber-700 border-amber-200' }
+      return { text: 'Pdf', className: 'bg-red-200 text-red-900 border-red-500' }
     case DocumentType.word:
-      return { text: 'WORD', className: 'bg-blue-100 text-blue-700 border-blue-200' }
+      return { text: 'Word', className: 'bg-blue-100 text-blue-700 border-blue-200' }
     case DocumentType.video:
       return { text: 'Video', className: 'bg-purple-100 text-purple-700 border-purple-200' }
     case DocumentType.audio:
-      return { text: 'Audio', className: 'bg-blue-100 text-blue-700 border-blue-200' }
+      return { text: 'Audio', className: 'bg-yellow-100 text-yellow-800 border-yellow-200' }
     case DocumentType.image:
       return { text: 'Image', className: 'bg-green-100 text-green-700 border-green-200' }
     case DocumentType.web:
       return { text: 'Web', className: 'bg-indigo-100 text-indigo-700 border-indigo-200' }
     case DocumentType.youtube:
-      return { text: 'YouTube', className: 'bg-red-100 text-red-700 border-red-200' }
+      return { text: 'Youtube', className: 'bg-red-100 text-red-700 border-red-200' }
     default:
       return { text: 'Other', className: 'bg-gray-100 text-gray-700 border-gray-200' }
   }
@@ -114,7 +164,7 @@ export function getFileTypeColor(type: DocumentType): string {
 }
 
 export function formatFileSize(bytes: number | null | undefined, docType?: DocumentType): string {
-  if (docType === DocumentType.web || docType === DocumentType.youtube) return 'Link'
+  if (docType === DocumentType.web || docType === DocumentType.youtube) return '-'
 
   if (bytes === null || bytes === undefined) return 'Unknown'
 
@@ -156,6 +206,8 @@ export function getPageCount(document: any, docType: DocumentType): string | und
 }
 
 // Helper function to get file size from backend
-export function getFileSize(document: any): number {
+export function getFileSize(document: any, docType?: DocumentType): number {
+  // Web and YouTube documents should be treated as size 0 for sorting
+  if (docType === DocumentType.web || docType === DocumentType.youtube) return 0
   return document.file_size || 0
 }

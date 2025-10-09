@@ -13,10 +13,11 @@ import {
   Globe,
   Eye,
   Target,
-  Share2,
+  Download,
   Trash2,
   ExternalLink,
-  PanelRightOpen,
+  ArrowRight,
+  SquareSplitHorizontal,
   Youtube
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
@@ -52,6 +53,7 @@ interface DocumentCardProps {
   onBulkOpen?: () => void
   onBulkOpenInRightPane?: () => void
   onBulkAddToContext?: () => void
+  onBulkDownload?: () => void
   onOpenInRightPane?: () => void
   onAddToContext?: (documentId: string) => void
 }
@@ -60,19 +62,47 @@ interface DocumentCardProps {
 const getDocumentIcon = (type: DocumentType) => {
   switch (type) {
     case DocumentType.pdf:
-      return <FileText className="w-6 h-6 text-gray-600" />
+      return (
+        <div className="p-2 rounded-lg border-2 border-red-300 shadow-sm shadow-red-200">
+          <FileText className="w-6 h-6 text-red-600" />
+        </div>
+      )
     case DocumentType.word:
-      return <FileText className="w-6 h-6 text-blue-600" />
+      return (
+        <div className="p-2 rounded-lg border-2 border-blue-300 shadow-sm shadow-blue-200">
+          <FileText className="w-6 h-6 text-blue-600" />
+        </div>
+      )
     case DocumentType.video:
-      return <Video className="w-6 h-6 text-gray-600" />
+      return (
+        <div className="p-2 rounded-lg border-2 border-purple-300 shadow-sm shadow-purple-200">
+          <Video className="w-6 h-6 text-purple-600" />
+        </div>
+      )
     case DocumentType.audio:
-      return <Mic className="w-6 h-6 text-gray-600" />
+      return (
+        <div className="p-2 rounded-lg border-2 border-yellow-300 shadow-sm shadow-yellow-200">
+          <Mic className="w-6 h-6 text-yellow-600" />
+        </div>
+      )
     case DocumentType.image:
-      return <ImageIcon className="w-6 h-6 text-gray-600" />
+      return (
+        <div className="p-2 rounded-lg border-2 border-green-300 shadow-sm shadow-green-200">
+          <ImageIcon className="w-6 h-6 text-green-600" />
+        </div>
+      )
     case DocumentType.web:
-      return <Globe className="w-6 h-6 text-gray-600" />
+      return (
+        <div className="p-2 rounded-lg border-2 border-indigo-300 shadow-sm shadow-indigo-200">
+          <Globe className="w-6 h-6 text-indigo-600" />
+        </div>
+      )
     case DocumentType.youtube:
-      return <Youtube className="w-6 h-6 text-red-600" />
+      return (
+        <div className="p-2 rounded-lg border-2 border-red-300 shadow-sm shadow-red-200">
+          <Youtube className="w-6 h-6 text-red-600" />
+        </div>
+      )
     default:
       return <FileText className="w-6 h-6 text-gray-600" />
   }
@@ -82,9 +112,9 @@ const getDocumentIcon = (type: DocumentType) => {
 const getTypeBadge = (type: DocumentType) => {
   switch (type) {
     case DocumentType.pdf:
-      return { text: 'PDF', className: 'bg-amber-100 text-amber-700 border-amber-200' }
+      return { text: 'Pdf', className: 'bg-red-200 text-red-900 border-red-500' }
     case DocumentType.word:
-      return { text: 'WORD', className: 'bg-blue-100 text-blue-700 border-blue-200' }
+      return { text: 'Word', className: 'bg-blue-100 text-blue-700 border-blue-200' }
     case DocumentType.video:
       return { text: 'Video', className: 'bg-purple-100 text-purple-700 border-purple-200' }
     case DocumentType.audio:
@@ -94,7 +124,7 @@ const getTypeBadge = (type: DocumentType) => {
     case DocumentType.web:
       return { text: 'Web', className: 'bg-indigo-100 text-indigo-700 border-indigo-200' }
     case DocumentType.youtube:
-      return { text: 'YouTube', className: 'bg-red-100 text-red-700 border-red-200' }
+      return { text: 'Youtube', className: 'bg-red-100 text-red-700 border-red-200' }
     default:
       return { text: 'Other', className: 'bg-gray-100 text-gray-700 border-gray-200' }
   }
@@ -117,6 +147,7 @@ export function DocumentCard({
   onBulkOpen,
   onBulkOpenInRightPane,
   onBulkAddToContext,
+  onBulkDownload,
   onOpenInRightPane,
   onAddToContext
 }: DocumentCardProps) {
@@ -125,15 +156,49 @@ export function DocumentCard({
   // Helper to check if document type is URL-based
   const isUrlBasedType = type === DocumentType.youtube || type === DocumentType.web
 
+    // Download function for documents
+    const handleDownload = async () => {
+      try {
+        const token = localStorage.getItem('access_token')
+        const baseUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
+        const downloadUrl = `${baseUrl}/documents/view/${id}`
+
+        const response = await fetch(downloadUrl, {
+          headers: {
+            ...(token && { Authorization: `Bearer ${token}` }),
+          },
+        })
+
+        if (!response.ok) {
+          throw new Error(`Download failed: ${response.status} ${response.statusText}`)
+        }
+
+        const blob = await response.blob()
+
+        // Create blob URL and trigger download
+        const blobUrl = URL.createObjectURL(blob)
+        const link = document.createElement('a')
+        link.href = blobUrl
+        link.download = filename // Suggest the original filename
+        document.body.appendChild(link)
+        link.click()
+        document.body.removeChild(link)
+
+        // Clean up the blob URL after download
+        URL.revokeObjectURL(blobUrl)
+      } catch (error) {
+        console.error('Download failed:', error)
+      }
+    }
+
   const cardContent = (
     <div
       className={cn(
-        "group relative bg-card border rounded-lg p-4 card-hover cursor-pointer",
+        "group relative bg-card border rounded-lg p-4 card-hover",
         isSelected ? "border-teal-500 bg-teal-50" : "border-border"
       )}
-      onClick={onClick}
     >
-      {/* Checkbox - top left */}
+      {/* Checkbox - moved out of content flow to allow full width content */}
       <div
         className="absolute top-3 left-3 z-10"
         onClick={(e) => e.stopPropagation()}
@@ -145,27 +210,73 @@ export function DocumentCard({
         />
       </div>
 
-      {/* Badge - top right */}
-      <Badge
-        variant="outline"
-        className={cn(
-          "absolute top-3 right-3 text-xs font-medium",
-          badge.className
-        )}
-      >
-        {badge.text}
-      </Badge>
-
-      {/* Icon - shifted right when checkbox present */}
-      <div className="mb-3">
-        <div className="h-12 w-12 rounded-lg bg-gray-100 flex items-center justify-center ml-7">
+      {/* Header row - Icon on left, Badge and actions on right */}
+      <div className="flex items-center justify-between mb-3">
+        {/* Icon positioned to the right of checkbox */}
+        <div className="ml-10">
           {getDocumentIcon(type)}
+        </div>
+
+        {/* Badge and open actions pushed to the far right */}
+        <div className="flex items-center gap-2">
+          {/* Badge - left of actions */}
+          <Badge
+            variant="outline"
+            className={cn(
+              "text-xs font-medium",
+              badge.className
+            )}
+          >
+            {badge.text}
+          </Badge>
+
+          {/* Always visible open actions - right of badge */}
+          {!isUrlBasedType && (
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-6 w-6 text-gray-700 hover:bg-teal-100 hover:text-teal-600"
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    onClick()
+                  }}
+                >
+                  <Eye className="h-3.5 w-3.5" />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>
+                <p>Open document</p>
+              </TooltipContent>
+            </Tooltip>
+          )}
+          {onOpenInRightPane && !isUrlBasedType && (
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-6 w-6 text-gray-700 hover:bg-teal-100 hover:text-teal-600"
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    onOpenInRightPane()
+                  }}
+                >
+                  <SquareSplitHorizontal className="h-3.5 w-3.5" />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>
+                <p>Open in right pane</p>
+              </TooltipContent>
+            </Tooltip>
+          )}
         </div>
       </div>
 
-      {/* Content - aligned under icon */}
+      {/* Content - full width, no narrow first column */}
       <div className="space-y-1">
-        <h3 className="font-medium text-sm text-gray-900 line-clamp-2 pr-16 ml-7">
+        <h3 className="font-medium text-sm text-gray-900 line-clamp-2">
           {filename}
         </h3>
         {/* URL - shown for YouTube and Web documents */}
@@ -175,101 +286,88 @@ export function DocumentCard({
             target="_blank"
             rel="noopener noreferrer"
             onClick={(e) => e.stopPropagation()}
-            className="text-xs text-blue-600 hover:text-blue-800 hover:underline ml-7 block truncate pr-16"
+            className="text-xs text-blue-600 hover:text-blue-800 hover:underline block truncate line-clamp-1"
             title={url}
           >
             {url}
           </a>
         )}
-        <div className="flex items-center gap-2 text-xs text-gray-500 ml-7">
+        <div className="flex items-center gap-2 text-xs text-gray-500">
           {pageCount && <span>{pageCount}</span>}
           {pageCount && size && !isUrlBasedType && <span>•</span>}
           {size && !isUrlBasedType && <span>{size}</span>}
         </div>
-        {timestamp && (
-          <p className="text-xs text-gray-400 ml-7">
-            {timestamp}
-          </p>
-        )}
       </div>
 
-      {/* Quick actions - shown on hover, bottom right */}
-      <div className="absolute bottom-3 right-3 flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity duration-150">
-        {isUrlBasedType && url ? (
+      {/* Separator line */}
+      <hr className="my-2 border-gray-200" />
+
+      {/* Bottom section - Date and hover actions */}
+      <div className="flex items-center justify-between">
+        {/* Date - always visible */}
+        <p className="text-xs text-gray-400">
+          {timestamp || 'No date'}
+        </p>
+
+        {/* Hover actions - shown on hover */}
+        <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity duration-150">
+          {!isUrlBasedType && (
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-6 w-6 hover:bg-teal-100 hover:text-teal-600"
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    handleDownload()
+                  }}
+                >
+                  <Download className="h-3.5 w-3.5" />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>
+                <p>Download</p>
+              </TooltipContent>
+            </Tooltip>
+          )}
           <Tooltip>
             <TooltipTrigger asChild>
               <Button
                 variant="ghost"
                 size="icon"
-                className="h-7 w-7 hover:bg-teal-100 hover:text-teal-600"
+                className="h-6 w-6 hover:bg-teal-100 hover:text-teal-600"
                 onClick={(e) => {
                   e.stopPropagation()
-                  window.open(url, '_blank', 'noopener,noreferrer')
+                  onAddToContext?.(id)
                 }}
               >
-                <ExternalLink className="h-3.5 w-3.5" />
+                <Target className="h-3.5 w-3.5" />
               </Button>
             </TooltipTrigger>
             <TooltipContent>
-              <p>Open in new tab</p>
+              <p>Set chat context</p>
             </TooltipContent>
           </Tooltip>
-        ) : (
           <Tooltip>
             <TooltipTrigger asChild>
               <Button
                 variant="ghost"
                 size="icon"
-                className="h-7 w-7 hover:bg-teal-100 hover:text-teal-600"
+                className="h-6 w-6 hover:bg-red-100 hover:text-red-600"
                 onClick={(e) => {
                   e.stopPropagation()
-                  onClick()
+                  onDelete?.()
                 }}
               >
-                <Eye className="h-3.5 w-3.5" />
+                <Trash2 className="h-3.5 w-3.5" />
               </Button>
             </TooltipTrigger>
             <TooltipContent>
-              <p>View document</p>
+              <p>Delete document</p>
             </TooltipContent>
           </Tooltip>
-        )}
-        <Tooltip>
-          <TooltipTrigger asChild>
-            <Button
-              variant="ghost"
-              size="icon"
-              className="h-7 w-7 hover:bg-teal-100 hover:text-teal-600"
-              onClick={(e) => {
-                e.stopPropagation()
-                onAddToContext?.(id)
-              }}
-            >
-              <Target className="h-3.5 w-3.5" />
-            </Button>
-          </TooltipTrigger>
-          <TooltipContent>
-            <p>Add to chat context</p>
-          </TooltipContent>
-        </Tooltip>
-        <Tooltip>
-          <TooltipTrigger asChild>
-            <Button
-              variant="ghost"
-              size="icon"
-              className="h-7 w-7 hover:bg-red-100 hover:text-red-600"
-              onClick={(e) => {
-                e.stopPropagation()
-                onDelete?.()
-              }}
-            >
-              <Trash2 className="h-3.5 w-3.5" />
-            </Button>
-          </TooltipTrigger>
-          <TooltipContent>
-            <p>Delete document</p>
-          </TooltipContent>
-        </Tooltip>
+        </div>
       </div>
     </div>
   )
@@ -279,18 +377,21 @@ export function DocumentCard({
       <ContextMenuTrigger asChild>
         {cardContent}
       </ContextMenuTrigger>
-      <ContextMenuContent className="w-60">
+      <ContextMenuContent className="w-72">
         {/* Header showing document name/type or selection count */}
         <div className="px-2 py-1.5 text-sm font-medium text-muted-foreground border-b mb-1">
           {selectedCount > 1 ? (
             <span>{selectedCount} documents</span>
           ) : (
-            <div className="flex items-center gap-2">
-              <span className="truncate" title={filename}>
+            <div className="flex items-center justify-between gap-4">
+              <span className="truncate flex-1" title={filename}>
                 {filename.length > 30 ? filename.substring(0, 30) + '...' : filename}
               </span>
-              <Badge variant="secondary" className="text-xs">
-                {type.toUpperCase()}
+              <Badge
+                variant="outline"
+                className={cn("text-xs font-medium flex-shrink-0", badge.className)}
+              >
+                {badge.text}
               </Badge>
             </div>
           )}
@@ -298,26 +399,18 @@ export function DocumentCard({
         {selectedCount > 1 ? (
           <>
             <ContextMenuItem
-              onClick={onBulkOpen}
+              onClick={() => onBulkDownload?.()}
               className="focus:bg-teal-50 focus:text-teal-900"
             >
-              <ExternalLink className="mr-2 h-4 w-4" />
-              Open Selected Documents
+              <Download className="mr-2 h-4 w-4" />
+              Download Selected
             </ContextMenuItem>
-            <ContextMenuItem
-              onClick={onBulkOpenInRightPane}
-              className="focus:bg-teal-50 focus:text-teal-900"
-            >
-              <Eye className="mr-2 h-4 w-4" />
-              Open Selected in Right Pane
-            </ContextMenuItem>
-            <ContextMenuSeparator />
             <ContextMenuItem
               onClick={onBulkAddToContext}
               className="focus:bg-teal-50 focus:text-teal-900"
             >
               <Target className="mr-2 h-4 w-4" />
-              Add Selected to Chat Context
+              Set Selected Chat Context
             </ContextMenuItem>
             <ContextMenuSeparator />
             <ContextMenuItem
@@ -330,19 +423,22 @@ export function DocumentCard({
           </>
         ) : (
           <>
-            <ContextMenuItem
-              onClick={onClick}
-              className="focus:bg-teal-50 focus:text-teal-900"
-            >
-              <ExternalLink className="mr-2 h-4 w-4" />
-              Open
-            </ContextMenuItem>
-            {onOpenInRightPane && (
+            {/* Only show Open for non-URL documents, or Open Link for URL docs */}
+            {!isUrlBasedType && (
+              <ContextMenuItem
+                onClick={onClick}
+                className="focus:bg-teal-50 focus:text-teal-900"
+              >
+                <Eye className="mr-2 h-4 w-4" />
+                Open
+              </ContextMenuItem>
+            )}
+            {onOpenInRightPane && !isUrlBasedType && (
               <ContextMenuItem
                 onClick={onOpenInRightPane}
                 className="focus:bg-teal-50 focus:text-teal-900"
               >
-                <PanelRightOpen className="mr-2 h-4 w-4" />
+                <SquareSplitHorizontal className="mr-2 h-4 w-4" />
                 Open in Right Pane
               </ContextMenuItem>
             )}
@@ -355,19 +451,27 @@ export function DocumentCard({
                 Open Link in New Tab
               </ContextMenuItem>
             )}
+            {/* Download available for non-URL docs */}
+            {!isUrlBasedType && (
+              <ContextMenuItem
+                onClick={handleDownload}
+                className="focus:bg-teal-50 focus:text-teal-900"
+              >
+                <Download className="mr-2 h-4 w-4" />
+                Download
+              </ContextMenuItem>
+            )}
             <ContextMenuSeparator />
             {onAddToContext && (
-              <>
-                <ContextMenuItem
-                  onClick={() => onAddToContext?.(id)}
-                  className="focus:bg-teal-50 focus:text-teal-900"
-                >
-                  <Target className="mr-2 h-4 w-4" />
-                  Add to Chat Context
-                </ContextMenuItem>
-                <ContextMenuSeparator />
-              </>
+              <ContextMenuItem
+                onClick={() => onAddToContext?.(id)}
+                className="focus:bg-teal-50 focus:text-teal-900"
+              >
+                <Target className="mr-2 h-4 w-4" />
+                Set Chat Context
+              </ContextMenuItem>
             )}
+            <ContextMenuSeparator />
             {onDelete && (
               <ContextMenuItem
                 onClick={() => onDelete()}

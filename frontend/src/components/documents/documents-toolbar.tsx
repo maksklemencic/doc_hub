@@ -23,7 +23,7 @@ import {
   Check,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
-import { DocumentType, getFileTypeColor } from '@/utils/document-utils'
+import { DocumentType, getTypeBadge } from '@/utils/document-utils'
 
 export type SortBy = 'date' | 'name' | 'size'
 export type SortOrder = 'asc' | 'desc'
@@ -110,7 +110,7 @@ export function DocumentsToolbar({
               <div className="space-y-1">
                 <DropdownMenuItem
                   onClick={() => onSortChange('date')}
-                  className="cursor-pointer px-2 py-2 rounded-md hover:bg-teal-50 hover:text-teal-900 transition-colors duration-150"
+                  className="cursor-pointer px-2 py-2 rounded-md hover:bg-teal-100 hover:text-teal-600 transition-colors duration-150"
                 >
                   <div className="flex items-center justify-between w-full">
                     <div className="flex items-center">
@@ -128,7 +128,7 @@ export function DocumentsToolbar({
                 </DropdownMenuItem>
                 <DropdownMenuItem
                   onClick={() => onSortChange('name')}
-                  className="cursor-pointer px-2 py-2 rounded-md hover:bg-teal-50 hover:text-teal-900 transition-colors duration-150"
+                  className="cursor-pointer px-2 py-2 rounded-md hover:bg-teal-100 hover:text-teal-600 transition-colors duration-150"
                 >
                   <div className="flex items-center justify-between w-full">
                     <div className="flex items-center">
@@ -146,7 +146,7 @@ export function DocumentsToolbar({
                 </DropdownMenuItem>
                 <DropdownMenuItem
                   onClick={() => onSortChange('size')}
-                  className="cursor-pointer px-2 py-2 rounded-md hover:bg-teal-50 hover:text-teal-900 transition-colors duration-150"
+                  className="cursor-pointer px-2 py-2 rounded-md hover:bg-teal-100 hover:text-teal-600 transition-colors duration-150"
                 >
                   <div className="flex items-center justify-between w-full">
                     <div className="flex items-center">
@@ -225,22 +225,19 @@ function TypeFilterDropdown({
         </div>
 
         <div className="space-y-1 max-h-96 overflow-y-auto">
-          {Object.values(DocumentType)
-            .filter((type) =>
-              type.toLowerCase().includes(typeFilterSearch.toLowerCase())
-            )
+          {[DocumentType.word, DocumentType.pdf, DocumentType.image, DocumentType.web, DocumentType.youtube]
+            .filter((type) => !typeFilterSearch || type.toLowerCase().includes(typeFilterSearch.toLowerCase()))
             .map((type) => {
-              const typeColor = getFileTypeColor(type as DocumentType)
-              const isSelected = selectedTypes.has(type as DocumentType)
-              const badgeClassName = cn("text-xs px-2 py-0.5", typeColor)
+              const badgeInfo = getTypeBadge(type)
+              const isSelected = selectedTypes.has(type)
               return (
                 <div
                   key={type}
-                  onClick={() => onTypeFilterChange(type as DocumentType)}
-                  className="cursor-pointer px-2 py-2 rounded-md hover:bg-teal-50 transition-colors duration-150 flex items-center justify-between"
+                  onClick={() => onTypeFilterChange(type)}
+                  className="cursor-pointer px-2 py-2 rounded-md hover:bg-teal-50 hover:text-teal-900 transition-colors duration-150 flex items-center justify-between"
                 >
-                  <Badge variant="secondary" className={badgeClassName}>
-                    {type.toUpperCase()}
+                  <Badge variant="secondary" className={cn("text-xs px-2 py-0.5", badgeInfo.className)}>
+                    {badgeInfo.text}
                   </Badge>
                   {isSelected && (
                     <Check className="h-4 w-4 text-teal-600" />
@@ -254,7 +251,7 @@ function TypeFilterDropdown({
             <DropdownMenuSeparator className="my-2" />
             <DropdownMenuItem
               onClick={onClearFilters}
-              className="cursor-pointer px-2 py-2 rounded-md hover:bg-red-50 hover:text-red-600 transition-colors duration-150"
+              className="cursor-pointer px-2 py-2 rounded-md hover:bg-red-100 hover:text-red-600 transition-colors duration-150"
             >
               <X className="h-4 w-4 mr-2" />
               Clear All Filters

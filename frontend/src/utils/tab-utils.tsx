@@ -6,7 +6,7 @@ export type TabType = TabDocumentType | 'documents' | 'ai-chat'
 
 export const iconMap: Record<TabType, any> = {
   documents: FileText,
-  pdf: FileType,
+  pdf: FileText,
   word: FileText,
   video: Video,
   audio: Mic,
@@ -24,7 +24,7 @@ export const colorMap: Record<TabType, string> = {
   pdf: 'text-red-600',
   word: 'text-blue-600',
   video: 'text-purple-600',
-  audio: 'text-blue-600',
+  audio: 'text-yellow-600',
   'ai-note': 'text-teal-600',
   'user-note': 'text-indigo-600',
   'ai-chat': 'text-primary',

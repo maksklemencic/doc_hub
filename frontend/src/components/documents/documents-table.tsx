@@ -14,12 +14,14 @@ import {
   ContextMenuSeparator,
   ContextMenuTrigger,
 } from '@/components/ui/context-menu'
-import { Eye, ExternalLink, Target, Trash2 } from 'lucide-react'
+import { Eye, ExternalLink, Target, Trash2, Download, SquareSplitHorizontal } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { DocumentResponse } from '@/lib/api'
 import {
   getDocumentType,
+  getDocumentIcon,
   getFileIcon,
+  getTypeBadge,
   getFileTypeColor,
   formatFileSize,
   formatDate,
@@ -38,6 +40,8 @@ interface DocumentsTableProps {
   onBulkOpen?: () => void
   onBulkOpenInRightPane?: () => void
   onBulkAddToContext?: () => void
+  onBulkDownload?: () => void
+  onOpenInRightPane?: (documentId: string) => void
   onAddToContext?: (documentId: string) => void
 }
 
@@ -52,8 +56,54 @@ export function DocumentsTable({
   onBulkOpen,
   onBulkOpenInRightPane,
   onBulkAddToContext,
+  onBulkDownload,
+  onOpenInRightPane,
   onAddToContext,
 }: DocumentsTableProps) {
+  // Helper to check if document type is URL-based
+  const isUrlBasedType = (type: DocumentType) => type === DocumentType.youtube || type === DocumentType.web
+
+  // Download function for documents
+  const handleDownload = async (documentId: string) => {
+    try {
+      const token = typeof window !== 'undefined'
+        ? localStorage.getItem('access_token')
+        : null
+      const baseUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
+      const downloadUrl = `${baseUrl}/documents/view/${documentId}`
+
+      const response = await fetch(downloadUrl, {
+        headers: {
+          ...(token && { Authorization: `Bearer ${token}` }),
+        },
+      })
+
+      if (!response.ok) {
+        throw new Error(`Download failed: ${response.status} ${response.statusText}`)
+      }
+
+      const blob = await response.blob()
+      const contentDisposition = response.headers.get('content-disposition')
+      const filename = contentDisposition
+        ? contentDisposition.split('filename=')[1]?.replace(/"/g, '') || 'document'
+        : 'document'
+
+      // Create blob URL and trigger download
+      const blobUrl = URL.createObjectURL(blob)
+      const link = document.createElement('a')
+      link.href = blobUrl
+      link.download = filename // Suggest the original filename
+      document.body.appendChild(link)
+      link.click()
+      document.body.removeChild(link)
+
+      // Clean up the blob URL after download
+      URL.revokeObjectURL(blobUrl)
+    } catch (error) {
+      console.error('Download failed:', error)
+    }
+  }
+
   return (
     <div className="overflow-x-auto">
       <Table>
@@ -83,8 +133,7 @@ export function DocumentsTable({
             const tableRow = (
               <TableRow
                 key={document.id}
-                className="hover:bg-muted/50 cursor-pointer"
-                onClick={() => onDocumentClick(document.id)}
+                className="hover:bg-muted/50"
               >
                 <TableCell onClick={(e) => e.stopPropagation()}>
                   <Checkbox
@@ -97,77 +146,145 @@ export function DocumentsTable({
                     {getFileIcon(docType)}
                   </div>
                 </TableCell>
-                <TableCell className="font-medium max-w-0">
+                <TableCell className="font-medium max-w-0" onClick={(e) => e.stopPropagation()}>
                   <div className="truncate" title={document.filename}>
                     {document.filename}
                   </div>
                 </TableCell>
                 <TableCell>
-                  <Badge variant="secondary" className={cn("text-xs", getFileTypeColor(docType))}>
-                    {docType.toUpperCase()}
+                  <Badge
+                    variant="outline"
+                    className={cn("text-xs font-medium", getTypeBadge(docType).className)}
+                  >
+                    {getTypeBadge(docType).text}
                   </Badge>
                 </TableCell>
                 <TableCell className="text-muted-foreground">
-                  {formatFileSize(getFileSize(document), docType)}
+                  {formatFileSize(getFileSize(document, docType), docType)}
                 </TableCell>
                 <TableCell className="text-muted-foreground">
                   {formatDate(document.created_at)}
                 </TableCell>
                 <TableCell onClick={(e) => e.stopPropagation()}>
-                  <div className="flex items-center gap-1">
-                    {/* Open or Open Link button */}
-                    {(docType === DocumentType.youtube || docType === DocumentType.web) && document.url ? (
+                  <div className="flex items-center justify-end gap-1">
+                    {/* Open actions - Eye for non-URL docs, hidden spacer for URL docs */}
+                    {!isUrlBasedType(docType) && (
                       <Tooltip>
                         <TooltipTrigger asChild>
                           <Button
                             variant="ghost"
                             size="sm"
-                            onClick={() => window.open(document.url, '_blank', 'noopener,noreferrer')}
-                          >
-                            <ExternalLink className="h-4 w-4" />
-                          </Button>
-                        </TooltipTrigger>
-                        <TooltipContent>
-                          <p>Open in new tab</p>
-                        </TooltipContent>
-                      </Tooltip>
-                    ) : (
-                      <Tooltip>
-                        <TooltipTrigger asChild>
-                          <Button
-                            variant="ghost"
-                            size="sm"
+                            className="hover:bg-teal-100 hover:text-teal-600"
                             onClick={() => onDocumentClick(document.id)}
                           >
                             <Eye className="h-4 w-4" />
                           </Button>
                         </TooltipTrigger>
                         <TooltipContent>
-                          <p>View document</p>
+                          <p>Open document</p>
                         </TooltipContent>
                       </Tooltip>
                     )}
-                    {/* Add to Context button */}
+                    {isUrlBasedType(docType) && (
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="opacity-0 pointer-events-none"
+                        disabled
+                      >
+                        <div className="h-4 w-4" />
+                      </Button>
+                    )}
+
+                    {/* Open in right pane (only for non-URL docs) */}
+                    {!isUrlBasedType(docType) && (
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="hover:bg-teal-100 hover:text-teal-600"
+                            onClick={() => onOpenInRightPane?.(document.id)}
+                          >
+                            <SquareSplitHorizontal className="h-4 w-4" />
+                          </Button>
+                        </TooltipTrigger>
+                        <TooltipContent>
+                          <p>Open in right pane</p>
+                        </TooltipContent>
+                      </Tooltip>
+                    )}
+                    {isUrlBasedType(docType) && (
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="opacity-0 pointer-events-none"
+                        disabled
+                      >
+                        <div className="h-4 w-4" />
+                      </Button>
+                    )}
+
+                    {/* Download for non-URL docs, ExternalLink for URL docs */}
+                    {!isUrlBasedType(docType) && (
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="hover:bg-teal-100 hover:text-teal-600"
+                            onClick={() => handleDownload(document.id)}
+                          >
+                            <Download className="h-4 w-4" />
+                          </Button>
+                        </TooltipTrigger>
+                        <TooltipContent>
+                          <p>Download</p>
+                        </TooltipContent>
+                      </Tooltip>
+                    )}
+                    {isUrlBasedType(docType) && document.url && (
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="hover:bg-teal-100 hover:text-teal-600"
+                            onClick={() => window.open(document.url, '_blank', 'noopener,noreferrer')}
+                          >
+                            <ExternalLink className="h-4 w-4" />
+                          </Button>
+                        </TooltipTrigger>
+                        <TooltipContent>
+                          <p>Open link</p>
+                        </TooltipContent>
+                      </Tooltip>
+                    )}
+
+                    {/* Add to Context button (always present) */}
                     <Tooltip>
                       <TooltipTrigger asChild>
                         <Button
                           variant="ghost"
                           size="sm"
+                          className="hover:bg-teal-100 hover:text-teal-600"
                           onClick={() => onAddToContext?.(document.id)}
                         >
                           <Target className="h-4 w-4" />
                         </Button>
                       </TooltipTrigger>
                       <TooltipContent>
-                        <p>Add to chat context</p>
+                        <p>Set chat context</p>
                       </TooltipContent>
                     </Tooltip>
-                    {/* Delete button */}
+
+                    {/* Delete button (always present) */}
                     <Tooltip>
                       <TooltipTrigger asChild>
                         <Button
                           variant="ghost"
                           size="sm"
+                          className="hover:bg-red-100 hover:text-red-600"
                           onClick={() => onDeleteDocument(document.id)}
                         >
                           <Trash2 className="h-4 w-4" />
@@ -187,16 +304,21 @@ export function DocumentsTable({
                 <ContextMenuTrigger asChild>
                   {tableRow}
                 </ContextMenuTrigger>
-                <ContextMenuContent className="w-60">
+                <ContextMenuContent className="w-72">
                   {/* Header showing document name/type or selection count */}
                   <div className="px-2 py-1.5 text-sm font-medium text-muted-foreground border-b mb-1">
                     {selectedDocuments.size > 1 ? (
                       <span>{selectedDocuments.size} documents</span>
                     ) : (
-                      <div className="flex items-center gap-2">
-                        <span className="truncate" title={document.filename}>{truncatedFilename}</span>
-                        <Badge variant="secondary" className="text-xs">
-                          {docType.toUpperCase()}
+                      <div className="flex items-center justify-between gap-4">
+                        <span className="truncate flex-1" title={document.filename}>
+                          {truncatedFilename}
+                        </span>
+                        <Badge
+                          variant="outline"
+                          className={cn("text-xs font-medium flex-shrink-0", getTypeBadge(docType).className)}
+                        >
+                          {getTypeBadge(docType).text}
                         </Badge>
                       </div>
                     )}
@@ -204,26 +326,18 @@ export function DocumentsTable({
                   {selectedDocuments.size > 1 ? (
                     <>
                       <ContextMenuItem
-                        onClick={onBulkOpen}
+                        onClick={() => onBulkDownload?.()}
                         className="focus:bg-teal-50 focus:text-teal-900"
                       >
-                        <ExternalLink className="mr-2 h-4 w-4" />
-                        Open Selected Documents
+                        <Download className="mr-2 h-4 w-4" />
+                        Download Selected
                       </ContextMenuItem>
-                      <ContextMenuItem
-                        onClick={onBulkOpenInRightPane}
-                        className="focus:bg-teal-50 focus:text-teal-900"
-                      >
-                        <Eye className="mr-2 h-4 w-4" />
-                        Open Selected in Right Pane
-                      </ContextMenuItem>
-                      <ContextMenuSeparator />
                       <ContextMenuItem
                         onClick={onBulkAddToContext}
                         className="focus:bg-teal-50 focus:text-teal-900"
                       >
                         <Target className="mr-2 h-4 w-4" />
-                        Add Selected to Chat Context
+                        Set Selected Chat Context
                       </ContextMenuItem>
                       <ContextMenuSeparator />
                       <ContextMenuItem
@@ -236,20 +350,38 @@ export function DocumentsTable({
                     </>
                   ) : (
                     <>
-                      <ContextMenuItem
-                        onClick={() => onDocumentClick(document.id)}
-                        className="focus:bg-teal-50 focus:text-teal-900"
-                      >
-                        <ExternalLink className="mr-2 h-4 w-4" />
-                        Open
-                      </ContextMenuItem>
-                      {(docType === DocumentType.youtube || docType === DocumentType.web) && document.url && (
+                      {!isUrlBasedType(docType) && (
+                        <>
+                          <ContextMenuItem
+                            onClick={() => onDocumentClick(document.id)}
+                            className="focus:bg-teal-50 focus:text-teal-900"
+                          >
+                            <Eye className="mr-2 h-4 w-4" />
+                            Open
+                          </ContextMenuItem>
+                          <ContextMenuItem
+                            onClick={() => onOpenInRightPane?.(document.id)}
+                            className="focus:bg-teal-50 focus:text-teal-900"
+                          >
+                            <SquareSplitHorizontal className="mr-2 h-4 w-4" />
+                            Open in Right Pane
+                          </ContextMenuItem>
+                          <ContextMenuItem
+                            onClick={() => handleDownload(document.id)}
+                            className="focus:bg-teal-50 focus:text-teal-900"
+                          >
+                            <Download className="mr-2 h-4 w-4" />
+                            Download
+                          </ContextMenuItem>
+                        </>
+                      )}
+                      {isUrlBasedType(docType) && document.url && (
                         <ContextMenuItem
                           onClick={() => window.open(document.url, '_blank', 'noopener,noreferrer')}
                           className="focus:bg-teal-50 focus:text-teal-900"
                         >
                           <ExternalLink className="mr-2 h-4 w-4" />
-                          Open Link in New Tab
+                          Open link
                         </ContextMenuItem>
                       )}
                       <ContextMenuSeparator />
@@ -258,7 +390,7 @@ export function DocumentsTable({
                         className="focus:bg-teal-50 focus:text-teal-900"
                       >
                         <Target className="mr-2 h-4 w-4" />
-                        Add to Chat Context
+                        Set Chat Context
                       </ContextMenuItem>
                       <ContextMenuSeparator />
                       <ContextMenuItem
