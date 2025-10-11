@@ -20,6 +20,7 @@ import { EmptyState } from '@/components/shared/empty-state'
 import { useSpaceDocuments, useDeleteDocument, useDeleteDocumentSilent } from '@/hooks/use-documents'
 import { DocumentResponse } from '@/lib/api'
 import { useSpacesContext } from '@/contexts/spaces-context'
+import { usePaneWidthContext } from '@/contexts/pane-width-context'
 import { getDocumentType, DocumentType, getFileSize } from '@/utils/document-utils'
 import { SpaceStorage } from '@/utils/localStorage'
 import toast from 'react-hot-toast'
@@ -136,6 +137,29 @@ export default function SpacePage() {
   // Zoom state persistence per TAB ID (not document ID, so same doc in different tabs has separate zoom)
   const [tabZoomStates, setTabZoomStates] = useState<Record<string, { scale: number; isFitToWidth: boolean }>>({})
 
+  // Load tab zoom states from localStorage on mount
+  useEffect(() => {
+    const storedZooms = SpaceStorage.get<Record<string, { scale: number; isFitToWidth: boolean }>>(spaceId, 'tabZooms')
+    if (storedZooms) {
+      setTabZoomStates(storedZooms)
+    }
+  }, [spaceId])
+
+  // Debounced save for tab zoom states
+  const debouncedSaveZooms = useMemo(() => {
+    let timeoutId: NodeJS.Timeout
+    return () => {
+      clearTimeout(timeoutId)
+      timeoutId = setTimeout(() => {
+        SpaceStorage.set(spaceId, 'tabZooms', tabZoomStates)
+      }, 300)
+    }
+  }, [spaceId, tabZoomStates])
+
+  useEffect(() => {
+    debouncedSaveZooms()
+  }, [tabZoomStates, debouncedSaveZooms])
+
   // Apply filtering and sorting
   const filteredAndSortedDocuments = documents
     .filter(doc => {
@@ -186,18 +210,25 @@ export default function SpacePage() {
     }
   }, [searchTerm, selectedTypes, sortBy, sortOrder]) // Re-run when any filter changes
 
-  // Function to update grid columns based on container width
-  const updateGridColumns = () => {
-    // Observe the documents pane (parent) instead of the grid itself
-    const containerToMeasure = documentsPaneRef.current || gridContainerRef.current
+  // Use unified width context for grid column calculations
+  const { leftWidth, rightWidth, mode, updateSplitterWidths } = usePaneWidthContext()
 
-    if (containerToMeasure) {
-      const width = containerToMeasure.offsetWidth
+  // Load pane layout from localStorage on space mount
+  useEffect(() => {
+    const storedLayout = SpaceStorage.get<{leftWidth: number, rightWidth: number, isSplit: boolean}>(spaceId, 'layout')
+    if (storedLayout) {
+      updateSplitterWidths(storedLayout.leftWidth, storedLayout.rightWidth, storedLayout.isSplit)
+    }
+  }, [spaceId, updateSplitterWidths])
 
-      // Calculate optimal columns based on actual container width
+  // Update grid columns when width changes
+  useEffect(() => {
+    const containerWidth = mode === 'split' ? leftWidth : leftWidth
+
+    if (containerWidth > 0) {
       // Account for padding: px-6 on the container = 24px each side = 48px total
       const padding = 48
-      const availableWidth = width - padding
+      const availableWidth = containerWidth - padding
 
       // Card width: ~280px minimum with gaps
       const minCardWidth = 280
@@ -212,48 +243,7 @@ export default function SpacePage() {
         setGridColumns(cols)
       }
     }
-  }
-
-  // Update grid columns based on container width
-  useEffect(() => {
-    // Small delay to ensure container has rendered
-    const timer = setTimeout(updateGridColumns, 100)
-
-    const resizeObserver = new ResizeObserver(() => {
-      updateGridColumns()
-    })
-
-    // Observe the documents pane (the container that actually resizes with split pane)
-    const elementToObserve = documentsPaneRef.current || gridContainerRef.current
-    if (elementToObserve) {
-      resizeObserver.observe(elementToObserve)
-    }
-
-    return () => {
-      clearTimeout(timer)
-      resizeObserver.disconnect()
-    }
-  }, [])
-
-  // Recalculate grid when split pane opens/closes
-  useEffect(() => {
-    let timerId: NodeJS.Timeout | null = null
-
-    // Use requestAnimationFrame to ensure DOM has updated
-    const rafId = requestAnimationFrame(() => {
-      updateGridColumns()
-
-      // Double-check after layout settles
-      timerId = setTimeout(() => {
-        updateGridColumns()
-      }, 50)
-    })
-
-    return () => {
-      cancelAnimationFrame(rafId)
-      if (timerId) clearTimeout(timerId)
-    }
-  }, [rightTabs.length])
+  }, [leftWidth, mode])
 
   const handleDeleteDocument = (documentId: string) => {
     setDocumentToDelete(documentId)
@@ -879,6 +869,16 @@ export default function SpacePage() {
     debouncedSaveTabs()
   }, [tabs, rightTabs, debouncedSaveTabs])
 
+  // Save pane layout changes
+  useEffect(() => {
+    const layout = {
+      leftWidth: leftWidth,
+      rightWidth: rightWidth,
+      isSplit: rightTabs.length > 0
+    }
+    SpaceStorage.set(spaceId, 'layout', layout)
+  }, [spaceId, leftWidth, rightWidth, rightTabs.length])
+
   // Handle document deletion cleanup - remove from tabs and localStorage
   useEffect(() => {
     const documentIds = new Set(documents.map(d => d.id))
@@ -1006,6 +1006,8 @@ export default function SpacePage() {
           onUploadClick={() => setIsUploadOpen(true)}
         />
         <SplitPaneView
+          key={spaceId} // Force remount on space change to reset panel sizes
+          spaceId={spaceId}
           leftTabs={tabs}
           rightTabs={rightTabs.length > 0 ? rightTabs : undefined}
           onTabClick={handleTabClick}
@@ -1015,7 +1017,7 @@ export default function SpacePage() {
           onTabReorderLeft={handleTabReorder('left')}
           onTabReorderRight={handleTabReorder('right')}
           onTabDragBetweenPanes={handleTabDragBetweenPanes}
-          onPanelResize={updateGridColumns}
+          onPanelResize={() => {}} // Now handled by unified width context
           rightContent={rightTabs.length > 0 ? renderRightContent() : undefined}
         >
           {renderLeftContent()}
