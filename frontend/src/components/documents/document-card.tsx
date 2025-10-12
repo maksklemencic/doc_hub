@@ -33,7 +33,7 @@ import {
   TooltipContent,
   TooltipTrigger,
 } from '@/components/ui/tooltip'
-import { DocumentType } from '@/utils/document-utils'
+import { DocumentType, getDocumentIcon, getTypeBadge, isUrlBasedType } from '@/utils/document-utils'
 import { isValidUrl } from '@/utils'
 
 interface DocumentCardProps {
@@ -56,78 +56,6 @@ interface DocumentCardProps {
   onBulkDownload?: () => void
   onOpenInRightPane?: () => void
   onAddToContext?: (documentId: string) => void
-}
-
-// Get icon for document type - small size for card
-const getDocumentIcon = (type: DocumentType) => {
-  switch (type) {
-    case DocumentType.pdf:
-      return (
-        <div className="p-2 rounded-lg border-2 border-red-300 shadow-sm shadow-red-200">
-          <FileText className="w-6 h-6 text-red-600" />
-        </div>
-      )
-    case DocumentType.word:
-      return (
-        <div className="p-2 rounded-lg border-2 border-blue-300 shadow-sm shadow-blue-200">
-          <FileText className="w-6 h-6 text-blue-600" />
-        </div>
-      )
-    case DocumentType.video:
-      return (
-        <div className="p-2 rounded-lg border-2 border-purple-300 shadow-sm shadow-purple-200">
-          <Video className="w-6 h-6 text-purple-600" />
-        </div>
-      )
-    case DocumentType.audio:
-      return (
-        <div className="p-2 rounded-lg border-2 border-yellow-300 shadow-sm shadow-yellow-200">
-          <Mic className="w-6 h-6 text-yellow-600" />
-        </div>
-      )
-    case DocumentType.image:
-      return (
-        <div className="p-2 rounded-lg border-2 border-green-300 shadow-sm shadow-green-200">
-          <ImageIcon className="w-6 h-6 text-green-600" />
-        </div>
-      )
-    case DocumentType.web:
-      return (
-        <div className="p-2 rounded-lg border-2 border-indigo-300 shadow-sm shadow-indigo-200">
-          <Globe className="w-6 h-6 text-indigo-600" />
-        </div>
-      )
-    case DocumentType.youtube:
-      return (
-        <div className="p-2 rounded-lg border-2 border-red-300 shadow-sm shadow-red-200">
-          <Youtube className="w-6 h-6 text-red-600" />
-        </div>
-      )
-    default:
-      return <FileText className="w-6 h-6 text-gray-600" />
-  }
-}
-
-// Get badge color and text for document type
-const getTypeBadge = (type: DocumentType) => {
-  switch (type) {
-    case DocumentType.pdf:
-      return { text: 'Pdf', className: 'bg-red-200 text-red-900 border-red-500' }
-    case DocumentType.word:
-      return { text: 'Word', className: 'bg-blue-100 text-blue-700 border-blue-200' }
-    case DocumentType.video:
-      return { text: 'Video', className: 'bg-purple-100 text-purple-700 border-purple-200' }
-    case DocumentType.audio:
-      return { text: 'Audio', className: 'bg-blue-100 text-blue-700 border-blue-200' }
-    case DocumentType.image:
-      return { text: 'Image', className: 'bg-green-100 text-green-700 border-green-200' }
-    case DocumentType.web:
-      return { text: 'Web', className: 'bg-indigo-100 text-indigo-700 border-indigo-200' }
-    case DocumentType.youtube:
-      return { text: 'Youtube', className: 'bg-red-100 text-red-700 border-red-200' }
-    default:
-      return { text: 'Other', className: 'bg-gray-100 text-gray-700 border-gray-200' }
-  }
 }
 
 export function DocumentCard({
@@ -153,8 +81,8 @@ export function DocumentCard({
 }: DocumentCardProps) {
   const badge = getTypeBadge(type)
 
-  // Helper to check if document type is URL-based
-  const isUrlBasedType = type === DocumentType.youtube || type === DocumentType.web
+  // Use centralized helper to check if document type is URL-based
+  const isUrlBased = isUrlBasedType(type)
 
     // Download function for documents
     const handleDownload = async () => {
@@ -231,7 +159,7 @@ export function DocumentCard({
           </Badge>
 
           {/* Always visible open actions - right of badge */}
-          {!isUrlBasedType && (
+          {!isUrlBased && (
             <Tooltip>
               <TooltipTrigger asChild>
                 <Button
@@ -251,7 +179,7 @@ export function DocumentCard({
               </TooltipContent>
             </Tooltip>
           )}
-          {onOpenInRightPane && !isUrlBasedType && (
+          {onOpenInRightPane && !isUrlBased && (
             <Tooltip>
               <TooltipTrigger asChild>
                 <Button
@@ -280,7 +208,7 @@ export function DocumentCard({
           {filename}
         </h3>
         {/* URL - shown for YouTube and Web documents */}
-        {isUrlBasedType && url && isValidUrl(url) && (
+        {isUrlBased && url && isValidUrl(url) && (
           <a
             href={url}
             target="_blank"
@@ -294,8 +222,8 @@ export function DocumentCard({
         )}
         <div className="flex items-center gap-2 text-xs text-gray-500">
           {pageCount && <span>{pageCount}</span>}
-          {pageCount && size && !isUrlBasedType && <span>•</span>}
-          {size && !isUrlBasedType && <span>{size}</span>}
+          {pageCount && size && !isUrlBased && <span>•</span>}
+          {size && !isUrlBased && <span>{size}</span>}
         </div>
       </div>
 
@@ -311,7 +239,7 @@ export function DocumentCard({
 
         {/* Hover actions - shown on hover */}
         <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity duration-150">
-          {!isUrlBasedType && (
+          {!isUrlBased && (
             <Tooltip>
               <TooltipTrigger asChild>
                 <Button
@@ -424,7 +352,7 @@ export function DocumentCard({
         ) : (
           <>
             {/* Only show Open for non-URL documents, or Open Link for URL docs */}
-            {!isUrlBasedType && (
+            {!isUrlBased && (
               <ContextMenuItem
                 onClick={onClick}
                 className="focus:bg-teal-50 focus:text-teal-900"
@@ -433,7 +361,7 @@ export function DocumentCard({
                 Open
               </ContextMenuItem>
             )}
-            {onOpenInRightPane && !isUrlBasedType && (
+            {onOpenInRightPane && !isUrlBased && (
               <ContextMenuItem
                 onClick={onOpenInRightPane}
                 className="focus:bg-teal-50 focus:text-teal-900"
@@ -442,7 +370,7 @@ export function DocumentCard({
                 Open in Right Pane
               </ContextMenuItem>
             )}
-            {isUrlBasedType && url && (
+            {isUrlBased && url && (
               <ContextMenuItem
                 onClick={() => window.open(url, '_blank', 'noopener,noreferrer')}
                 className="focus:bg-teal-50 focus:text-teal-900"
@@ -452,7 +380,7 @@ export function DocumentCard({
               </ContextMenuItem>
             )}
             {/* Download available for non-URL docs */}
-            {!isUrlBasedType && (
+            {!isUrlBased && (
               <ContextMenuItem
                 onClick={handleDownload}
                 className="focus:bg-teal-50 focus:text-teal-900"

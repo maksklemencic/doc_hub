@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
-import { useAuth } from '@/hooks/use-auth'
+import { useAuth } from '@/hooks/auth/use-auth'
 import { Spinner } from '@/components/ui/spinner'
 import { ROUTES } from '@/constants'
 import { spacesApi } from '@/lib/api'

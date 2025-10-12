@@ -211,3 +211,41 @@ export function getFileSize(document: any, docType?: DocumentType): number {
   if (docType === DocumentType.web || docType === DocumentType.youtube) return 0
   return document.file_size || 0
 }
+
+// Helper to check if document type is URL-based (YouTube or Web)
+export function isUrlBasedType(type: DocumentType): boolean {
+  return type === DocumentType.youtube || type === DocumentType.web
+}
+
+// Helper to check if document type is previewable (not audio, video, or web)
+export function isPreviewableType(type: DocumentType): boolean {
+  return type !== DocumentType.audio && type !== DocumentType.video && type !== DocumentType.web && type !== DocumentType.youtube
+}
+
+// Helper to check if document is an image
+export function isImageType(type: DocumentType): boolean {
+  return type === DocumentType.image
+}
+
+// Helper to check if document is a PDF
+export function isPdfType(type: DocumentType): boolean {
+  return type === DocumentType.pdf
+}
+
+// Check if mime type is supported for preview based on type patterns
+export function isSupportedForPreview(mimeType?: string): boolean {
+  if (!mimeType) return false
+
+  const unsupportedTypes = ['text/youtube', 'audio/', 'video/', 'html']
+  return !unsupportedTypes.some(type => mimeType.includes(type))
+}
+
+// Helper to get document type from file (for upload preview)
+export function getDocumentTypeFromFile(file: File): DocumentType {
+  return getDocumentType(file.type)
+}
+
+// Check if a document type is downloadable (not URL-based)
+export function isDownloadable(type: DocumentType): boolean {
+  return !isUrlBasedType(type)
+}

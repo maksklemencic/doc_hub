@@ -2,7 +2,7 @@
 
 import React, { createContext, useContext, useState, useCallback } from 'react'
 import { SpaceResponse } from '@/lib/api'
-import { useSpaces } from '@/hooks/use-spaces'
+import { useSpaces } from '@/hooks/spaces/use-spaces'
 
 interface SpacesContextType {
   spaces: SpaceResponse[]

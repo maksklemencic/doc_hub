@@ -1,12 +1,12 @@
 'use client'
 
-import { useState, useRef, useEffect, useCallback } from 'react'
+import { useState, useRef, useEffect, useCallback, useMemo } from 'react'
 import { Button } from '@/components/ui/button'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { Spinner } from '@/components/ui/spinner'
-import { useAuth } from '@/hooks/use-auth'
-import { useMessagesInfinite, useCreateMessage } from '@/hooks/use-messages'
-import { MessageResponse } from '@/lib/api'
+import { useAuth } from '@/hooks/auth/use-auth'
+import { useMessagesInfinite, useCreateMessage } from '@/hooks/chat/use-messages'
+import { MessageResponse } from '@/types'
 import { QueryBar } from './query-bar'
 import {
   Sparkles,
@@ -81,13 +81,24 @@ export function SpaceChat({ spaceId, spaceName, className, chatState = 'visible'
   const backendMessages = infiniteData?.pages
   // 1. Create a shallow copy and reverse the order of the pages array.
   .slice()
-  .reverse() 
+  .reverse()
   // 2. Flatten the reversed array.
   .flatMap(page => page.messages) ?? []
 
-  // Transform backend messages to chat format
-  const messages: ChatMessage[] = backendMessages.length > 0 ?
-    backendMessages.flatMap((msg, index) => {
+  // Transform backend messages to chat format with memoization to prevent re-computation on every render
+  const messages: ChatMessage[] = useMemo(() => {
+    if (backendMessages.length === 0) {
+      return [
+        {
+          id: 'welcome',
+          content: 'Hello! I can help you find information from your documents in this space. What would you like to know?',
+          role: 'assistant' as const,
+          timestamp: new Date().toISOString()
+        }
+      ]
+    }
+
+    return backendMessages.flatMap((msg, index) => {
       const chatMessages: ChatMessage[] = []
 
       // Add user message (from content field)
@@ -106,14 +117,8 @@ export function SpaceChat({ spaceId, spaceName, className, chatState = 'visible'
       }
 
       return chatMessages
-    }) : [
-      {
-        id: 'welcome',
-        content: 'Hello! I can help you find information from your documents in this space. What would you like to know?',
-        role: 'assistant',
-        timestamp: new Date().toISOString()
-      }
-    ]
+    })
+  }, [backendMessages, messageContexts])
 
   const isLoading = createMessageMutation.isPending
   const scrollAreaRef = useRef<HTMLDivElement>(null)
@@ -135,26 +140,28 @@ export function SpaceChat({ spaceId, spaceName, className, chatState = 'visible'
   const previousMessageCountRef = useRef(0)
   const previousScrollHeightRef = useRef(0)
 
+  // Memoized scroll handler to avoid recreation on every render
+  const handleScroll = useCallback((event: Event) => {
+    const target = event.target as HTMLDivElement
+    const scrollTop = target.scrollTop
+    const scrollContainer = scrollAreaRef.current?.querySelector('[data-radix-scroll-area-viewport]')
+
+    // Load more when scrolled near top (within 100px)
+    if (scrollTop < 100 && hasNextPage && !isFetchingNextPage && scrollContainer) {
+      isLoadingMoreRef.current = true
+      previousScrollHeightRef.current = scrollContainer.scrollHeight
+      fetchNextPage()
+    }
+  }, [hasNextPage, isFetchingNextPage, fetchNextPage])
+
   // Handle scroll to load older messages - attach listener to viewport
   useEffect(() => {
     const scrollContainer = scrollAreaRef.current?.querySelector('[data-radix-scroll-area-viewport]')
     if (!scrollContainer) return
 
-    const handleScroll = (event: Event) => {
-      const target = event.target as HTMLDivElement
-      const scrollTop = target.scrollTop
-
-      // Load more when scrolled near top (within 100px)
-      if (scrollTop < 100 && hasNextPage && !isFetchingNextPage) {
-        isLoadingMoreRef.current = true
-        previousScrollHeightRef.current = scrollContainer.scrollHeight
-        fetchNextPage()
-      }
-    }
-
     scrollContainer.addEventListener('scroll', handleScroll)
     return () => scrollContainer.removeEventListener('scroll', handleScroll)
-  }, [hasNextPage, isFetchingNextPage, fetchNextPage])
+  }, [handleScroll])
 
   // Preserve scroll position when loading older messages
   useEffect(() => {

@@ -11,7 +11,7 @@ import {
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { Grid3X3, List, Plus, User, ChevronRight } from 'lucide-react'
 import { cn } from '@/lib/utils'
-import { useAuth } from '@/hooks/use-auth'
+import { useAuth } from '@/hooks/auth/use-auth'
 
 interface HeaderProps {
   spaceName: string

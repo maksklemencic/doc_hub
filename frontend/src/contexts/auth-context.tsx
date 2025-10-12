@@ -101,8 +101,6 @@ export function AuthProvider({ children }: AuthProviderProps) {
     if (typeof window !== 'undefined') {
       localStorage.setItem(STORAGE_KEYS.ACCESS_TOKEN, authResponse.access_token)
       localStorage.setItem(STORAGE_KEYS.USER, JSON.stringify(authResponse.user))
-
-      document.cookie = `access_token=${authResponse.access_token}; path=/; max-age=${authResponse.expires_in}; SameSite=Lax`
     }
     dispatch({ type: 'LOGIN_SUCCESS', payload: authResponse })
   }
@@ -111,8 +109,6 @@ export function AuthProvider({ children }: AuthProviderProps) {
     if (typeof window !== 'undefined') {
       localStorage.removeItem(STORAGE_KEYS.ACCESS_TOKEN)
       localStorage.removeItem(STORAGE_KEYS.USER)
-
-      document.cookie = 'access_token=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT'
 
       sessionStorage.setItem('show_logout_toast', 'true')
     }

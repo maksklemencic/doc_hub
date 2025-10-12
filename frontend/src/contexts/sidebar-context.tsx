@@ -8,7 +8,7 @@
 'use client'
 
 import React, { createContext, useContext, ReactNode } from 'react'
-import { useSidebarState, SidebarState } from '@/hooks/use-sidebar-state'
+import { useSidebarState, SidebarState } from '@/hooks/ui/use-sidebar-state'
 
 interface SidebarContextValue {
   state: SidebarState

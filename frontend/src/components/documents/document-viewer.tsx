@@ -1,17 +1,17 @@
 'use client'
 
-import { useState, useEffect, useRef, useMemo } from 'react'
+import { useState, useEffect, useRef, useCallback } from 'react'
 import { Spinner } from '@/components/ui/spinner'
 import { FileText } from 'lucide-react'
 import { ZoomControls } from './zoom-controls'
 import { ScrollArea, ScrollBar } from '@/components/ui/scroll-area'
 import { documentsApi } from '@/lib/api'
 import { SpaceStorage } from '@/utils/localStorage'
-import { usePaneWidthContext } from '@/contexts/pane-width-context'
 import { Document, Page, pdfjs } from 'react-pdf'
 import 'react-pdf/dist/Page/AnnotationLayer.css'
 import 'react-pdf/dist/Page/TextLayer.css'
 import Image from 'next/image'
+import { isSupportedForPreview, isImageType, getDocumentType } from '@/utils/document-utils'
 
 pdfjs.GlobalWorkerOptions.workerSrc = `//unpkg.com/pdfjs-dist@${pdfjs.version}/build/pdf.worker.min.mjs`
 
@@ -41,18 +41,8 @@ export function DocumentViewer({
   const [manualZoomInput, setManualZoomInput] = useState<string>(
     zoomState ? (zoomState.isFitToWidth ? 'Fit' : Math.round(zoomState.scale * 100).toString()) : 'Fit'
   )
-  const scrollAreaRef = useRef<HTMLDivElement>(null)
   const contentContainerRef = useRef<HTMLDivElement>(null)
   const onZoomStateChangeRef = useRef(onZoomStateChange)
-
-  // Use unified pane width context
-  const {
-    leftWidth,
-    rightWidth,
-    isSplit,
-    mode,
-    updateSplitterWidths
-  } = usePaneWidthContext()
 
   // Keep ref up to date
   useEffect(() => {
@@ -69,25 +59,28 @@ export function DocumentViewer({
     }
   }, [documentId, zoomState])
 
-  // Debounced save to localStorage
-  const debouncedSaveZoom = useMemo(
-    () => {
-      let timeoutId: NodeJS.Timeout
-      return () => {
-        clearTimeout(timeoutId)
-        timeoutId = setTimeout(() => {
-          const zoomData = { scale, isFitToWidth }
-          SpaceStorage.set(documentId, 'zoom', zoomData)
-        }, 300)
-      }
-    },
-    [documentId, scale, isFitToWidth]
-  )
+  // Debounced save to localStorage - using useRef to maintain stable timeout reference
+  const timeoutIdRef = useRef<NodeJS.Timeout | undefined>(undefined)
+  const debouncedSaveZoom = useCallback(() => {
+    if (timeoutIdRef.current) {
+      clearTimeout(timeoutIdRef.current)
+    }
+    timeoutIdRef.current = setTimeout(() => {
+      const zoomData = { scale, isFitToWidth }
+      SpaceStorage.set(documentId, 'zoom', zoomData)
+    }, 300)
+  }, [documentId, scale, isFitToWidth])
 
   // Save zoom changes to localStorage (only when not using explicit zoomState prop)
   useEffect(() => {
     if (!zoomState) {
       debouncedSaveZoom()
+    }
+    // Cleanup timeout on unmount
+    return () => {
+      if (timeoutIdRef.current) {
+        clearTimeout(timeoutIdRef.current)
+      }
     }
   }, [scale, isFitToWidth, zoomState, debouncedSaveZoom])
 
@@ -165,11 +158,8 @@ export function DocumentViewer({
       setIsLoading(true)
       setError(null)
 
-      // Check if document type is supported for preview
-      const unsupportedTypes = ['text/youtube', 'audio/', 'video/', 'html']
-      const isUnsupported = unsupportedTypes.some(type => mimeType?.includes(type))
-
-      if (isUnsupported) {
+      // Check if document type is supported for preview using centralized utility
+      if (!isSupportedForPreview(mimeType)) {
         if (mounted) {
           setIsLoading(false)
           setDocType('unsupported')
@@ -277,7 +267,6 @@ export function DocumentViewer({
   }
 
   const scaledWidth = getScaledWidth()
-  const imageScaleValue = isFitToWidth ? 1.0 : scale
 
   return (
     <div className="h-full flex flex-col bg-background relative">
@@ -300,7 +289,7 @@ export function DocumentViewer({
           className={`${isFitToWidth ? 'p-2' : 'p-6'} flex flex-col items-center min-w-fit`}
           ref={contentContainerRef}
         >
-          {docType === 'image' || docType === 'web' || mimeType?.startsWith('image/') ? (
+          {docType === 'image' || docType === 'web' || (mimeType && isImageType(getDocumentType(mimeType))) ? (
             <div className="w-full flex flex-col items-center justify-center">
               <div
                 className="relative"
@@ -357,6 +346,7 @@ export function DocumentViewer({
             </Document>
           )}
         </div>
+        <ScrollBar orientation="horizontal" />
       </ScrollArea>
     </div>
   )

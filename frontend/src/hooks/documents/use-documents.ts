@@ -1,7 +1,8 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import toast from 'react-hot-toast'
 import { documentsApi, DocumentResponse } from '@/lib/api'
-import { useAuth } from './use-auth'
+import { GetDocumentsResponse } from '@/types'
+import { useAuth } from '@/hooks/auth/use-auth'
 
 // Query key factory for documents
 export const documentsKeys = {
@@ -27,8 +28,8 @@ export function useSpaceDocuments(spaceId: string, limit = 100, offset = 0) {
   })
 }
 
-// Custom hook to delete a document
-export function useDeleteDocument() {
+// Base hook to delete a document with optional toast notifications
+function useDeleteDocumentBase(silent = false) {
   const queryClient = useQueryClient()
 
   return useMutation({
@@ -36,8 +37,8 @@ export function useDeleteDocument() {
 
     // Optimistic update
     onMutate: async (documentId) => {
-      // Show loading toast
-      const toastId = toast.loading('Deleting document...')
+      // Show loading toast (only if not silent)
+      const toastId = silent ? undefined : toast.loading('Deleting document...')
 
       // Cancel any outgoing refetches for documents
       await queryClient.cancelQueries({ queryKey: documentsKeys.all })
@@ -51,7 +52,7 @@ export function useDeleteDocument() {
       const queries = queryCache.findAll({ queryKey: documentsKeys.spaces() })
 
       queries.forEach((query) => {
-        const data = query.state.data as any
+        const data = query.state.data as GetDocumentsResponse | undefined
         if (data?.documents) {
           const foundDoc = data.documents.find((doc: DocumentResponse) => doc.id === documentId)
           if (foundDoc) {
@@ -93,8 +94,8 @@ export function useDeleteDocument() {
         queryClient.invalidateQueries({ queryKey: documentsKeys.space(context.affectedSpaceId) })
       }
 
-      // Show error toast
-      if (context?.toastId) {
+      // Show error toast (only if not silent)
+      if (!silent && context?.toastId) {
         const docName = context?.deletedDocument?.filename || 'document'
         toast.error(`Failed to delete "${docName}". Please try again.`, {
           id: context.toastId,
@@ -103,8 +104,8 @@ export function useDeleteDocument() {
     },
 
     onSuccess: (data, documentId, context) => {
-      // Show success toast
-      if (context?.toastId) {
+      // Show success toast (only if not silent)
+      if (!silent && context?.toastId) {
         const docName = context?.deletedDocument?.filename || 'document'
         toast.success(`"${docName}" deleted successfully!`, {
           id: context.toastId,
@@ -123,6 +124,16 @@ export function useDeleteDocument() {
   })
 }
 
+// Custom hook to delete a document with toast notifications
+export function useDeleteDocument() {
+  return useDeleteDocumentBase(false)
+}
+
+// Custom hook to delete a document without toast notifications (for bulk operations)
+export function useDeleteDocumentSilent() {
+  return useDeleteDocumentBase(true)
+}
+
 // Hook for invalidating documents cache (useful for external updates like uploads)
 export function useInvalidateSpaceDocuments() {
   const queryClient = useQueryClient()
@@ -130,79 +141,4 @@ export function useInvalidateSpaceDocuments() {
   return (spaceId: string) => {
     queryClient.invalidateQueries({ queryKey: documentsKeys.space(spaceId) })
   }
-}
-
-// Custom hook to delete a document without toast notifications (for bulk operations)
-export function useDeleteDocumentSilent() {
-  const queryClient = useQueryClient()
-
-  return useMutation({
-    mutationFn: (documentId: string) => documentsApi.deleteDocument(documentId),
-
-    // Optimistic update without toasts
-    onMutate: async (documentId) => {
-      // Cancel any outgoing refetches for documents
-      await queryClient.cancelQueries({ queryKey: documentsKeys.all })
-
-      // Find the document being deleted across all cached space documents
-      let deletedDocument: DocumentResponse | undefined
-      let affectedSpaceId: string | undefined
-
-      // Check all space document caches to find the document
-      const queryCache = queryClient.getQueryCache()
-      const queries = queryCache.findAll({ queryKey: documentsKeys.spaces() })
-
-      queries.forEach((query) => {
-        const data = query.state.data as any
-        if (data?.documents) {
-          const foundDoc = data.documents.find((doc: DocumentResponse) => doc.id === documentId)
-          if (foundDoc) {
-            deletedDocument = foundDoc
-            // Extract spaceId from query key
-            const queryKey = query.queryKey as string[]
-            if (queryKey.length >= 3) {
-              affectedSpaceId = queryKey[2]
-            }
-          }
-        }
-      })
-
-      // Optimistically remove from the affected space's documents
-      if (affectedSpaceId) {
-        queryClient.setQueriesData(
-          { queryKey: documentsKeys.space(affectedSpaceId) },
-          (oldData: any) => {
-            if (!oldData?.documents) return oldData
-
-            return {
-              ...oldData,
-              documents: oldData.documents.filter((doc: DocumentResponse) => doc.id !== documentId),
-              pagination: {
-                ...oldData.pagination,
-                total_count: Math.max(0, oldData.pagination.total_count - 1)
-              }
-            }
-          }
-        )
-      }
-
-      return { deletedDocument, affectedSpaceId }
-    },
-
-    onError: (err, documentId, context) => {
-      // Rollback optimistic update
-      if (context?.affectedSpaceId) {
-        queryClient.invalidateQueries({ queryKey: documentsKeys.space(context.affectedSpaceId) })
-      }
-    },
-
-    onSettled: (data, error, documentId, context) => {
-      // Invalidate and refetch the affected space's documents
-      if (context?.affectedSpaceId) {
-        queryClient.invalidateQueries({ queryKey: documentsKeys.space(context.affectedSpaceId) })
-        // Also invalidate document counts to update sidebar
-        queryClient.invalidateQueries({ queryKey: ['space-document-counts'] })
-      }
-    },
-  })
 }

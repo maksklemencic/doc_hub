@@ -2,7 +2,7 @@
 
 import { useQuery } from '@tanstack/react-query'
 import { documentsApi } from '@/lib/api'
-import { useAuth } from './use-auth'
+import { useAuth } from '@/hooks/auth/use-auth'
 
 // Hook to get document counts for multiple spaces
 export function useSpaceDocumentCounts(spaceIds: string[]) {

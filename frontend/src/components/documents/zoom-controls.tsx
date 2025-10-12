@@ -22,7 +22,7 @@ export function ZoomControls({
   isFitToWidth
 }: ZoomControlsProps) {
   return (
-    <div className="absolute top-4 right-4 z-10 flex flex-col gap-0.5 bg-white backdrop-blur-sm rounded-lg border border-gray-200 shadow shadow-secondary p-1 opacity-60 hover:opacity-100">
+    <div className="absolute top-4 right-4 z-10 flex flex-col gap-0.5 bg-white backdrop-blur-sm rounded-lg border border-gray-200 shadow shadow-secondary p-1 opacity-50 hover:opacity-100 ease-in-out duration-300">
       <Button
         variant="ghost"
         size="sm"

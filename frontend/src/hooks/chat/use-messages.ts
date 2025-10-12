@@ -14,7 +14,7 @@ import {
   MessageCompleteEvent,
   ErrorEvent
 } from '@/lib/api'
-import { useAuth } from './use-auth'
+import { useAuth } from '@/hooks/auth/use-auth'
 
 // Type for infinite query data structure
 type InfiniteMessagesData = {

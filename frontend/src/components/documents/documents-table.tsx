@@ -26,7 +26,8 @@ import {
   formatFileSize,
   formatDate,
   getFileSize,
-  DocumentType
+  DocumentType,
+  isUrlBasedType
 } from '@/utils/document-utils'
 
 interface DocumentsTableProps {
@@ -60,9 +61,6 @@ export function DocumentsTable({
   onOpenInRightPane,
   onAddToContext,
 }: DocumentsTableProps) {
-  // Helper to check if document type is URL-based
-  const isUrlBasedType = (type: DocumentType) => type === DocumentType.youtube || type === DocumentType.web
-
   // Download function for documents
   const handleDownload = async (documentId: string) => {
     try {

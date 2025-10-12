@@ -15,9 +15,34 @@ import { Progress } from "@/components/ui/progress";
 import { Spinner } from "@/components/ui/spinner";
 import { Cloud, Upload, X, FileText, Trash2, Check, Link, AlertCircle } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { useUploadFile, useUploadWebDocument, useUploadYouTubeVideo } from "@/hooks/use-upload";
-import { useDeleteDocument } from "@/hooks/use-documents";
-import { useSpaceDocuments } from "@/hooks/use-documents";
+import { useUploadFile, useUploadWebDocument, useUploadYouTubeVideo } from "@/hooks/documents/use-upload";
+import { useDeleteDocument } from "@/hooks/documents/use-documents";
+import { useSpaceDocuments } from "@/hooks/documents/use-documents";
+import { getDocumentTypeFromFile, DocumentType } from "@/utils/document-utils";
+
+// URL validation utility
+const ALLOWED_PROTOCOLS = ['http:', 'https:'];
+
+const validateUrl = (urlString: string): { valid: boolean; error?: string } => {
+    try {
+        const url = new URL(urlString);
+
+        // Check if protocol is whitelisted
+        if (!ALLOWED_PROTOCOLS.includes(url.protocol)) {
+            return {
+                valid: false,
+                error: `Invalid protocol. Only HTTP and HTTPS are allowed.`
+            };
+        }
+
+        return { valid: true };
+    } catch (error) {
+        return {
+            valid: false,
+            error: 'Invalid URL format. Please enter a valid web address.'
+        };
+    }
+};
 
 // YouTube URL detection utility
 const isYouTubeUrl = (url: string): boolean => {
@@ -53,6 +78,7 @@ export function DocumentUpload({ open, onOpenChange, spaceId }: DocumentUploadPr
     const [uploadItems, setUploadItems] = useState<UploadItem[]>([]);
     const [isDragOver, setIsDragOver] = useState(false);
     const [urlInput, setUrlInput] = useState("");
+    const [urlError, setUrlError] = useState<string | null>(null);
     const fileInputRef = useRef<HTMLInputElement>(null);
     const isProcessingQueue = useRef(false);
     const uploadingIds = useRef(new Set<string>());
@@ -273,6 +299,17 @@ export function DocumentUpload({ open, onOpenChange, spaceId }: DocumentUploadPr
         if (!urlInput.trim()) return;
 
         const trimmedUrl = urlInput.trim();
+
+        // Validate URL
+        const validation = validateUrl(trimmedUrl);
+        if (!validation.valid) {
+            setUrlError(validation.error || 'Invalid URL');
+            return;
+        }
+
+        // Clear any previous errors
+        setUrlError(null);
+
         const isYouTube = isYouTubeUrl(trimmedUrl);
 
         const urlItem: UploadItem = {
@@ -414,8 +451,10 @@ export function DocumentUpload({ open, onOpenChange, spaceId }: DocumentUploadPr
             const pastedText = e.clipboardData?.getData('text');
             if (pastedText && pastedText.trim()) {
                 const trimmedUrl = pastedText.trim();
-                // Check if it looks like a URL
-                if (trimmedUrl.startsWith('http://') || trimmedUrl.startsWith('https://') || trimmedUrl.includes('youtu')) {
+
+                // Validate URL
+                const validation = validateUrl(trimmedUrl);
+                if (validation.valid) {
                     const isYouTube = isYouTubeUrl(trimmedUrl);
                     const urlItem: UploadItem = {
                         id: Date.now().toString(),
@@ -429,6 +468,7 @@ export function DocumentUpload({ open, onOpenChange, spaceId }: DocumentUploadPr
                     setUrlInput("");
                     setTimeout(processQueue, 100);
                 }
+                // Silently ignore invalid URLs in paste
             }
         };
 
@@ -457,30 +497,32 @@ export function DocumentUpload({ open, onOpenChange, spaceId }: DocumentUploadPr
 
         if (!uploadItem.file) return <FileText className="w-8 h-8 text-gray-400" />;
 
+        // Use centralized document type detection
         const file = uploadItem.file;
-        const type = file.type;
-        if (type.includes("pdf")) {
-            return (
-                <div className="w-8 h-8 bg-red-100 rounded flex items-center justify-center">
-                    <span className="text-red-600 text-xs font-semibold">PDF</span>
-                </div>
-            );
+        const docType = getDocumentTypeFromFile(file);
+
+        switch (docType) {
+            case DocumentType.pdf:
+                return (
+                    <div className="w-8 h-8 bg-red-100 rounded flex items-center justify-center">
+                        <span className="text-red-600 text-xs font-semibold">PDF</span>
+                    </div>
+                );
+            case DocumentType.image:
+                return (
+                    <div className="w-8 h-8 bg-green-100 rounded flex items-center justify-center">
+                        <span className="text-green-600 text-xs font-semibold">IMG</span>
+                    </div>
+                );
+            case DocumentType.word:
+                return (
+                    <div className="w-8 h-8 bg-blue-100 rounded flex items-center justify-center">
+                        <span className="text-blue-600 text-xs font-semibold">DOC</span>
+                    </div>
+                );
+            default:
+                return <FileText className="w-8 h-8 text-gray-400" />;
         }
-        if (type.startsWith("image/")) {
-            return (
-                <div className="w-8 h-8 bg-green-100 rounded flex items-center justify-center">
-                    <span className="text-green-600 text-xs font-semibold">IMG</span>
-                </div>
-            );
-        }
-        if (type.includes("word") || type.includes("document")) {
-            return (
-                <div className="w-8 h-8 bg-blue-100 rounded flex items-center justify-center">
-                    <span className="text-blue-600 text-xs font-semibold">DOC</span>
-                </div>
-            );
-        }
-        return <FileText className="w-8 h-8 text-gray-400" />;
     };
 
     return (
@@ -668,12 +710,22 @@ export function DocumentUpload({ open, onOpenChange, spaceId }: DocumentUploadPr
                             <Input
                                 placeholder="Paste web or YouTube URL"
                                 value={urlInput}
-                                onChange={(e) => setUrlInput(e.target.value)}
+                                onChange={(e) => {
+                                    setUrlInput(e.target.value);
+                                    // Clear error when user types
+                                    if (urlError) setUrlError(null);
+                                }}
                                 onKeyDown={handleKeyDown}
-                                className="pl-10"
+                                className={cn("pl-10", urlError && "border-red-500 focus-visible:ring-red-500")}
                                 disabled={false}
                             />
                         </div>
+                        {urlError && (
+                            <div className="flex items-center gap-2 mt-2 text-sm text-red-600">
+                                <AlertCircle className="w-4 h-4 flex-shrink-0" />
+                                <span>{urlError}</span>
+                            </div>
+                        )}
                     </div>
                 </div>
             </DialogContent>

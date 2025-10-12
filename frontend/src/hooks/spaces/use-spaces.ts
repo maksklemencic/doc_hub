@@ -1,7 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import toast from 'react-hot-toast'
 import { spacesApi, SpaceResponse, CreateSpaceRequest, UpdateSpaceRequest } from '@/lib/api'
-import { useAuth } from './use-auth'
+import { useAuth } from '@/hooks/auth/use-auth'
 
 // Query key factory for spaces
 export const spacesKeys = {
