@@ -16,7 +16,7 @@ import { useLayoutPersistence } from '@/hooks/spaces/use-layout-persistence'
 import { useZoomPersistence } from '@/hooks/spaces/use-zoom-persistence'
 import { useBulkActions } from '@/hooks/spaces/use-bulk-actions'
 import { useTabManagement } from '@/hooks/spaces/use-tab-management'
-import toast from 'react-hot-toast'
+import { useDocumentOperations } from '@/hooks/spaces/use-document-operations'
 
 export default function SpacePage() {
   const params = useParams()
@@ -49,42 +49,13 @@ export default function SpacePage() {
     onAddToContext: handleAddToContext,
   })
 
-  // Handlers for document operations
-  const handleAddToContextSingle = useCallback((documentId: string) => {
-    setSpaceContext(spaceId, [documentId])
-    const document = documents.find(d => d.id === documentId)
-    if (document) {
-      toast.success(`Set chat context to ${document.filename}`)
-    }
-  }, [spaceId, documents, setSpaceContext])
-
-  const handleOpenInRightPaneById = useCallback((documentId: string) => {
-    const document = documents.find(d => d.id === documentId)
-    if (document) {
-      tabHook.handleOpenInRightPane(document)
-    }
-  }, [documents, tabHook])
-
-  const handleMiniChatSend = useCallback((message: string) => {
-    tabHook.handleOpenChat(message)
-  }, [tabHook])
-
-  const handleOpenChatInPane = useCallback((pane: 'left' | 'right') => {
-    const chatId = `ai-chat-${Date.now()}`
-    const newTab = {
-      id: chatId,
-      title: 'AI Chat',
-      type: 'ai-chat' as const,
-      isActive: true,
-      closable: true,
-    }
-
-    if (pane === 'left') {
-      tabHook.setTabs([...tabHook.tabs.map(t => ({ ...t, isActive: false })), newTab])
-    } else {
-      tabHook.setRightTabs([...tabHook.rightTabs.map(t => ({ ...t, isActive: false })), newTab])
-    }
-  }, [tabHook])
+  // Document operations hook
+  const operationsHook = useDocumentOperations({
+    spaceId,
+    documents,
+    tabHook,
+    setSpaceContext,
+  })
 
   // Render documents pane content
   const documentsContent = (
@@ -114,8 +85,8 @@ export default function SpacePage() {
       onBulkAddToContext={bulkActionsHook.handleBulkAddToContext}
       onBulkDownload={bulkActionsHook.handleBulkDownload}
       onOpenInRightPane={tabHook.handleOpenInRightPane}
-      onOpenInRightPaneById={handleOpenInRightPaneById}
-      onAddToContext={handleAddToContextSingle}
+      onOpenInRightPaneById={operationsHook.handleOpenInRightPaneById}
+      onAddToContext={operationsHook.handleAddToContextSingle}
       gridColumns={layoutHook.gridColumns}
     />
   )
@@ -188,9 +159,9 @@ export default function SpacePage() {
         </SplitPaneView>
         {tabHook.rightTabs.length === 0 && !tabHook.tabs.some(t => t.type === 'ai-chat') && (
           <MiniAIChat
-            onSend={handleMiniChatSend}
+            onSend={operationsHook.handleMiniChatSend}
             onOpenChat={() => tabHook.handleOpenChat()}
-            onOpenInPane={handleOpenChatInPane}
+            onOpenInPane={operationsHook.handleOpenChatInPane}
             documents={documents}
             selectedDocumentIds={getSpaceContext(spaceId)}
             onDocumentContextChange={(documentIds) => setSpaceContext(spaceId, documentIds)}
