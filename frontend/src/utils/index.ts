@@ -1,19 +1,23 @@
 import { STORAGE_KEYS } from '@/constants'
+import { safeGetItem, safeSetItem, safeRemoveItem } from './safe-storage'
 
 // Auth utilities
 export const getAuthToken = (): string | null => {
   if (typeof window === 'undefined') return null
-  return localStorage.getItem(STORAGE_KEYS.ACCESS_TOKEN)
+  return safeGetItem<string>(STORAGE_KEYS.ACCESS_TOKEN, null)
 }
 
-export const setAuthToken = (token: string): void => {
-  if (typeof window === 'undefined') return
-  localStorage.setItem(STORAGE_KEYS.ACCESS_TOKEN, token)
+export const setAuthToken = (token: string): boolean => {
+  if (typeof window === 'undefined') return false
+  return safeSetItem(STORAGE_KEYS.ACCESS_TOKEN, token, {
+    showToast: false, // Don't show toast for token operations
+    retryWithCleanup: true,
+  })
 }
 
-export const removeAuthToken = (): void => {
-  if (typeof window === 'undefined') return
-  localStorage.removeItem(STORAGE_KEYS.ACCESS_TOKEN)
+export const removeAuthToken = (): boolean => {
+  if (typeof window === 'undefined') return false
+  return safeRemoveItem(STORAGE_KEYS.ACCESS_TOKEN)
 }
 
 // File utilities

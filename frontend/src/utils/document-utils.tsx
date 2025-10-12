@@ -195,12 +195,10 @@ export function getPageCount(document: any, docType: DocumentType): string | und
     return undefined
   }
 
-  // TODO: Implement page count retrieval once backend provides page_count metadata
-  // The backend needs to extract and store page_count during document processing
   // Check if document has page_count metadata
-  // if (document.page_count && document.page_count > 0) {
-  //   return `${document.page_count} pages`
-  // }
+  if (document.page_count && document.page_count > 0) {
+    return `${document.page_count} pages`
+  }
 
   return undefined
 }

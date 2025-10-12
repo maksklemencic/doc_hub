@@ -115,7 +115,6 @@ export function DocumentCard({
         // Clean up the blob URL after download
         URL.revokeObjectURL(blobUrl)
       } catch (error) {
-        console.error('Download failed:', error)
       }
     }
 

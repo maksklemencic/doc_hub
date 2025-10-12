@@ -55,6 +55,7 @@ import { SpaceEditPopover } from '@/components/shared/space-edit-popover'
 import { spacesApi } from '@/lib/api'
 import { useQueryClient } from '@tanstack/react-query'
 import toast from 'react-hot-toast'
+import { safeGetItem, safeSetItem } from '@/utils/safe-storage'
 import {
   Dialog,
   DialogContent,
@@ -357,7 +358,7 @@ export function Sidebar({ className }: SidebarProps) {
   // Sidebar state - pinned or collapsed
   const [isPinned, setIsPinned] = useState(() => {
     if (typeof window === 'undefined') return false
-    const stored = localStorage.getItem(STORAGE_KEY)
+    const stored = safeGetItem<string>(STORAGE_KEY, 'false')
     return stored === 'true'
   })
 
@@ -378,9 +379,11 @@ export function Sidebar({ className }: SidebarProps) {
 
   // Save pinned state to localStorage
   useEffect(() => {
-    if (typeof window !== 'undefined') {
-      localStorage.setItem(STORAGE_KEY, isPinned.toString())
-    }
+    if (typeof window === 'undefined') return
+    safeSetItem(STORAGE_KEY, isPinned.toString(), {
+      showToast: false, // Don't show toast for UI state
+      retryWithCleanup: true,
+    })
   }, [isPinned])
 
   const togglePinned = () => {
@@ -450,7 +453,7 @@ export function Sidebar({ className }: SidebarProps) {
   const handleCreateSpace = async (data: { name: string; icon: string; icon_color: string }) => {
     if (createSpaceMutation.isPending) return
 
-    console.log('Creating space with data:', data)
+
 
     try {
       const newSpace = await createSpaceMutation.mutateAsync(data)
@@ -459,7 +462,7 @@ export function Sidebar({ className }: SidebarProps) {
         router.push(`/spaces/${newSpace.id}`)
       }
     } catch (error) {
-      console.error('Failed to create space:', error)
+
       throw error // Re-throw to let popover handle it
     }
   }
@@ -495,7 +498,7 @@ export function Sidebar({ className }: SidebarProps) {
       setDeleteDialogOpen(false)
       setSpaceToDelete(null)
     } catch (error) {
-      console.error('Failed to delete space:', error)
+
     }
   }
 
@@ -539,7 +542,7 @@ export function Sidebar({ className }: SidebarProps) {
       // Check for failures
       const failures = results.filter(r => r.status === 'rejected')
       if (failures.length > 0) {
-        console.error('Failed to update some spaces:', failures)
+  
         toast.error(`Failed to update ${failures.length} space(s). Changes reverted.`, { id: toastId })
         // Revert pending changes
         setPendingReorderedSpaces(null)
@@ -783,7 +786,6 @@ export function Sidebar({ className }: SidebarProps) {
             isExpanded ? "justify-start" : "justify-center p-2"
           )}
           onClick={() => {
-            // TODO: Open settings dialog/page
             console.log('Settings clicked')
           }}
           title={!isExpanded ? "Settings" : undefined}

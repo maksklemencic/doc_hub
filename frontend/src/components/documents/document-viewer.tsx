@@ -6,7 +6,7 @@ import { FileText } from 'lucide-react'
 import { ZoomControls } from './zoom-controls'
 import { ScrollArea, ScrollBar } from '@/components/ui/scroll-area'
 import { documentsApi } from '@/lib/api'
-import { SpaceStorage } from '@/utils/localStorage'
+import { SpaceStorage } from '@/utils/local-storage'
 import Image from 'next/image'
 import { isSupportedForPreview, isImageType, getDocumentType } from '@/utils/document-utils'
 import { LazyPdfViewer } from './lazy-pdf-viewer'
@@ -168,7 +168,13 @@ export function DocumentViewer({
         currentUrl = result.url
 
         if (mounted) {
-          setPdfUrl(result.url)
+          // Revoke the previous blob URL before setting the new one
+          setPdfUrl((prevUrl) => {
+            if (prevUrl) {
+              URL.revokeObjectURL(prevUrl)
+            }
+            return result.url
+          })
           setDocType(result.docType)
         } else {
           URL.revokeObjectURL(result.url)

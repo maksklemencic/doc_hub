@@ -116,7 +116,6 @@ export function Header({
             <DropdownMenuItem
               className="focus:bg-teal-50 focus:text-teal-900"
               onClick={() => {
-                // TODO: Open profile page/dialog
                 console.log('Profile clicked')
               }}
             >
@@ -125,7 +124,6 @@ export function Header({
             <DropdownMenuItem
               className="focus:bg-teal-50 focus:text-teal-900"
               onClick={() => {
-                // TODO: Open settings page/dialog
                 console.log('Settings clicked')
               }}
             >

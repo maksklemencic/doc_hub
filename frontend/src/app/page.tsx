@@ -25,7 +25,6 @@ export default function Home() {
           }
         } catch (err) {
           // If fetching spaces fails, just stay on landing page
-          console.error('Failed to fetch spaces:', err)
         }
       }
       redirectToSpace()

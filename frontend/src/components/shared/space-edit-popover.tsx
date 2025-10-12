@@ -139,7 +139,6 @@ export function SpaceEditPopover({ space, mode, children, onUpdate, onCreate, di
       }
       handleOpenChange(false)
     } catch (error) {
-      console.error(`Failed to ${mode} space:`, error)
     } finally {
       setIsSubmitting(false)
     }

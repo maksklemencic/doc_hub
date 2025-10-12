@@ -132,9 +132,6 @@ export function SpaceChat({ spaceId, spaceName, className, chatState = 'visible'
       initialMessageSentRef.current = true
       processedInitialMessageRef.current = initialMessage
 
-      console.log('Sending message with context from documents:', selectedDocumentIds.map(id => documents.find(d => d.id === id)?.filename || id))
-      console.log('Document IDs being sent:', selectedDocumentIds)
-      console.log('Total documents in space:', documents.length)
 
       createMessageMutation.mutateAsync({
         content: initialMessage,
@@ -187,9 +184,7 @@ export function SpaceChat({ spaceId, spaceName, className, chatState = 'visible'
     const messageContent = inputValue.trim()
     setInputValue('')
 
-    console.log('Sending message with context from documents:', selectedDocumentIds.map(id => documents.find(d => d.id === id)?.filename || id))
-    console.log('Document IDs being sent:', selectedDocumentIds)
-    console.log('Total documents in space:', documents.length)
+
 
     try {
       await createMessageMutation.mutateAsync({
@@ -215,9 +210,7 @@ export function SpaceChat({ spaceId, spaceName, className, chatState = 'visible'
   const handleSaveEditMessage = async (messageId: string, editContent: string) => {
     setEditValue(editContent)
 
-    console.log('Sending edited message with context from documents:', selectedDocumentIds.map(id => documents.find(d => d.id === id)?.filename || id))
-    console.log('Document IDs being sent:', selectedDocumentIds)
-    console.log('Total documents in space:', documents.length)
+
 
     try {
       await createMessageMutation.mutateAsync({

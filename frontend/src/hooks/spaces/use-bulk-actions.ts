@@ -31,12 +31,15 @@ export function useBulkActions({
         Array.from(selectedDocuments).filter(id => visibleDocumentIds.has(id))
       )
 
-      // Only update if selections actually changed
-      if (updatedSelections.size !== selectedDocuments.size) {
+      // Check if sets are actually different (content, not just size)
+      const hasChanges = updatedSelections.size !== selectedDocuments.size ||
+        !Array.from(updatedSelections).every(id => selectedDocuments.has(id))
+
+      if (hasChanges) {
         setSelectedDocuments(updatedSelections)
       }
     }
-  }, [filteredDocuments])
+  }, [filteredDocuments, selectedDocuments])
 
   const handleSelectDocument = useCallback((documentId: string) => {
     setSelectedDocuments(prev => {

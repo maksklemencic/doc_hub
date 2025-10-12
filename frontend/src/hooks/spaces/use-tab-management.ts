@@ -2,7 +2,7 @@ import { useEffect, useCallback, useMemo } from 'react'
 import { DocumentResponse } from '@/lib/api'
 import { getDocumentType } from '@/utils/document-utils'
 import { Tab } from '@/components/shared/tab-bar'
-import { SpaceStorage } from '@/utils/localStorage'
+import { SpaceStorage } from '@/utils/local-storage'
 import { useTabState } from './use-tab-state'
 
 interface PersistentTabState {
@@ -65,17 +65,12 @@ export function useTabManagement({ spaceId, documents }: UseTabManagementProps) 
     }))
   }, [])
 
-  // Restore tabs from localStorage after documents load
+  // Phase 1: Immediately restore tabs from localStorage on mount
   useEffect(() => {
-    if (documents.length === 0) return
-
     const storedTabs = SpaceStorage.get<PersistentTabState>(spaceId, 'tabs')
     if (storedTabs) {
-      const validLeftTabs = validateStoredTabs(storedTabs.leftTabs, documents)
-      const validRightTabs = validateStoredTabs(storedTabs.rightTabs, documents)
-
       const tabsWithActiveState = restoreTabsWithActiveState(
-        validLeftTabs,
+        storedTabs.leftTabs,
         storedTabs.leftActiveId || 'documents'
       )
 
@@ -89,7 +84,45 @@ export function useTabManagement({ spaceId, documents }: UseTabManagementProps) 
         },
         ...tabsWithActiveState
       ])
-      rightPane.replaceTabs(restoreTabsWithActiveState(validRightTabs, storedTabs.rightActiveId))
+      rightPane.replaceTabs(restoreTabsWithActiveState(storedTabs.rightTabs, storedTabs.rightActiveId))
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [spaceId])
+
+  // Phase 2: Validate and clean up stale tabs after documents load
+  useEffect(() => {
+    if (documents.length === 0) return
+
+    const storedTabs = SpaceStorage.get<PersistentTabState>(spaceId, 'tabs')
+    if (storedTabs) {
+      const validLeftTabs = validateStoredTabs(storedTabs.leftTabs, documents)
+      const validRightTabs = validateStoredTabs(storedTabs.rightTabs, documents)
+
+      // Only update if validation removed stale tabs
+      const currentLeftDocTabs = leftPane.tabs.filter(t => t.id !== 'documents')
+      const currentRightDocTabs = rightPane.tabs
+
+      if (currentLeftDocTabs.length !== validLeftTabs.length) {
+        const tabsWithActiveState = restoreTabsWithActiveState(
+          validLeftTabs,
+          storedTabs.leftActiveId || 'documents'
+        )
+
+        leftPane.replaceTabs([
+          {
+            id: 'documents',
+            title: 'Documents',
+            type: 'documents',
+            isActive: storedTabs.leftActiveId === 'documents',
+            closable: false
+          },
+          ...tabsWithActiveState
+        ])
+      }
+
+      if (currentRightDocTabs.length !== validRightTabs.length) {
+        rightPane.replaceTabs(restoreTabsWithActiveState(validRightTabs, storedTabs.rightActiveId))
+      }
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [spaceId, documents.length])

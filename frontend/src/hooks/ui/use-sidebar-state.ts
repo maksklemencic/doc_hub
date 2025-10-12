@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from 'react'
+import { safeGetItem, safeSetItem } from '@/utils/safe-storage'
 
 export type SidebarState = 'collapsed' | 'expanded' | 'pinned'
 
@@ -9,13 +10,14 @@ export function useSidebarState() {
   // Check if pinned on initial load
   const [isPinned, setIsPinned] = useState(() => {
     if (typeof window === 'undefined') return false
-    return localStorage.getItem(STORAGE_PINNED_KEY) === 'true'
+    const stored = safeGetItem<string>(STORAGE_PINNED_KEY, 'false')
+    return stored === 'true'
   })
 
   // Initialize state based on pinned preference
   const [state, setState] = useState<SidebarState>(() => {
     if (typeof window === 'undefined') return 'collapsed'
-    const pinned = localStorage.getItem(STORAGE_PINNED_KEY) === 'true'
+    const pinned = safeGetItem<string>(STORAGE_PINNED_KEY, 'false') === 'true'
     return pinned ? 'pinned' : 'collapsed'
   })
 
@@ -25,7 +27,10 @@ export function useSidebarState() {
   // Persist pinned state to localStorage
   useEffect(() => {
     if (typeof window === 'undefined') return
-    localStorage.setItem(STORAGE_PINNED_KEY, isPinned.toString())
+    safeSetItem(STORAGE_PINNED_KEY, isPinned.toString(), {
+      showToast: false, // Don't show toast for UI state
+      retryWithCleanup: true,
+    })
   }, [isPinned])
 
   // Handle hover expand (only if not pinned)

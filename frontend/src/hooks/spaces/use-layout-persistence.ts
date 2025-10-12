@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react'
-import { SpaceStorage } from '@/utils/localStorage'
+import { SpaceStorage } from '@/utils/local-storage'
 
 type ViewMode = 'list' | 'grid'
 

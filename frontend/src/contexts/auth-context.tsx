@@ -5,6 +5,7 @@ import toast from 'react-hot-toast'
 import { useRouter } from 'next/navigation'
 import { User, AuthTokenResponse } from '@/types'
 import { STORAGE_KEYS, ROUTES } from '@/constants'
+import { safeGetItem, safeSetItem, safeRemoveItem } from '@/utils/safe-storage'
 
 interface AuthState {
   user: User | null
@@ -89,9 +90,8 @@ export function AuthProvider({ children }: AuthProviderProps) {
 
   useEffect(() => {
     if (typeof window !== 'undefined') {
-      const token = localStorage.getItem(STORAGE_KEYS.ACCESS_TOKEN)
-      const userData = localStorage.getItem(STORAGE_KEYS.USER)
-      const user = userData ? JSON.parse(userData) : null
+      const token = safeGetItem<string>(STORAGE_KEYS.ACCESS_TOKEN, null)
+      const user = safeGetItem<User>(STORAGE_KEYS.USER, null)
 
       dispatch({ type: 'HYDRATE', payload: { user, token } })
     }
@@ -99,18 +99,34 @@ export function AuthProvider({ children }: AuthProviderProps) {
 
   const login = (authResponse: AuthTokenResponse) => {
     if (typeof window !== 'undefined') {
-      localStorage.setItem(STORAGE_KEYS.ACCESS_TOKEN, authResponse.access_token)
-      localStorage.setItem(STORAGE_KEYS.USER, JSON.stringify(authResponse.user))
+      const tokenSaved = safeSetItem(STORAGE_KEYS.ACCESS_TOKEN, authResponse.access_token, {
+        showToast: false, // Don't show toast on successful login
+        retryWithCleanup: true,
+      })
+      const userSaved = safeSetItem(STORAGE_KEYS.USER, authResponse.user, {
+        showToast: false,
+        retryWithCleanup: true,
+      })
+
+      if (!tokenSaved || !userSaved) {
+        console.error('Failed to save authentication data to storage')
+        toast.error('Warning: Your session may not persist after closing the browser')
+      }
     }
     dispatch({ type: 'LOGIN_SUCCESS', payload: authResponse })
   }
 
   const logout = () => {
     if (typeof window !== 'undefined') {
-      localStorage.removeItem(STORAGE_KEYS.ACCESS_TOKEN)
-      localStorage.removeItem(STORAGE_KEYS.USER)
+      safeRemoveItem(STORAGE_KEYS.ACCESS_TOKEN)
+      safeRemoveItem(STORAGE_KEYS.USER)
 
-      sessionStorage.setItem('show_logout_toast', 'true')
+      // Use sessionStorage for logout toast flag (doesn't use quota as much)
+      try {
+        sessionStorage.setItem('show_logout_toast', 'true')
+      } catch {
+        // Silently fail if sessionStorage is not available
+      }
     }
 
     dispatch({ type: 'LOGOUT' })
@@ -120,7 +136,10 @@ export function AuthProvider({ children }: AuthProviderProps) {
 
   const setUser = (user: User) => {
     if (typeof window !== 'undefined') {
-      localStorage.setItem(STORAGE_KEYS.USER, JSON.stringify(user))
+      safeSetItem(STORAGE_KEYS.USER, user, {
+        showToast: false,
+        retryWithCleanup: true,
+      })
     }
     dispatch({ type: 'SET_USER', payload: user })
   }

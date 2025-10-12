@@ -2,6 +2,8 @@
  * Utility functions for persisting space-specific data in localStorage
  */
 
+import { safeGetItem, safeSetItem, safeRemoveItem } from './safe-storage'
+
 export class SpaceStorage {
   private static PREFIX = 'space:'
 
@@ -14,23 +16,25 @@ export class SpaceStorage {
   static get<T>(spaceId: string, key: string): T | null {
     try {
       const fullKey = `${this.PREFIX}${spaceId}:${key}`
-      const item = localStorage.getItem(fullKey)
+      const item = safeGetItem<any>(fullKey, null)
 
       if (item === null) {
         return null
       }
 
-      return JSON.parse(item)
+      // Handle both new format (with timestamp) and old format (direct value)
+      if (item && typeof item === 'object' && 'data' in item && 'timestamp' in item) {
+        return item.data as T
+      }
+
+      // Legacy format - return as is
+      return item as T
     } catch (error) {
       console.warn(`Failed to parse localStorage for ${spaceId}:${key}`, error)
 
       // Clean up corrupted data
-      try {
-        const fullKey = `${this.PREFIX}${spaceId}:${key}`
-        localStorage.removeItem(fullKey)
-      } catch (cleanupError) {
-        console.warn('Failed to clean up corrupted localStorage data', cleanupError)
-      }
+      const fullKey = `${this.PREFIX}${spaceId}:${key}`
+      safeRemoveItem(fullKey)
 
       return null
     }
@@ -41,29 +45,44 @@ export class SpaceStorage {
    * @param spaceId - The space identifier
    * @param key - The storage key within the space
    * @param value - The value to store
+   * @returns True if successful, false otherwise
    */
-  static set<T>(spaceId: string, key: string, value: T): void {
-    try {
-      const fullKey = `${this.PREFIX}${spaceId}:${key}`
-      localStorage.setItem(fullKey, JSON.stringify(value))
-    } catch (error) {
-      console.error(`Failed to save to localStorage for ${spaceId}:${key}`, error)
-      throw error
+  static set<T>(spaceId: string, key: string, value: T): boolean {
+    const fullKey = `${this.PREFIX}${spaceId}:${key}`
+
+    // Add timestamp for cleanup purposes
+    const dataWithTimestamp = {
+      data: value,
+      timestamp: Date.now(),
     }
+
+    const success = safeSetItem(fullKey, dataWithTimestamp, {
+      showToast: true,
+      retryWithCleanup: true,
+    })
+
+    if (!success) {
+      console.error(`Failed to save to localStorage for ${spaceId}:${key}`)
+    }
+
+    return success
   }
 
   /**
    * Remove a value from localStorage for a specific space
    * @param spaceId - The space identifier
    * @param key - The storage key within the space
+   * @returns True if successful, false otherwise
    */
-  static remove(spaceId: string, key: string): void {
-    try {
-      const fullKey = `${this.PREFIX}${spaceId}:${key}`
-      localStorage.removeItem(fullKey)
-    } catch (error) {
-      console.error(`Failed to remove from localStorage for ${spaceId}:${key}`, error)
+  static remove(spaceId: string, key: string): boolean {
+    const fullKey = `${this.PREFIX}${spaceId}:${key}`
+    const success = safeRemoveItem(fullKey)
+
+    if (!success) {
+      console.error(`Failed to remove from localStorage for ${spaceId}:${key}`)
     }
+
+    return success
   }
 
   /**

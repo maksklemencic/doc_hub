@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo, useCallback } from 'react'
-import { SpaceStorage } from '@/utils/localStorage'
+import { SpaceStorage } from '@/utils/local-storage'
 
 interface ZoomState {
   scale: number
