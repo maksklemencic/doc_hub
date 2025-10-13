@@ -7,6 +7,7 @@ backend/app/debug
 uploads
 github
 .vscode/
+.idea/
 OAUTH_SETUP.md
 google_secrets*
 IMPROVEMENTS.md

@@ -40,6 +40,9 @@ interface QueryBarProps {
   selectedDocumentIds?: string[]
   onDocumentContextChange?: (documentIds: string[]) => void
   spaceName?: string
+  // Optional custom buttons to inject into bottom row
+  extraLeftButtons?: React.ReactNode
+  extraRightButtons?: React.ReactNode
 }
 
 export function QueryBar({
@@ -60,11 +63,13 @@ export function QueryBar({
   selectedDocumentIds = [],
   onDocumentContextChange,
   spaceName = 'Space',
+  extraLeftButtons,
+  extraRightButtons,
 }: QueryBarProps) {
   const textareaRef = useRef<HTMLTextAreaElement>(null)
   const containerRef = useRef<HTMLDivElement>(null)
-  const popoverRef = useRef<HTMLDivElement>(null)
-  const [isPopoverOpen, setIsPopoverOpen] = useState(false)
+  const contextPopoverRef = useRef<HTMLDivElement>(null)
+  const [isContextPopoverOpen, setisContextPopoverOpen] = useState(false)
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === 'Enter' && !e.shiftKey) {
@@ -75,22 +80,22 @@ export function QueryBar({
 
   // Handle click outside to close popover
   useEffect(() => {
-    if (!isPopoverOpen) return
+    if (!isContextPopoverOpen) return
 
     const handleClickOutside = (event: MouseEvent) => {
       if (
-        popoverRef.current &&
+        contextPopoverRef.current &&
         containerRef.current &&
-        !popoverRef.current.contains(event.target as Node) &&
+        !contextPopoverRef.current.contains(event.target as Node) &&
         !containerRef.current.contains(event.target as Node)
       ) {
-        handlePopoverOpenChange(false)
+        handleContextPopoverOpenChange(false)
       }
     }
 
     document.addEventListener('mousedown', handleClickOutside)
     return () => document.removeEventListener('mousedown', handleClickOutside)
-  }, [isPopoverOpen])
+  }, [isContextPopoverOpen])
 
   const handleInput = (e: React.FormEvent<HTMLTextAreaElement>) => {
     const target = e.target as HTMLTextAreaElement
@@ -146,7 +151,7 @@ export function QueryBar({
     return `${selectedDocumentIds.length} documents`
   }
 
-  const handlePopoverOpenChange = (open: boolean) => {
+  const handleContextPopoverOpenChange = (open: boolean) => {
     if (!open && onDocumentContextChange) {
       // Validate: at least one document must be selected
       const isAllSelected = selectedDocumentIds.length === 0 || selectedDocumentIds.length === documents.length
@@ -155,7 +160,7 @@ export function QueryBar({
         return
       }
     }
-    setIsPopoverOpen(open)
+    setisContextPopoverOpen(open)
   }
 
   const handleContextChange = (documentIds: string[]) => {
@@ -167,18 +172,19 @@ export function QueryBar({
   const content = (
     <div
       ref={containerRef}
-      className={cn(className, "relative")}
+      className={cn(className, "relative rounded-2xl")}
+            // className={cn(className, "relative border-black shadow-lg shadow-primary/20 rounded-2xl")}
       style={style}
       onClick={(e) => {
         // Close popover if clicking on query bar (but not on the badge)
-        if (isPopoverOpen && !(e.target as HTMLElement).closest('.context-badge')) {
-          handlePopoverOpenChange(false)
+        if (isContextPopoverOpen && !(e.target as HTMLElement).closest('.context-badge')) {
+          handleContextPopoverOpenChange(false)
         }
       }}
       onContextMenu={() => {
         // Close popover on right-click
-        if (isPopoverOpen) {
-          handlePopoverOpenChange(false)
+        if (isContextPopoverOpen) {
+          handleContextPopoverOpenChange(false)
         }
       }}
     >
@@ -193,8 +199,8 @@ export function QueryBar({
           onChange={(e) => {
             onChange(e.target.value)
             // Close popover when user starts typing
-            if (isPopoverOpen) {
-              handlePopoverOpenChange(false)
+            if (isContextPopoverOpen) {
+              handleContextPopoverOpenChange(false)
             }
           }}
           onKeyDown={handleKeyDown}
@@ -222,7 +228,7 @@ export function QueryBar({
           <Badge
             variant="secondary"
             className="context-badge bg-primary/10 text-primary border-primary/20 hover:bg-primary/20 cursor-pointer transition-colors"
-            onClick={() => setIsPopoverOpen(!isPopoverOpen)}
+            onClick={() => setisContextPopoverOpen(!isContextPopoverOpen)}
           >
             {getContextText()}
           </Badge>
@@ -236,12 +242,14 @@ export function QueryBar({
               Use all ({documents.length})
             </Button>
           )}
+          {/* Inject extra left buttons */}
+          {extraLeftButtons}
         </div>
 
       {/* Custom positioned popover - positioned relative to query bar container */}
-      {isPopoverOpen && (
+      {isContextPopoverOpen && (
         <div
-          ref={popoverRef}
+          ref={contextPopoverRef}
           className={cn(
             "absolute z-50 bg-popover text-popover-foreground rounded-2xl border shadow-md",
             "animate-in fade-in-0 zoom-in-95 slide-in-from-bottom-2"
@@ -261,7 +269,7 @@ export function QueryBar({
                   documents={documents}
                   selectedDocumentIds={selectedDocumentIds}
                   onContextChange={handleContextChange}
-                  onClose={() => setIsPopoverOpen(false)}
+                  onClose={() => setisContextPopoverOpen(false)}
                 />
               ) : (
                 // Fallback to old UI if new props not provided
@@ -375,6 +383,8 @@ export function QueryBar({
               </DropdownMenuContent>
             </DropdownMenu>
           )}
+          {/* Inject extra right buttons */}
+          {extraRightButtons}
         </div>
       </div>
     </div>

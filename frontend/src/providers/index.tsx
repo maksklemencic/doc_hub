@@ -5,6 +5,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { Toaster } from 'react-hot-toast'
 import { AuthProvider } from '@/contexts/auth-context'
 import { SpacesProvider } from '@/contexts/spaces-context'
+import { ChatLayoutProvider } from '@/contexts/chat-layout-context'
 
 interface ProvidersProps {
   children: ReactNode
@@ -38,7 +39,9 @@ export function Providers({ children }: ProvidersProps) {
     <QueryClientProvider client={queryClient}>
       <AuthProvider>
         <SpacesProvider>
-          {children}
+          <ChatLayoutProvider>
+            {children}
+          </ChatLayoutProvider>
         </SpacesProvider>
         <Toaster
           position="top-right"

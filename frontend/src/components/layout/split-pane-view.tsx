@@ -35,6 +35,12 @@ interface SplitPaneViewProps {
   onLeftPaneWidthChange?: (width: number) => void // Callback to report left pane width
   children: React.ReactNode
   rightContent?: React.ReactNode
+  // Bottom chat positioning
+  bottomChatLeft?: React.ReactNode
+  bottomChatRight?: React.ReactNode
+  bottomChatFull?: React.ReactNode
+  // Chat tab context menu handler
+  onMoveChatToBottom?: (position: 'bottom-full' | 'bottom-left' | 'bottom-right') => void
 }
 
 export function SplitPaneView({
@@ -52,6 +58,10 @@ export function SplitPaneView({
   onLeftPaneWidthChange,
   children,
   rightContent,
+  bottomChatLeft,
+  bottomChatRight,
+  bottomChatFull,
+  onMoveChatToBottom,
 }: SplitPaneViewProps) {
   const hasSplit = !!(rightTabs && rightTabs.length > 0)
   const [activeId, setActiveId] = useState<string | null>(null)
@@ -223,7 +233,7 @@ export function SplitPaneView({
         {hasSplit ? (
           <ResizablePanelGroup direction="horizontal">
             <ResizablePanel defaultSize={50} minSize={30} onResize={onPanelResize}>
-              <div ref={leftPaneRef} className="h-full flex flex-col">
+              <div ref={leftPaneRef} className="h-full flex flex-col relative">
                 <TabBar
                   tabs={leftTabs}
                   pane="left"
@@ -232,15 +242,23 @@ export function SplitPaneView({
                   onSplitRight={onSplitRight}
                   onTabReorder={onTabReorderLeft}
                   isDragging={!!activeId}
+                  onMoveChatToBottom={onMoveChatToBottom}
+                  hasRightPane={hasSplit}
                 />
                 <div className="flex-1 overflow-hidden">{children}</div>
+                {/* Bottom chat in left pane only */}
+                {bottomChatLeft && (
+                  <div className="absolute bottom-0 left-0 right-0 z-10">
+                    {bottomChatLeft}
+                  </div>
+                )}
               </div>
             </ResizablePanel>
 
             <ResizableHandle withHandle />
 
             <ResizablePanel defaultSize={50} minSize={30} onResize={onPanelResize}>
-              <div className="h-full flex flex-col">
+              <div className="h-full flex flex-col relative">
                 <TabBar
                   tabs={rightTabs}
                   pane="right"
@@ -250,13 +268,21 @@ export function SplitPaneView({
                   isOnlyTabInPane={(tabId) => rightTabs.length === 1}
                   onTabReorder={onTabReorderRight}
                   isDragging={!!activeId}
+                  onMoveChatToBottom={onMoveChatToBottom}
+                  hasRightPane={hasSplit}
                 />
                 <div className="flex-1 overflow-hidden">{rightContent}</div>
+                {/* Bottom chat in right pane only */}
+                {bottomChatRight && (
+                  <div className="absolute bottom-0 left-0 right-0 z-10">
+                    {bottomChatRight}
+                  </div>
+                )}
               </div>
             </ResizablePanel>
           </ResizablePanelGroup>
         ) : (
-          <div ref={leftPaneRef} className="h-full flex flex-col">
+          <div ref={leftPaneRef} className="h-full flex flex-col relative">
             <TabBar
               tabs={leftTabs}
               pane="left"
@@ -265,8 +291,23 @@ export function SplitPaneView({
               onSplitRight={onSplitRight}
               onTabReorder={onTabReorderLeft}
               isDragging={!!activeId}
+              onMoveChatToBottom={onMoveChatToBottom}
+              hasRightPane={hasSplit}
             />
             <div className="flex-1 overflow-hidden">{children}</div>
+            {/* Bottom chat in single pane / full width */}
+            {(bottomChatLeft || bottomChatFull) && (
+              <div className="absolute bottom-0 left-0 right-0 z-10">
+                {bottomChatLeft || bottomChatFull}
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Bottom chat full width - spans entire container when split */}
+        {hasSplit && bottomChatFull && (
+          <div className="absolute bottom-0 left-0 right-0 z-10">
+            {bottomChatFull}
           </div>
         )}
 

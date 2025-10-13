@@ -1,6 +1,6 @@
 'use client'
 
-import { X, PanelRightOpen, PanelLeftOpen } from 'lucide-react'
+import { X, PanelRightOpen, PanelLeftOpen, MoveDown, LayoutPanelTop, MoveHorizontal } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useRef } from 'react'
 import {
@@ -45,6 +45,9 @@ interface TabBarProps {
   isDragging?: boolean
   onDragStart?: () => void
   onDragEnd?: () => void
+  // Chat-specific handlers
+  onMoveChatToBottom?: (position: 'bottom-full' | 'bottom-left' | 'bottom-right') => void
+  hasRightPane?: boolean
 }
 
 // Sortable Tab Item Component
@@ -56,6 +59,8 @@ function SortableTab({
   onTabClose,
   onSplitRight,
   onMoveToLeft,
+  onMoveChatToBottom,
+  hasRightPane,
 }: {
   tab: Tab
   isOnlyTab: boolean
@@ -64,6 +69,8 @@ function SortableTab({
   onTabClose: (tabId: string) => void
   onSplitRight?: (tabId: string) => void
   onMoveToLeft?: (tabId: string) => void
+  onMoveChatToBottom?: (position: 'bottom-full' | 'bottom-left' | 'bottom-right') => void
+  hasRightPane?: boolean
 }) {
   const {
     attributes,
@@ -128,13 +135,16 @@ function SortableTab({
     return tabButton
   }
 
+  const isChatTab = tab.type === 'ai-chat'
+
   return (
     <ContextMenu>
       <ContextMenuTrigger asChild>
         {tabButton}
       </ContextMenuTrigger>
       <ContextMenuContent className="w-48">
-        {pane === 'left' && onSplitRight && (
+        {/* Regular tab options */}
+        {!isChatTab && pane === 'left' && onSplitRight && (
           <ContextMenuItem
             onClick={() => onSplitRight(tab.id)}
             className="focus:bg-teal-50 focus:text-teal-900"
@@ -143,7 +153,7 @@ function SortableTab({
             Split Right
           </ContextMenuItem>
         )}
-        {pane === 'right' && onMoveToLeft && (
+        {!isChatTab && pane === 'right' && onMoveToLeft && (
           <ContextMenuItem
             onClick={() => onMoveToLeft(tab.id)}
             className="focus:bg-teal-50 focus:text-teal-900"
@@ -152,9 +162,33 @@ function SortableTab({
             Move to Left
           </ContextMenuItem>
         )}
+
+        {/* Chat-specific options */}
+        {isChatTab && onMoveChatToBottom && (
+          <>
+            <ContextMenuItem onClick={() => onMoveChatToBottom('bottom-full')}>
+              <MoveHorizontal className="mr-2 h-4 w-4" />
+              Move to Bottom Full
+            </ContextMenuItem>
+            <ContextMenuItem onClick={() => onMoveChatToBottom('bottom-left')}>
+              <LayoutPanelTop className="mr-2 h-4 w-4 rotate-90" />
+              Move to Bottom Left
+            </ContextMenuItem>
+            {/* Only show bottom-right if:
+                - Right pane exists (hasRightPane)
+                - AND we're NOT in right pane OR we're not the only tab in right pane */}
+            {hasRightPane && (pane === 'left' || !isOnlyTab) && (
+              <ContextMenuItem onClick={() => onMoveChatToBottom('bottom-right')}>
+                <LayoutPanelTop className="mr-2 h-4 w-4 -rotate-90" />
+                Move to Bottom Right
+              </ContextMenuItem>
+            )}
+          </>
+        )}
+
         {tab.closable !== false && (
           <>
-            {(pane === 'left' && onSplitRight) || (pane === 'right' && onMoveToLeft) ? (
+            {((pane === 'left' && onSplitRight) || (pane === 'right' && onMoveToLeft) || isChatTab) ? (
               <ContextMenuSeparator />
             ) : null}
             <ContextMenuItem
@@ -182,6 +216,8 @@ export function TabBar({
   onTabDragToOtherPane,
   onTabReorder,
   isDragging,
+  onMoveChatToBottom,
+  hasRightPane,
 }: TabBarProps) {
   const scrollContainerRef = useRef<HTMLDivElement>(null)
 
@@ -218,6 +254,8 @@ export function TabBar({
                 onTabClose={onTabClose}
                 onSplitRight={onSplitRight}
                 onMoveToLeft={onMoveToLeft}
+                onMoveChatToBottom={onMoveChatToBottom}
+                hasRightPane={hasRightPane}
               />
             )
           })}

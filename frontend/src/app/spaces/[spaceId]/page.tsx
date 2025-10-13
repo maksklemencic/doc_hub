@@ -1,11 +1,12 @@
 'use client'
 
-import { useState, useCallback } from 'react'
+import { useState, useCallback, useEffect } from 'react'
 import { useParams } from 'next/navigation'
 import { DocumentUpload } from '@/components/shared/document-upload'
 import { Header } from '@/components/shared/header'
 import { SplitPaneView } from '@/components/layout/split-pane-view'
 import { MiniAIChat } from '@/components/chat/mini-ai-chat'
+import { BottomChatBar } from '@/components/chat/bottom-chat-bar'
 import { DeleteConfirmationDialog } from '@/components/documents/delete-confirmation-dialog'
 import { DocumentsPane } from '@/components/spaces/DocumentsPane'
 import { TabContentRenderer } from '@/components/spaces/TabContentRenderer'
@@ -17,6 +18,7 @@ import { useZoomPersistence } from '@/hooks/spaces/use-zoom-persistence'
 import { useBulkActions } from '@/hooks/spaces/use-bulk-actions'
 import { useTabManagement } from '@/hooks/spaces/use-tab-management'
 import { useDocumentOperations } from '@/hooks/spaces/use-document-operations'
+import { useChatLayout } from '@/hooks/chat/use-chat-layout'
 
 export default function SpacePage() {
   const params = useParams()
@@ -38,6 +40,7 @@ export default function SpacePage() {
   const layoutHook = useLayoutPersistence({ spaceId })
   const zoomHook = useZoomPersistence({ spaceId })
   const tabHook = useTabManagement({ spaceId, documents })
+  const chatLayout = useChatLayout({ spaceId })
 
   const handleAddToContext = useCallback((documentIds: string[]) => {
     setSpaceContext(spaceId, documentIds)
@@ -130,6 +133,90 @@ export default function SpacePage() {
     )
   }
 
+  // Determine where to render bottom chat (only if not in tabs)
+  const chatInLeftTab = tabHook.tabs.some(t => t.type === 'ai-chat')
+  const chatInRightTab = tabHook.rightTabs.some(t => t.type === 'ai-chat')
+  const chatInAnyTab = chatInLeftTab || chatInRightTab
+  const hasRightPane = tabHook.rightTabs.length > 0
+
+  // Handler for moving chat to a tab
+  const handleMoveToTab = useCallback((pane: 'left' | 'right') => {
+    // This will be called before the position state changes
+    // We need to open the chat tab in the specified pane
+    if (pane === 'left') {
+      tabHook.handleOpenChatInLeftPane()
+    } else {
+      operationsHook.handleOpenChatInPane('right')
+    }
+  }, [tabHook, operationsHook])
+
+  // Watch for chat tab closure and reset to bottom-full
+  useEffect(() => {
+    // If chat is in tab mode position state but not actually in any tab, reset to bottom-full
+    if (!chatInAnyTab && (chatLayout.isTabLeft || chatLayout.isTabRight)) {
+      chatLayout.moveToBottomFull()
+    }
+  }, [chatInAnyTab, chatLayout])
+
+  // Watch for right pane closure and reset chat if it was in bottom-right
+  useEffect(() => {
+    // If chat is in bottom-right but right pane no longer exists, move to bottom-full
+    if (!hasRightPane && chatLayout.isBottomRight) {
+      chatLayout.moveToBottomFull()
+    }
+  }, [hasRightPane, chatLayout])
+
+  // Handler for moving chat from tab to bottom (from context menu)
+  const handleMoveChatToBottom = useCallback((position: 'bottom-full' | 'bottom-left' | 'bottom-right') => {
+    // First close any open chat tabs
+    const leftChatTab = tabHook.tabs.find(t => t.type === 'ai-chat')
+    const rightChatTab = tabHook.rightTabs.find(t => t.type === 'ai-chat')
+
+    if (leftChatTab) {
+      tabHook.handleTabClose(leftChatTab.id, 'left')
+    }
+    if (rightChatTab) {
+      tabHook.handleTabClose(rightChatTab.id, 'right')
+    }
+
+    // Then move to the requested position
+    if (position === 'bottom-full') {
+      chatLayout.moveToBottomFull()
+    } else if (position === 'bottom-left') {
+      chatLayout.moveToBottomLeft()
+    } else if (position === 'bottom-right') {
+      chatLayout.moveToBottomRight()
+    }
+  }, [tabHook, chatLayout])
+
+  // Always render chat - either in tabs or in bottom
+  const renderBottomChat = () => {
+    // If chat is in a tab, don't render bottom chat
+    if (chatInAnyTab) return { full: undefined, left: undefined, right: undefined }
+
+    const chatComponent = (
+      <BottomChatBar
+        spaceId={spaceId}
+        spaceName={spaceName}
+        documents={documents}
+        selectedDocumentIds={getSpaceContext(spaceId)}
+        onDocumentContextChange={(documentIds) => setSpaceContext(spaceId, documentIds)}
+        hasRightPane={hasRightPane}
+        onMoveToTab={handleMoveToTab}
+      />
+    )
+
+    // Return chat for the appropriate position based on layout state
+    if (chatLayout.isBottomFull) return { full: chatComponent, left: undefined, right: undefined }
+    if (chatLayout.isBottomLeft) return { full: undefined, left: chatComponent, right: undefined }
+    if (chatLayout.isBottomRight) return { full: undefined, left: undefined, right: chatComponent }
+
+    // Default to full if position is undefined or hidden
+    return { full: chatComponent, left: undefined, right: undefined }
+  }
+
+  const bottomChat = renderBottomChat()
+
   return (
     <>
       <div className="flex flex-col h-full">
@@ -154,21 +241,13 @@ export default function SpacePage() {
           onPanelResize={() => {}}
           onLeftPaneWidthChange={layoutHook.handlePaneWidthChange}
           rightContent={tabHook.rightTabs.length > 0 ? renderRightContent() : undefined}
+          bottomChatFull={bottomChat.full}
+          bottomChatLeft={bottomChat.left}
+          bottomChatRight={bottomChat.right}
+          onMoveChatToBottom={handleMoveChatToBottom}
         >
           {renderLeftContent()}
         </SplitPaneView>
-        {tabHook.rightTabs.length === 0 && !tabHook.tabs.some(t => t.type === 'ai-chat') && (
-          <MiniAIChat
-            onSend={operationsHook.handleMiniChatSend}
-            onOpenChat={() => tabHook.handleOpenChat()}
-            onOpenInPane={operationsHook.handleOpenChatInPane}
-            documents={documents}
-            selectedDocumentIds={getSpaceContext(spaceId)}
-            onDocumentContextChange={(documentIds) => setSpaceContext(spaceId, documentIds)}
-            spaceName={spaceName}
-            spaceId={spaceId}
-          />
-        )}
       </div>
       <DocumentUpload open={isUploadOpen} onOpenChange={setIsUploadOpen} spaceId={spaceId} />
 

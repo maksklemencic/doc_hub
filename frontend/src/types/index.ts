@@ -188,3 +188,17 @@ export interface TaskStatusResponse {
   started_at?: string
   completed_at?: string
 }
+
+// Chat layout types
+export type ChatPosition =
+  | 'bottom-full'      // Bottom of entire viewport, full width
+  | 'bottom-left'      // Bottom of left pane only
+  | 'bottom-right'     // Bottom of right pane only
+  | 'tab-left'         // As a tab in left pane
+  | 'tab-right'        // As a tab in right pane
+  | 'hidden'           // Chat is hidden/minimized
+
+export interface ChatLayoutState {
+  position: ChatPosition
+  showHistory: boolean  // Whether history overlay is expanded (for bottom positions)
+}

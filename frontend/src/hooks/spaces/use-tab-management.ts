@@ -316,6 +316,26 @@ export function useTabManagement({ spaceId, documents }: UseTabManagementProps) 
     }
   }, [rightPane])
 
+  const handleOpenChatInLeftPane = useCallback((initialMessage?: string) => {
+    const chatId = `ai-chat-${Date.now()}`
+    const existingChat = leftPane.tabs.find(t => t.type === 'ai-chat')
+
+    if (existingChat) {
+      // Update existing chat with new initial message and activate it
+      leftPane.updateTab(existingChat.id, { initialMessage: initialMessage })
+      leftPane.activateTab(existingChat.id)
+    } else {
+      leftPane.addTab({
+        id: chatId,
+        title: 'AI Chat',
+        type: 'ai-chat',
+        isActive: true,
+        closable: true,
+        initialMessage: initialMessage,
+      })
+    }
+  }, [leftPane])
+
   const handleBulkOpen = useCallback((selectedDocuments: Set<string>) => {
     const selectedIds = Array.from(selectedDocuments)
 
@@ -358,6 +378,7 @@ export function useTabManagement({ spaceId, documents }: UseTabManagementProps) 
     handleTabDragBetweenPanes,
     handleOpenInRightPane,
     handleOpenChat,
+    handleOpenChatInLeftPane,
     handleBulkOpen,
     handleBulkOpenInRightPane,
   }
