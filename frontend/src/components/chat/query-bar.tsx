@@ -18,6 +18,7 @@ import {
   ContextMenuTrigger,
 } from '@/components/ui/context-menu'
 import { ContextManager } from './context-manager'
+import { ChatHistoryOverlay } from './chat-history-overlay'
 import toast from 'react-hot-toast'
 import { cn } from '@/lib/utils'
 
@@ -43,6 +44,14 @@ interface QueryBarProps {
   // Optional custom buttons to inject into bottom row
   extraLeftButtons?: React.ReactNode
   extraRightButtons?: React.ReactNode
+  // History props for chat history overlay
+  historyProps?: {
+    spaceId: string
+    showHistory: boolean
+    onToggleHistory: () => void
+    isLoading: boolean
+    onStopStreaming: () => void
+  }
 }
 
 export function QueryBar({
@@ -65,6 +74,7 @@ export function QueryBar({
   spaceName = 'Space',
   extraLeftButtons,
   extraRightButtons,
+  historyProps,
 }: QueryBarProps) {
   const textareaRef = useRef<HTMLTextAreaElement>(null)
   const containerRef = useRef<HTMLDivElement>(null)
@@ -228,7 +238,13 @@ export function QueryBar({
           <Badge
             variant="secondary"
             className="context-badge bg-primary/10 text-primary border-primary/20 hover:bg-primary/20 cursor-pointer transition-colors"
-            onClick={() => setisContextPopoverOpen(!isContextPopoverOpen)}
+            onClick={() => {
+              // Close history if open when context is clicked
+              if (historyProps?.showHistory) {
+                historyProps.onToggleHistory()
+              }
+              setisContextPopoverOpen(!isContextPopoverOpen)
+            }}
           >
             {getContextText()}
           </Badge>
@@ -359,6 +375,35 @@ export function QueryBar({
               )}
             </div>
           )}
+
+        {/* Chat History Overlay - positioned exactly like context popover */}
+        {historyProps && historyProps.showHistory && (
+          <div
+            className={cn(
+              "absolute z-50 bg-popover text-popover-foreground rounded-2xl border shadow-md",
+              "animate-in fade-in-0 zoom-in-95 slide-in-from-bottom-2"
+            )}
+            style={{
+              bottom: '100%',
+              left: 0,
+              right: 0,
+              marginBottom: '8px',
+              maxHeight: '640px',
+            }}
+            onClick={(e) => e.stopPropagation()}
+            onContextMenu={(e) => e.stopPropagation()}
+          >
+            <ChatHistoryOverlay
+              spaceId={historyProps.spaceId}
+              onClose={() => historyProps.onToggleHistory()}
+              anchorRef={containerRef as React.RefObject<HTMLElement>}
+              isOpen={historyProps.showHistory}
+              onOpenChange={(open) => !open && historyProps.onToggleHistory()}
+              isLoading={historyProps.isLoading}
+              onStopStreaming={historyProps.onStopStreaming}
+            />
+          </div>
+        )}
 
         <div className="flex items-center gap-1">
           <button className="text-xs text-muted-foreground hover:text-foreground px-2 py-1 rounded hover:bg-muted transition-colors">

@@ -61,7 +61,7 @@ export function ChatMessages({
 
             return (
               <div key={message.id} className="flex gap-3 max-w-full justify-end">
-                <div className="rounded-lg px-3 py-2 max-w-[80%] bg-white border border-primary/20 ml-auto group relative">
+                <div className="rounded-lg px-3 py-2 max-w-[80%] bg-background border border-primary/20 ml-auto group relative">
                   {isEditing ? (
                     // Edit mode
                     <div className="space-y-3">

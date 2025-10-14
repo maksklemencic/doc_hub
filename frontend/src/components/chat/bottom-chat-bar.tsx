@@ -11,7 +11,6 @@ import {
   DropdownMenuSeparator,
 } from '@/components/ui/dropdown-menu'
 import { QueryBar } from './query-bar'
-import { ChatHistoryOverlay } from './chat-history-overlay'
 import { useChatLayout } from '@/hooks/chat/use-chat-layout'
 import { useCreateMessage } from '@/hooks/chat/use-messages'
 import { cn } from '@/lib/utils'
@@ -44,6 +43,7 @@ export function BottomChatBar({
   const {
     showHistory,
     toggleHistory,
+    openHistory,
     moveToTabLeft,
     moveToTabRight,
     moveToBottomLeft,
@@ -83,6 +83,11 @@ export function BottomChatBar({
     const messageContent = message.trim()
     setMessage('')
 
+    // Auto-open history immediately if in bottom position (full, left, or right)
+    if (isBottomFull || isBottomLeft || isBottomRight) {
+      openHistory()
+    }
+
     try {
       await createMessageMutation.mutateAsync({
         content: messageContent,
@@ -112,8 +117,8 @@ export function BottomChatBar({
       >
         {/* Centered container for QueryBar - with padding for breathing room */}
         <div className="max-w-4xl mx-auto px-6 py-4">
-          {/* QueryBar with white background, rounded, and shadow */}
-          <div ref={queryBarRef} className="bg-white rounded-2xl shadow-lg border border-primary/60 shadow-primary/20">
+          {/* QueryBar with white background, rounded, and shadow - positioned relative for history popover */}
+          <div ref={queryBarRef} className="relative bg-white rounded-2xl shadow-lg border border-primary/60 shadow-primary/20">
             <QueryBar
               value={message}
               onChange={setMessage}
@@ -125,6 +130,14 @@ export function BottomChatBar({
               spaceName={spaceName}
               placeholder="Ask about your documents..."
               className="border-0"
+              // History props
+              historyProps={{
+                spaceId,
+                showHistory,
+                onToggleHistory: toggleHistory,
+                isLoading,
+                onStopStreaming: handleStopStreaming,
+              }}
               extraLeftButtons={
                 <Button
                   variant="ghost"
@@ -212,14 +225,6 @@ export function BottomChatBar({
         </div>
       </div>
 
-      {/* History overlay */}
-      <ChatHistoryOverlay
-        spaceId={spaceId}
-        onClose={() => toggleHistory()}
-        anchorRef={queryBarRef as React.RefObject<HTMLElement>}
-        isOpen={showHistory}
-        onOpenChange={(open) => !open && toggleHistory()}
-      />
-    </>
+          </>
   )
 }

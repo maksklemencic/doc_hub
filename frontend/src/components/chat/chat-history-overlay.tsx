@@ -1,9 +1,8 @@
 'use client'
 
 import { useEffect, useRef, useState } from 'react'
-import { X, Sparkles } from 'lucide-react'
+import { Sparkles } from 'lucide-react'
 import { ScrollArea } from '@/components/ui/scroll-area'
-import { Button } from '@/components/ui/button'
 import { ChatMessages } from './chat-messages'
 import { useMessagesInfinite } from '@/hooks/chat/use-messages'
 import { useInfiniteScroll } from '@/hooks/chat/use-infinite-scroll'
@@ -17,6 +16,8 @@ interface ChatHistoryOverlayProps {
   anchorRef: React.RefObject<HTMLElement>
   isOpen: boolean
   onOpenChange: (open: boolean) => void
+  isLoading?: boolean
+  onStopStreaming?: () => void
 }
 
 export function ChatHistoryOverlay({
@@ -26,6 +27,8 @@ export function ChatHistoryOverlay({
   anchorRef,
   isOpen,
   onOpenChange,
+  isLoading = false,
+  onStopStreaming,
 }: ChatHistoryOverlayProps) {
   // Focus management: focus popover when opened
   useEffect(() => {
@@ -34,7 +37,45 @@ export function ChatHistoryOverlay({
     }
   }, [isOpen]);
   const popoverRef = useRef<HTMLDivElement>(null)
-  const [popoverStyle, setPopoverStyle] = useState<React.CSSProperties>({})
+
+  // State for message actions
+  const [copiedMessageId, setCopiedMessageId] = useState<string | null>(null)
+  const [editingMessageId, setEditingMessageId] = useState<string | null>(null)
+  const [editValue, setEditValue] = useState('')
+
+  // Copy message handler
+  const handleCopyMessage = async (messageId: string, content: string) => {
+    try {
+      await navigator.clipboard.writeText(content)
+      setCopiedMessageId(messageId)
+      // Reset copied state after 2 seconds
+      setTimeout(() => setCopiedMessageId(null), 2000)
+    } catch (err) {
+      console.error('Failed to copy message:', err)
+    }
+  }
+
+  // Edit handlers
+  const handleStartEdit = (messageId: string, currentContent: string) => {
+    setEditingMessageId(messageId)
+    setEditValue(currentContent)
+  }
+
+  const handleCancelEdit = () => {
+    setEditingMessageId(null)
+    setEditValue('')
+  }
+
+  const handleSaveEdit = async (messageId: string, newContent: string) => {
+    // In history view, we don't allow actual editing
+    // This would require API integration to update the message
+    console.log('Edit not supported in history view:', messageId, newContent)
+    handleCancelEdit()
+  }
+
+  const handleUpdateEditValue = (value: string) => {
+    setEditValue(value)
+  }
 
   // Fetch messages with infinite scroll
   const {
@@ -90,111 +131,81 @@ export function ChatHistoryOverlay({
     document.addEventListener('mousedown', handleClickOutside)
     return () => document.removeEventListener('mousedown', handleClickOutside)
   }, [isOpen, onOpenChange, anchorRef])
-  // Position popover ABOVE anchor, like context popover
+  
+  // Auto-scroll to bottom when popover opens and when messages change
   useEffect(() => {
-    if (!isOpen || !anchorRef.current) return;
-    const anchorRect = anchorRef.current.getBoundingClientRect();
-    // Calculate position above anchor
-    const bottom = window.innerHeight - anchorRect.top + window.scrollY + 8;
-    const left = anchorRect.left + window.scrollX;
-    const width = anchorRect.width;
-
-    setPopoverStyle({
-      position: 'absolute',
-      bottom: `${bottom}px`,
-      left: `${left}px`,
-      width: `${width}px`,
-      maxHeight: '480px',
-      zIndex: 50,
-    });
-  }, [isOpen, anchorRef]);
-
-  // Auto-scroll to bottom on mount
-  useEffect(() => {
-    if (scrollAreaRef.current) {
+    if (scrollAreaRef.current && isOpen) {
       const scrollContainer = scrollAreaRef.current.querySelector('[data-radix-scroll-area-viewport]')
       if (scrollContainer) {
-        setTimeout(() => {
+        // Multiple attempts to ensure scroll happens after content is rendered
+        const scrollToBottom = () => {
           scrollContainer.scrollTop = scrollContainer.scrollHeight
-        }, 100)
+        }
+
+        // Immediate scroll
+        scrollToBottom()
+
+        // Delayed scroll to ensure content is fully rendered
+        setTimeout(scrollToBottom, 100)
+
+        // Final scroll attempt for any late-rendering content
+        setTimeout(scrollToBottom, 300)
       }
     }
-  }, [messages.length])
+  }, [messages.length, scrollAreaRef, isOpen])
 
   if (!isOpen) return null;
   return (
     <div
       ref={popoverRef}
       className={cn(
-        "bg-background/98 border border-border rounded-2xl shadow-2xl",
-        isOpen ? "animate-in fade-in-0 zoom-in-95 slide-in-from-bottom-2 duration-300" : "animate-out fade-out-0 zoom-out-95 slide-out-to-bottom-2 duration-200",
+        "bg-white overflow-hidden rounded-2xl border border-border",
         className
       )}
-      style={popoverStyle}
+      style={{
+        height: '640px',
+      }}
       role="dialog"
       tabIndex={-1}
       aria-modal="true"
       aria-label="Chat History"
     >
-      {/* Header */}
-      <div className="flex items-center justify-between px-6 py-4 border-b border-border/50">
-        <div className="flex items-center gap-3">
-          <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center">
-            <Sparkles className="w-4 h-4 text-primary" />
+      {/* Messages - full height with scrollable content */}
+      {isLoadingMessages ? (
+        <div className="flex items-center justify-center h-full">
+          <div className="text-sm text-muted-foreground">Loading messages...</div>
+        </div>
+      ) : messages.length === 0 ? (
+        <div className="flex flex-col items-center justify-center h-full gap-3 px-6">
+          <div className="w-16 h-16 rounded-full bg-muted/50 flex items-center justify-center">
+            <Sparkles className="w-8 h-8 text-muted-foreground" />
           </div>
-          <div>
-            <h3 className="text-sm font-semibold">Chat History</h3>
-            <p className="text-xs text-muted-foreground">
-              {messages.length} {messages.length === 1 ? 'message' : 'messages'}
-            </p>
+          <div className="text-center">
+            <p className="text-sm font-medium text-muted-foreground">No messages yet</p>
+            <p className="text-xs text-muted-foreground mt-1">Start a conversation to see your chat history</p>
           </div>
         </div>
-        <Button
-          variant="ghost"
-          size="sm"
-          onClick={onClose}
-          className="h-8 w-8 p-0 rounded-full"
-        >
-          <X className="h-4 w-4" />
-        </Button>
-      </div>
-
-      {/* Messages */}
-      <div className="flex-1 overflow-hidden" style={{ height: 'calc(100% - 64px)' }}>
-        {isLoadingMessages ? (
-          <div className="flex items-center justify-center h-full">
-            <div className="text-sm text-muted-foreground">Loading messages...</div>
-          </div>
-        ) : messages.length === 0 ? (
-          <div className="flex flex-col items-center justify-center h-full gap-3">
-            <div className="w-16 h-16 rounded-full bg-muted/50 flex items-center justify-center">
-              <Sparkles className="w-8 h-8 text-muted-foreground" />
-            </div>
-            <div className="text-center">
-              <p className="text-sm font-medium text-muted-foreground">No messages yet</p>
-              <p className="text-xs text-muted-foreground mt-1">Start a conversation to see your chat history</p>
-            </div>
-          </div>
-        ) : (
-          <ScrollArea ref={scrollAreaRef} className="h-full">
+      ) : (
+        <ScrollArea ref={scrollAreaRef} className="h-full rounded-2xl">
+          <div className="px-4 py-3">
             <ChatMessages
               messages={messages}
-              editingMessageId={null}
-              editValue=""
-              copiedMessageId={null}
+              editingMessageId={editingMessageId}
+              editValue={editValue}
+              copiedMessageId={copiedMessageId}
               isLoadingMore={isLoadingMore}
-              isLoading={false}
-              onStartEdit={() => {}}
-              onCancelEdit={() => {}}
-              onSaveEdit={() => Promise.resolve()}
-              onUpdateEditValue={() => {}}
-              onCopyMessage={() => {}}
-              onStopStreaming={() => {}}
+              isLoading={isLoading}
+              onStartEdit={handleStartEdit}
+              onCancelEdit={handleCancelEdit}
+              onSaveEdit={handleSaveEdit}
+              onUpdateEditValue={handleUpdateEditValue}
+              onCopyMessage={handleCopyMessage}
+              onStopStreaming={onStopStreaming}
               formatTime={formatTime}
             />
-          </ScrollArea>
-        )}
-      </div>
+          </div>
+        </ScrollArea>
+      )}
     </div>
   );
 }

@@ -207,6 +207,11 @@ export function SpaceChat({ spaceId, spaceName, className, chatState = 'visible'
   }
 
   // Enhanced edit handlers that work with the hook
+  const handleStartEditMessage = (messageId: string, currentContent: string) => {
+    setEditValue(currentContent)
+    handleStartEdit(messageId, currentContent)
+  }
+
   const handleSaveEditMessage = async (messageId: string, editContent: string) => {
     setEditValue(editContent)
 
@@ -253,7 +258,7 @@ export function SpaceChat({ spaceId, spaceName, className, chatState = 'visible'
             copiedMessageId={copiedMessageId}
             isLoadingMore={isLoadingMore}
             isLoading={isLoading}
-            onStartEdit={handleStartEdit}
+            onStartEdit={handleStartEditMessage}
             onCancelEdit={handleCancelEdit}
             onSaveEdit={handleSaveEditMessage}
             onUpdateEditValue={setEditValue}
