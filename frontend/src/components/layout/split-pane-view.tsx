@@ -15,6 +15,7 @@ import {
   useSensors,
   DragStartEvent,
   DragEndEvent,
+  useDroppable,
 } from '@dnd-kit/core'
 import { useState, useRef, useEffect, useCallback } from 'react'
 import { cn } from '@/lib/utils'
@@ -41,6 +42,8 @@ interface SplitPaneViewProps {
   bottomChatFull?: React.ReactNode
   // Chat tab context menu handler
   onMoveChatToBottom?: (position: 'bottom-full' | 'bottom-left' | 'bottom-right') => void
+  // Chat drag-and-drop handlers
+  onChatDragEnd?: (position: 'bottom-full' | 'bottom-left' | 'bottom-right' | 'tab-left' | 'tab-right') => void
 }
 
 export function SplitPaneView({
@@ -62,12 +65,17 @@ export function SplitPaneView({
   bottomChatRight,
   bottomChatFull,
   onMoveChatToBottom,
+  onChatDragEnd,
 }: SplitPaneViewProps) {
   const hasSplit = !!(rightTabs && rightTabs.length > 0)
   const [activeId, setActiveId] = useState<string | null>(null)
   const [showRightDropZone, setShowRightDropZone] = useState(false)
+  const [chatDropZone, setChatDropZone] = useState<string | null>(null)
+  const [highlightedTabBar, setHighlightedTabBar] = useState<'left' | 'right' | null>(null)
+  const [paneBoundaries, setPaneBoundaries] = useState<any>(null)
   const containerRef = useRef<HTMLDivElement>(null)
   const leftPaneRef = useRef<HTMLDivElement>(null)
+  const rightPaneRef = useRef<HTMLDivElement>(null)
   const mouseMoveHandlerRef = useRef<((e: MouseEvent) => void) | null>(null)
   const mouseUpHandlerRef = useRef<(() => void) | null>(null)
 
@@ -127,20 +135,143 @@ export function SplitPaneView({
   const handleDragStart = (event: DragStartEvent) => {
     setActiveId(event.active.id as string)
 
+    // Reset chat drop zone state
+    setChatDropZone(null)
+    setHighlightedTabBar(null)
+
+    // Function to get pane boundaries dynamically
+    const getPaneBoundaries = () => {
+      if (!containerRef.current) return null
+
+      const containerRect = containerRef.current.getBoundingClientRect()
+
+      if (hasSplit && leftPaneRef.current && rightPaneRef.current) {
+        const leftRect = leftPaneRef.current.getBoundingClientRect()
+        const rightRect = rightPaneRef.current.getBoundingClientRect()
+
+        const boundaries = {
+          container: containerRect,
+          left: leftRect,
+          right: rightRect,
+          hasSplit: true
+        }
+        setPaneBoundaries(boundaries)
+        return boundaries
+      } else if (leftPaneRef.current) {
+        const leftRect = leftPaneRef.current.getBoundingClientRect()
+
+        const boundaries = {
+          container: containerRect,
+          left: leftRect,
+          right: null,
+          hasSplit: false
+        }
+        setPaneBoundaries(boundaries)
+        return boundaries
+      }
+
+      return null
+    }
+
     const handleMouseMove = (e: MouseEvent) => {
-      if (!hasSplit && containerRef.current) {
+      const boundaries = getPaneBoundaries()
+      if (!boundaries) return
+
+      const mouseX = e.clientX
+      const mouseY = e.clientY
+      const { container, left, right, hasSplit: isSplit } = boundaries
+
+      // Handle tab dragging for right pane activation
+      if (!isSplit) {
         const isDraggingFromLeft = leftTabs.find(t => t.id === event.active.id)
-        if (!isDraggingFromLeft) return
+        if (isDraggingFromLeft) {
+          const threshold80Percent = container.left + (container.width * 0.8)
+          const isBelowTabBar = mouseY > container.top + 40
+          const isPastThreshold = mouseX > threshold80Percent
+          setShowRightDropZone(isPastThreshold && isBelowTabBar)
+        }
+      }
 
-        const rect = containerRef.current.getBoundingClientRect()
-        const mouseX = e.clientX
-        const mouseY = e.clientY
-        const threshold80Percent = rect.left + (rect.width * 0.8)
+      // Function to determine drop zone based on mouse position
+      const getDropZone = () => {
+        const isBottomArea = mouseY > container.top + (container.height * 0.7) // Bottom 30%
+        const isTabArea = mouseY < container.top + (container.height * 0.3) // Top 30%
+        const isDeadZone = !isBottomArea && !isTabArea // Middle 40% is dead zone
 
-        const isBelowTabBar = mouseY > rect.top + 40
-        const isPastThreshold = mouseX > threshold80Percent
+        if (isDeadZone) {
+          return null // No drop zone in dead zone
+        }
 
-        setShowRightDropZone(isPastThreshold && isBelowTabBar)
+        if (isBottomArea) {
+          if (isSplit && left && right) {
+            // Check center area for bottom-full
+            const centerThreshold = container.width * 0.1 // 10% center area
+            const leftBoundary = container.left + (container.width * 0.5) - centerThreshold
+            const rightBoundary = container.left + (container.width * 0.5) + centerThreshold
+
+            if (mouseX >= leftBoundary && mouseX <= rightBoundary) {
+              return 'bottom-full'
+            } else if (mouseX < (left.right ?? container.left + (container.width * 0.5))) {
+              return 'bottom-left'
+            } else {
+              return 'bottom-right'
+            }
+          } else {
+            return 'bottom-full'
+          }
+        } else if (isTabArea) {
+          // Tab zones
+          if (isSplit && left && right) {
+            return mouseX < (left.right ?? container.left + (container.width * 0.5)) ? 'tab-left' : 'tab-right'
+          } else {
+            // Single pane layout - check if dragging to right side for right tab
+            const midPoint = container.left + (container.width * 0.5)
+            return mouseX < midPoint ? 'tab-left' : 'tab-right'
+          }
+        }
+
+        return null
+      }
+
+      
+      // Handle chat dragging
+      if (event.active.id === 'chat-drag-handle') {
+        const newDropZone = getDropZone()
+        let newHighlightedTabBar: 'left' | 'right' | null = null
+
+        // Handle right pane activation when dragging to right side with no right pane
+        if (!isSplit && right === null && mouseX > container.left + (container.width * 0.8)) {
+          setShowRightDropZone(true)
+          newHighlightedTabBar = 'right'
+        } else {
+          setShowRightDropZone(false)
+        }
+
+        if (newDropZone === 'tab-left') {
+          newHighlightedTabBar = 'left'
+        } else if (newDropZone === 'tab-right') {
+          newHighlightedTabBar = 'right'
+        }
+
+        // Handle right pane activation when dragging to right side with no right pane
+        if (!isSplit && right === null && mouseX > container.left + (container.width * 0.8)) {
+          setShowRightDropZone(true)
+          newHighlightedTabBar = 'right'
+        } else {
+          setShowRightDropZone(false)
+        }
+
+        setChatDropZone(newDropZone)
+        setHighlightedTabBar(newHighlightedTabBar)
+      }
+
+      // Handle tab dragging to bottom positions
+      const draggedTab = leftTabs.find(t => t.id === event.active.id) || rightTabs?.find(t => t.id === event.active.id)
+      if (draggedTab && draggedTab.type === 'ai-chat') {
+        const newDropZone = getDropZone()
+
+        
+        setChatDropZone(newDropZone)
       }
     }
 
@@ -166,19 +297,57 @@ export function SplitPaneView({
   const handleDragEnd = (event: DragEndEvent) => {
     const { active, over } = event
 
+    // Handle chat dragging
+    if (active.id === 'chat-drag-handle') {
+      if (chatDropZone && onChatDragEnd) {
+        onChatDragEnd(chatDropZone as any)
+      }
+      setActiveId(null)
+      setShowRightDropZone(false)
+      setChatDropZone(null)
+      setHighlightedTabBar(null)
+      return
+    }
+
+    // Handle tab dragging to bottom positions
+    const draggedTab = leftTabs.find(t => t.id === active.id) || rightTabs?.find(t => t.id === active.id)
+    if (draggedTab && draggedTab.type === 'ai-chat' && chatDropZone && onChatDragEnd) {
+      // Close the tab first
+      const sourcePane = leftTabs.find(t => t.id === active.id) ? 'left' : 'right'
+      if (sourcePane === 'left') {
+        onTabClose(active.id as string, 'left')
+      } else {
+        onTabClose(active.id as string, 'right')
+      }
+
+      // Then move to bottom position
+      onChatDragEnd(chatDropZone as any)
+
+      setActiveId(null)
+      setShowRightDropZone(false)
+      setChatDropZone(null)
+      setHighlightedTabBar(null)
+      return
+    }
+
+    // Handle tab dragging for right pane activation
     if (!hasSplit && showRightDropZone && onSplitRight) {
       const isDraggingFromLeft = leftTabs.find(t => t.id === active.id)
       if (isDraggingFromLeft) {
         onSplitRight(active.id as string)
         setActiveId(null)
         setShowRightDropZone(false)
-        return
+        setChatDropZone(null)
+        setHighlightedTabBar(null)
+                return
       }
     }
 
     if (!over) {
       setActiveId(null)
       setShowRightDropZone(false)
+      setChatDropZone(null)
+      setHighlightedTabBar(null)
       return
     }
 
@@ -218,7 +387,9 @@ export function SplitPaneView({
 
     setActiveId(null)
     setShowRightDropZone(false)
-  }
+    setChatDropZone(null)
+    setHighlightedTabBar(null)
+      }
 
   const activeTab = [...leftTabs, ...(rightTabs || [])].find((t) => t.id === activeId)
 
@@ -242,6 +413,7 @@ export function SplitPaneView({
                   onSplitRight={onSplitRight}
                   onTabReorder={onTabReorderLeft}
                   isDragging={!!activeId}
+                  isHighlighted={highlightedTabBar === 'left'}
                   onMoveChatToBottom={onMoveChatToBottom}
                   hasRightPane={hasSplit}
                 />
@@ -258,7 +430,7 @@ export function SplitPaneView({
             <ResizableHandle withHandle />
 
             <ResizablePanel defaultSize={50} minSize={30} onResize={onPanelResize}>
-              <div className="h-full flex flex-col relative">
+              <div ref={rightPaneRef} className="h-full flex flex-col relative">
                 <TabBar
                   tabs={rightTabs}
                   pane="right"
@@ -268,6 +440,7 @@ export function SplitPaneView({
                   isOnlyTabInPane={(tabId) => rightTabs.length === 1}
                   onTabReorder={onTabReorderRight}
                   isDragging={!!activeId}
+                  isHighlighted={highlightedTabBar === 'right'}
                   onMoveChatToBottom={onMoveChatToBottom}
                   hasRightPane={hasSplit}
                 />
@@ -291,6 +464,7 @@ export function SplitPaneView({
               onSplitRight={onSplitRight}
               onTabReorder={onTabReorderLeft}
               isDragging={!!activeId}
+              isHighlighted={highlightedTabBar === 'left'}
               onMoveChatToBottom={onMoveChatToBottom}
               hasRightPane={hasSplit}
             />
@@ -318,6 +492,28 @@ export function SplitPaneView({
             <div className="flex-1" />
             {/* Right 50% - highlighted drop zone */}
             <div className="flex-1 bg-teal-50/80 border-l-2 border-teal-400" />
+          </div>
+        )}
+
+        {/* Visual drop zone indicators for chat dragging */}
+        {(activeId === 'chat-drag-handle' || (activeId && (leftTabs.find(t => t.id === activeId)?.type === 'ai-chat' || rightTabs?.find(t => t.id === activeId)?.type === 'ai-chat'))) && (
+          <div className="absolute inset-0 pointer-events-none z-40">
+            {/* Simple drop zones */}
+            {chatDropZone === 'tab-left' && (
+              <div className="absolute top-0 left-0 right-1/2 h-10 bg-teal-50/20 transition-all duration-200 ease-out" />
+            )}
+            {chatDropZone === 'tab-right' && (
+              <div className="absolute top-0 left-1/2 right-0 h-10 bg-teal-50/20 transition-all duration-200 ease-out" />
+            )}
+            {chatDropZone === 'bottom-left' && hasSplit && paneBoundaries?.left && (
+              <div className="absolute left-0 right-1/2 bottom-0 h-[15%] bg-teal-50/60 border-2 border-teal-300 transition-all duration-200 ease-out" />
+            )}
+            {chatDropZone === 'bottom-right' && hasSplit && paneBoundaries?.right && (
+              <div className="absolute left-1/2 right-0 bottom-0 h-[15%] bg-teal-50/60 border-2 border-teal-300 transition-all duration-200 ease-out" />
+            )}
+            {chatDropZone === 'bottom-full' && (
+              <div className="absolute left-0 right-0 bottom-0 h-[15%] bg-teal-50/60 border-2 border-teal-300 transition-all duration-200 ease-out" />
+            )}
           </div>
         )}
       </div>

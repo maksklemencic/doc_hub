@@ -19,6 +19,7 @@ import { useBulkActions } from '@/hooks/spaces/use-bulk-actions'
 import { useTabManagement } from '@/hooks/spaces/use-tab-management'
 import { useDocumentOperations } from '@/hooks/spaces/use-document-operations'
 import { useChatLayout } from '@/hooks/chat/use-chat-layout'
+import { useChatLayoutContext } from '@/contexts/chat-layout-context'
 
 export default function SpacePage() {
   const params = useParams()
@@ -41,6 +42,7 @@ export default function SpacePage() {
   const zoomHook = useZoomPersistence({ spaceId })
   const tabHook = useTabManagement({ spaceId, documents })
   const chatLayout = useChatLayout({ spaceId })
+  const chatLayoutContext = useChatLayoutContext()
 
   const handleAddToContext = useCallback((documentIds: string[]) => {
     setSpaceContext(spaceId, documentIds)
@@ -189,6 +191,69 @@ export default function SpacePage() {
     }
   }, [tabHook, chatLayout])
 
+  // Handler for chat drag and drop
+  const handleChatDragEnd = useCallback((position: 'bottom-full' | 'bottom-left' | 'bottom-right' | 'tab-left' | 'tab-right') => {
+    // Get current chat position to prevent redundant drops
+    const currentLayout = chatLayoutContext.getChatLayout(spaceId)
+    const currentPosition = currentLayout.position
+
+    // Prevent dropping in the same position
+    if (currentPosition === position) {
+      return
+    }
+
+    // If moving to tab mode, need to handle tab creation
+    if (position === 'tab-left' || position === 'tab-right') {
+      const pane = position === 'tab-left' ? 'left' : 'right'
+
+      // Check if chat already exists in target pane
+      const existingChatTab = pane === 'left'
+        ? tabHook.tabs.find(t => t.type === 'ai-chat')
+        : tabHook.rightTabs.find(t => t.type === 'ai-chat')
+
+      console.log('Existing chat tab check:', {
+        targetPane: pane,
+        existingChatTab: existingChatTab?.id,
+        leftChatTabCount: tabHook.tabs.filter(t => t.type === 'ai-chat').length,
+        rightChatTabCount: tabHook.rightTabs.filter(t => t.type === 'ai-chat').length
+      })
+
+      if (existingChatTab) {
+        // Chat already exists in this pane, just update position
+        chatLayoutContext.handleChatDragEnd(spaceId, position)
+        return
+      }
+
+      // First close any existing chat tabs in other panes
+      const leftChatTab = tabHook.tabs.find(t => t.type === 'ai-chat')
+      const rightChatTab = tabHook.rightTabs.find(t => t.type === 'ai-chat')
+
+      console.log('Closing existing chat tabs:', {
+        leftChatTab: leftChatTab?.id,
+        rightChatTab: rightChatTab?.id
+      })
+
+      if (leftChatTab) {
+        tabHook.handleTabClose(leftChatTab.id, 'left')
+      }
+      if (rightChatTab) {
+        tabHook.handleTabClose(rightChatTab.id, 'right')
+      }
+
+      // Open chat tab in the requested pane
+      if (pane === 'left') {
+        console.log('Opening chat in left pane')
+        tabHook.handleOpenChatInLeftPane()
+      } else {
+        console.log('Opening chat in right pane')
+        operationsHook.handleOpenChatInPane('right')
+      }
+    }
+
+    // Use the chat layout context to handle the position change
+    chatLayoutContext.handleChatDragEnd(spaceId, position)
+  }, [chatLayoutContext, spaceId, tabHook, operationsHook, chatLayout])
+
   // Always render chat - either in tabs or in bottom
   const renderBottomChat = () => {
     // If chat is in a tab, don't render bottom chat
@@ -245,6 +310,7 @@ export default function SpacePage() {
           bottomChatLeft={bottomChat.left}
           bottomChatRight={bottomChat.right}
           onMoveChatToBottom={handleMoveChatToBottom}
+          onChatDragEnd={handleChatDragEnd}
         >
           {renderLeftContent()}
         </SplitPaneView>

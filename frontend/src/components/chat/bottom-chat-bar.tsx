@@ -11,6 +11,7 @@ import {
   DropdownMenuSeparator,
 } from '@/components/ui/dropdown-menu'
 import { QueryBar } from './query-bar'
+import { DraggableChatHandle } from './draggable-chat-handle'
 import { useChatLayout } from '@/hooks/chat/use-chat-layout'
 import { useCreateMessage } from '@/hooks/chat/use-messages'
 import { cn } from '@/lib/utils'
@@ -139,18 +140,26 @@ export function BottomChatBar({
                 onStopStreaming: handleStopStreaming,
               }}
               extraLeftButtons={
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  className={cn(
-                    "h-[22px] px-2 gap-1.5 text-xs",
-                    showHistory && "bg-primary/10 text-primary"
-                  )}
-                  onClick={toggleHistory}
-                >
-                  <History className="h-3 w-3" />
-                  <span>History</span>
-                </Button>
+                <>
+                  {/* History button */}
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className={cn(
+                      "h-[22px] px-2 gap-1.5 text-xs",
+                      showHistory && "bg-primary/10 text-primary"
+                    )}
+                    onClick={toggleHistory}
+                  >
+                    <History className="h-3 w-3" />
+                    <span>History</span>
+                  </Button>
+
+                  {/* Drag handle */}
+                  <div className="flex items-center">
+                    <DraggableChatHandle className="h-[22px] w-[22px] flex items-center justify-center" />
+                  </div>
+                </>
               }
               extraRightButtons={
                 <>

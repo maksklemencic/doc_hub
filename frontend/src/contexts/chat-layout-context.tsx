@@ -25,6 +25,9 @@ interface ChatLayoutContextType {
 
   // Reset chat to default position
   resetChatLayout: (spaceId: string) => void
+
+  // Handle chat drag and drop position changes
+  handleChatDragEnd: (spaceId: string, position: ChatPosition) => void
 }
 
 const ChatLayoutContext = createContext<ChatLayoutContextType | undefined>(undefined)
@@ -153,6 +156,11 @@ export function ChatLayoutProvider({ children }: ChatLayoutProviderProps) {
     SpaceStorage.set(spaceId, 'chatLayout', newLayout)
   }, [])
 
+  // Handle chat drag and drop position changes
+  const handleChatDragEnd = useCallback((spaceId: string, position: ChatPosition) => {
+    moveChatTo(spaceId, position)
+  }, [moveChatTo])
+
   return (
     <ChatLayoutContext.Provider value={{
       getChatLayout,
@@ -162,6 +170,7 @@ export function ChatLayoutProvider({ children }: ChatLayoutProviderProps) {
       isBottomMode,
       isTabMode,
       resetChatLayout,
+      handleChatDragEnd,
     }}>
       {children}
     </ChatLayoutContext.Provider>

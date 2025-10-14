@@ -48,6 +48,7 @@ interface TabBarProps {
   // Chat-specific handlers
   onMoveChatToBottom?: (position: 'bottom-full' | 'bottom-left' | 'bottom-right') => void
   hasRightPane?: boolean
+  isHighlighted?: boolean
 }
 
 // Sortable Tab Item Component
@@ -218,6 +219,7 @@ export function TabBar({
   isDragging,
   onMoveChatToBottom,
   hasRightPane,
+  isHighlighted,
 }: TabBarProps) {
   const scrollContainerRef = useRef<HTMLDivElement>(null)
 
@@ -234,7 +236,8 @@ export function TabBar({
       ref={setDroppableRef}
       className={cn(
         "h-10 bg-card border-b border-border flex items-center relative transition-colors",
-        isOver && "bg-teal-50/50"
+        isOver && "bg-teal-50/50",
+        isHighlighted && "bg-teal-50/60 border-teal-300"
       )}
     >
       <div
