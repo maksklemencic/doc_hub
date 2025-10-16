@@ -26,6 +26,7 @@ export default function CallbackPage() {
       const user_id = searchParams.get('user_id')
       const user_email = searchParams.get('user_email')
       const user_name = searchParams.get('user_name')
+      const user_picture = searchParams.get('user_picture')
 
       if (error) {
         router.push(ROUTES.LANDING + '?error=oauth_failed')
@@ -46,6 +47,7 @@ export default function CallbackPage() {
             id: user_id,
             email: user_email,
             name: decodeURIComponent(user_name),
+            picture: user_picture ? decodeURIComponent(user_picture) : undefined,
             created_at: new Date().toISOString()
           }
         }

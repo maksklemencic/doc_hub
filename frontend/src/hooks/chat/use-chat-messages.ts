@@ -1,5 +1,6 @@
 import { useMemo, useState } from 'react'
 import { MessageResponse } from '@/types'
+import { chatLogger } from '@/utils/logger'
 
 interface ChatMessage {
   id: string
@@ -108,7 +109,11 @@ export function useChatMessages({
       setCopiedMessageId(messageId)
       setTimeout(() => setCopiedMessageId(null), 2000)
     } catch (error) {
-      console.error('Failed to copy:', error)
+      chatLogger.error('Failed to copy message to clipboard', error, {
+        action: 'copyMessage',
+        messageId,
+        contentLength: content.length
+      })
     }
   }
 

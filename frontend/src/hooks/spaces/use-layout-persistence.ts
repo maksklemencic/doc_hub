@@ -1,5 +1,5 @@
-import { useState, useEffect, useCallback } from 'react'
-import { SpaceStorage } from '@/utils/local-storage'
+import { useCallback } from 'react'
+import { useLayoutContext } from '@/contexts/layout-context'
 
 type ViewMode = 'list' | 'grid'
 
@@ -8,13 +8,11 @@ interface UseLayoutPersistenceProps {
 }
 
 export function useLayoutPersistence({ spaceId }: UseLayoutPersistenceProps) {
-  // View mode state with localStorage persistence
-  const [viewMode, setViewMode] = useState<ViewMode>(() => {
-    return SpaceStorage.get<ViewMode>(spaceId, 'viewMode') ?? 'grid'
-  })
+  const { getViewMode, setViewMode, getGridColumns, setGridColumns: setContextGridColumns } = useLayoutContext()
 
-  // Grid columns state
-  const [gridColumns, setGridColumns] = useState(4)
+  // Get current state from context
+  const viewMode = getViewMode(spaceId)
+  const gridColumns = getGridColumns(spaceId)
 
   // Callback to handle pane width changes from SplitPaneView
   const handlePaneWidthChange = useCallback((paneWidth: number) => {
@@ -33,17 +31,15 @@ export function useLayoutPersistence({ spaceId }: UseLayoutPersistenceProps) {
     cols = Math.max(1, Math.min(4, cols)) // Between 1 and 4
 
     // Only update if different to avoid unnecessary re-renders
-    setGridColumns(prevCols => prevCols === cols ? prevCols : cols)
-  }, [])
-
-  // Persist view mode changes
-  useEffect(() => {
-    SpaceStorage.set(spaceId, 'viewMode', viewMode)
-  }, [spaceId, viewMode])
+    const currentCols = getGridColumns(spaceId)
+    if (currentCols !== cols) {
+      setContextGridColumns(spaceId, cols)
+    }
+  }, [spaceId, getGridColumns, setContextGridColumns])
 
   return {
     viewMode,
-    setViewMode,
+    setViewMode: (mode: ViewMode) => setViewMode(spaceId, mode),
     gridColumns,
     handlePaneWidthChange, // Export callback for SplitPaneView
   }

@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useRef, useCallback, lazy } from 'react'
+import { useState, useEffect, useRef, useCallback, lazy, memo } from 'react'
 import { Spinner } from '@/components/ui/spinner'
 import { FileText } from 'lucide-react'
 import { ZoomControls } from './zoom-controls'
@@ -10,6 +10,7 @@ import { SpaceStorage } from '@/utils/local-storage'
 import Image from 'next/image'
 import { isSupportedForPreview, isImageType, getDocumentType } from '@/utils/document-utils'
 import { LazyPdfViewer } from './lazy-pdf-viewer'
+import { documentLogger } from '@/utils/logger'
 
 interface DocumentViewerProps {
   documentId: string
@@ -19,7 +20,7 @@ interface DocumentViewerProps {
   onZoomStateChange?: (state: { scale: number; isFitToWidth: boolean }) => void
 }
 
-export function DocumentViewer({
+export const DocumentViewer = memo(function DocumentViewer({
   documentId,
   filename,
   mimeType,
@@ -180,7 +181,13 @@ export function DocumentViewer({
           URL.revokeObjectURL(result.url)
         }
       } catch (err: any) {
-        console.error('Failed to load document:', err)
+        documentLogger.error('Failed to load document', err, {
+          action: 'loadDocument',
+          documentId,
+          filename,
+          mimeType,
+          docType
+        })
         if (mounted) {
           setError('Failed to load document')
         }
@@ -329,4 +336,4 @@ export function DocumentViewer({
       </ScrollArea>
     </div>
   )
-}
+})

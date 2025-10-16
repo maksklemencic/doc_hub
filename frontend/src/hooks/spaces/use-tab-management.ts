@@ -4,6 +4,7 @@ import { getDocumentType } from '@/utils/document-utils'
 import { Tab } from '@/components/shared/tab-bar'
 import { SpaceStorage } from '@/utils/local-storage'
 import { useTabState } from './use-tab-state'
+import { tabLogger } from '@/utils/logger'
 
 interface PersistentTabState {
   leftTabs: Omit<Tab, 'isActive'>[]
@@ -47,7 +48,14 @@ export function useTabManagement({ spaceId, documents }: UseTabManagementProps) 
       // For document tabs, verify document still exists
       const documentExists = currentDocuments.some(doc => doc.id === tab.id)
       if (!documentExists) {
-        console.info(`Removing stale tab: ${tab.title} (document deleted)`)
+        tabLogger.info('Removing stale tab due to document deletion', {
+          action: 'removeStaleTab',
+          tabId: tab.id,
+          tabTitle: tab.title,
+          tabType: tab.type,
+          reason: 'document_deleted',
+          spaceId
+        })
       }
 
       return documentExists

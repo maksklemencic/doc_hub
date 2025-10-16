@@ -7,6 +7,7 @@ import {
   StreamingEvent,
   TaskStatusResponse
 } from '../../types'
+import { apiLogger } from '@/utils/logger'
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
 
@@ -71,7 +72,12 @@ export const messagesApi = {
                     }
                   }
                 } catch (error) {
-                  console.warn('Failed to parse SSE data:', line, error)
+                  apiLogger.warn('Failed to parse SSE data', error, {
+                    action: 'parseSSEData',
+                    spaceId,
+                    line: line.substring(0, 100), // Truncate line to avoid logging too much data
+                    streamingType: 'message'
+                  })
                 }
               }
             }

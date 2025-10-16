@@ -6,6 +6,7 @@ import { useRouter } from 'next/navigation'
 import { User, AuthTokenResponse } from '@/types'
 import { STORAGE_KEYS, ROUTES } from '@/constants'
 import { safeGetItem, safeSetItem, safeRemoveItem } from '@/utils/safe-storage'
+import { authLogger } from '@/utils/logger'
 
 interface AuthState {
   user: User | null
@@ -109,7 +110,12 @@ export function AuthProvider({ children }: AuthProviderProps) {
       })
 
       if (!tokenSaved || !userSaved) {
-        console.error('Failed to save authentication data to storage')
+        authLogger.error('Failed to save authentication data to storage', null, {
+          action: 'login',
+          tokenSaved,
+          userSaved,
+          userId: authResponse.user.id
+        })
         toast.error('Warning: Your session may not persist after closing the browser')
       }
     }

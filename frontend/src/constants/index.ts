@@ -10,4 +10,5 @@ export const ROUTES = {
   LANDING: '/',
   AUTH_CALLBACK: '/auth/callback',
   SPACES: (spaceId?: string) => spaceId ? `/spaces/${spaceId}` : '/spaces',
+  SETTINGS: '/settings',
 } as const

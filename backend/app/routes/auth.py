@@ -1,6 +1,7 @@
 import logging
 import os
 from typing import Optional
+from urllib.parse import quote_plus
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from fastapi.responses import RedirectResponse
@@ -110,7 +111,8 @@ async def oauth_callback(
         logger.info(f"User authentication completed successfully: {auth_response.user.email}")
         
         # Redirect to frontend with auth data as URL parameters
-        redirect_url = f"{frontend_url}?access_token={auth_response.access_token}&expires_in={auth_response.expires_in}&user_id={auth_response.user.id}&user_email={auth_response.user.email}&user_name={auth_response.user.name}"
+        user_picture_param = quote_plus(auth_response.user.picture) if auth_response.user.picture else ""
+        redirect_url = f"{frontend_url}?access_token={auth_response.access_token}&expires_in={auth_response.expires_in}&user_id={auth_response.user.id}&user_email={auth_response.user.email}&user_name={auth_response.user.name}&user_picture={user_picture_param}"
         
         logger.info(f"Redirecting user to frontend: {frontend_url}")
         return RedirectResponse(url=redirect_url)

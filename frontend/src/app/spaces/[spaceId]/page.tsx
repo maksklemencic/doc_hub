@@ -3,11 +3,11 @@
 import { useState, useCallback, useEffect } from 'react'
 import { useParams } from 'next/navigation'
 import { DocumentUpload } from '@/components/shared/document-upload'
-import { Header } from '@/components/shared/header'
 import { SplitPaneView } from '@/components/layout/split-pane-view'
 import { MiniAIChat } from '@/components/chat/mini-ai-chat'
 import { BottomChatBar } from '@/components/chat/bottom-chat-bar'
-import { DeleteConfirmationDialog } from '@/components/documents/delete-confirmation-dialog'
+import { ConfirmDialog } from '@/components/ui/confirm-dialog'
+import { Trash2 } from 'lucide-react'
 import { DocumentsPane } from '@/components/spaces/DocumentsPane'
 import { TabContentRenderer } from '@/components/spaces/TabContentRenderer'
 import { useSpaceDocuments } from '@/hooks/documents/use-documents'
@@ -211,13 +211,7 @@ export default function SpacePage() {
         ? tabHook.tabs.find(t => t.type === 'ai-chat')
         : tabHook.rightTabs.find(t => t.type === 'ai-chat')
 
-      console.log('Existing chat tab check:', {
-        targetPane: pane,
-        existingChatTab: existingChatTab?.id,
-        leftChatTabCount: tabHook.tabs.filter(t => t.type === 'ai-chat').length,
-        rightChatTabCount: tabHook.rightTabs.filter(t => t.type === 'ai-chat').length
-      })
-
+  
       if (existingChatTab) {
         // Chat already exists in this pane, just update position
         chatLayoutContext.handleChatDragEnd(spaceId, position)
@@ -228,11 +222,7 @@ export default function SpacePage() {
       const leftChatTab = tabHook.tabs.find(t => t.type === 'ai-chat')
       const rightChatTab = tabHook.rightTabs.find(t => t.type === 'ai-chat')
 
-      console.log('Closing existing chat tabs:', {
-        leftChatTab: leftChatTab?.id,
-        rightChatTab: rightChatTab?.id
-      })
-
+    
       if (leftChatTab) {
         tabHook.handleTabClose(leftChatTab.id, 'left')
       }
@@ -242,10 +232,8 @@ export default function SpacePage() {
 
       // Open chat tab in the requested pane
       if (pane === 'left') {
-        console.log('Opening chat in left pane')
         tabHook.handleOpenChatInLeftPane()
       } else {
-        console.log('Opening chat in right pane')
         operationsHook.handleOpenChatInPane('right')
       }
     }
@@ -285,12 +273,6 @@ export default function SpacePage() {
   return (
     <>
       <div className="flex flex-col h-full">
-        <Header
-          spaceName={spaceName}
-          viewMode={layoutHook.viewMode}
-          onViewModeChange={layoutHook.setViewMode}
-          onUploadClick={() => setIsUploadOpen(true)}
-        />
         <SplitPaneView
           key={spaceId}
           spaceId={spaceId}
@@ -317,18 +299,25 @@ export default function SpacePage() {
       </div>
       <DocumentUpload open={isUploadOpen} onOpenChange={setIsUploadOpen} spaceId={spaceId} />
 
-      <DeleteConfirmationDialog
+      <ConfirmDialog
         open={bulkActionsHook.deleteDialogOpen}
         onOpenChange={bulkActionsHook.setDeleteDialogOpen}
-        documentName={
-          bulkActionsHook.documentToDelete
-            ? documents.find(d => d.id === bulkActionsHook.documentToDelete)?.filename
-            : undefined
+        title={bulkActionsHook.documentToDelete ? "Delete Document" : "Delete Documents"}
+        description={
+          bulkActionsHook.documentToDelete ? (
+            `Are you sure you want to delete "${documents.find(d => d.id === bulkActionsHook.documentToDelete)?.filename}"? This action cannot be undone.`
+          ) : (
+            `Are you sure you want to delete ${bulkActionsHook.selectedDocuments.size} document${bulkActionsHook.selectedDocuments.size > 1 ? 's' : ''}? This action cannot be undone and will permanently remove ${bulkActionsHook.selectedDocuments.size > 1 ? 'these documents' : 'this document'}.`
+          )
         }
-        selectedCount={!bulkActionsHook.documentToDelete ? bulkActionsHook.selectedDocuments.size : undefined}
-        isDeleting={bulkActionsHook.isDeleting}
+        confirmText={bulkActionsHook.documentToDelete ? "Delete Document" : `Delete ${bulkActionsHook.selectedDocuments.size} Document${bulkActionsHook.selectedDocuments.size > 1 ? 's' : ''}`}
+        cancelText="Cancel"
         onConfirm={bulkActionsHook.handleConfirmDelete}
         onCancel={bulkActionsHook.handleCancelDelete}
+        loading={bulkActionsHook.isDeleting}
+        disabled={bulkActionsHook.isDeleting}
+        icon={Trash2}
+        variant="destructive"
       />
     </>
   )

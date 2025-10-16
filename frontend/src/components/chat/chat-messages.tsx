@@ -1,3 +1,4 @@
+import { memo } from 'react'
 import { Button } from '@/components/ui/button'
 import { Spinner } from '@/components/ui/spinner'
 import { Check, Edit3, X as XIcon, Copy } from 'lucide-react'
@@ -29,7 +30,7 @@ interface ChatMessagesProps {
   formatTime: (timestamp: string) => string
 }
 
-export function ChatMessages({
+export const ChatMessages = memo(function ChatMessages({
   messages,
   editingMessageId,
   editValue,
@@ -204,4 +205,4 @@ export function ChatMessages({
       </div>
     </div>
   )
-}
+})

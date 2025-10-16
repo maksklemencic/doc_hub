@@ -3,6 +3,7 @@
  */
 
 import { safeGetItem, safeSetItem, safeRemoveItem } from './safe-storage'
+import { storageLogger } from './logger'
 
 export class SpaceStorage {
   private static PREFIX = 'space:'
@@ -30,7 +31,12 @@ export class SpaceStorage {
       // Legacy format - return as is
       return item as T
     } catch (error) {
-      console.warn(`Failed to parse localStorage for ${spaceId}:${key}`, error)
+      storageLogger.warn('Failed to parse localStorage item', error, {
+        action: 'parseLocalStorage',
+        spaceId,
+        key,
+        fullKey: `${this.PREFIX}${spaceId}:${key}`
+      })
 
       // Clean up corrupted data
       const fullKey = `${this.PREFIX}${spaceId}:${key}`
@@ -62,7 +68,13 @@ export class SpaceStorage {
     })
 
     if (!success) {
-      console.error(`Failed to save to localStorage for ${spaceId}:${key}`)
+      storageLogger.error('Failed to save to localStorage', null, {
+        action: 'saveLocalStorage',
+        spaceId,
+        key,
+        fullKey: `${this.PREFIX}${spaceId}:${key}`,
+        dataType: typeof value
+      })
     }
 
     return success
@@ -79,7 +91,12 @@ export class SpaceStorage {
     const success = safeRemoveItem(fullKey)
 
     if (!success) {
-      console.error(`Failed to remove from localStorage for ${spaceId}:${key}`)
+      storageLogger.error('Failed to remove from localStorage', null, {
+        action: 'removeLocalStorage',
+        spaceId,
+        key,
+        fullKey: `${this.PREFIX}${spaceId}:${key}`
+      })
     }
 
     return success
@@ -119,7 +136,10 @@ export class SpaceStorage {
 
       return keys
     } catch (error) {
-      console.error('Failed to enumerate localStorage keys', error)
+      storageLogger.error('Failed to enumerate localStorage keys', error, {
+        action: 'enumerateLocalStorage',
+        spaceId
+      })
       return []
     }
   }

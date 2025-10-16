@@ -8,57 +8,62 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
-import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
-import { Grid3X3, List, Plus, User, ChevronRight } from 'lucide-react'
+import { Grid3X3, List, Plus, User, ChevronRight, Settings } from 'lucide-react'
 import { cn } from '@/lib/utils'
+import { memo } from 'react'
 import { useAuth } from '@/hooks/auth/use-auth'
+import { ProfileAvatar } from '@/components/ui/profile-avatar'
+import { useRouter } from 'next/navigation'
+import { ROUTES } from '@/constants'
 
 interface HeaderProps {
-  spaceName: string
+  spaceName?: string
   documentName?: string
-  viewMode: 'grid' | 'list'
-  onViewModeChange: (mode: 'grid' | 'list') => void
-  onUploadClick: () => void
+  viewMode?: 'grid' | 'list'
+  onViewModeChange?: (mode: 'grid' | 'list') => void
+  onUploadClick?: () => void
   onLogout?: () => void
+  isSettingsPage?: boolean
 }
 
-export function Header({
+export const Header = memo(function Header({
   spaceName,
   documentName,
-  viewMode,
+  viewMode = 'grid',
   onViewModeChange,
   onUploadClick,
-  onLogout
+  onLogout,
+  isSettingsPage = false
 }: HeaderProps) {
-  const isDocumentsView = !documentName
+  const isDocumentsView = !documentName && !isSettingsPage
   const { user } = useAuth()
-
-  // Get user initials for fallback
-  const getUserInitials = () => {
-    if (!user?.name) return 'U'
-    const names = user.name.split(' ')
-    if (names.length >= 2) {
-      return `${names[0][0]}${names[1][0]}`.toUpperCase()
-    }
-    return user.name[0].toUpperCase()
-  }
+  const router = useRouter()
 
   return (
     <header className="h-14 border-b border-border flex items-center justify-between px-6 bg-card">
       {/* Breadcrumbs */}
       <div className="flex items-center gap-2 text-sm text-muted-foreground">
-        <span className="font-medium text-foreground">{spaceName}</span>
-        {documentName && (
+        {isSettingsPage ? (
+          <div className="flex items-center gap-3">
+            <Settings className="h-4 w-4 text-muted-foreground" />
+            <span className="font-medium text-foreground text-sm">Settings</span>
+          </div>
+        ) : (
           <>
-            <ChevronRight className="h-4 w-4" />
-            <span>{documentName}</span>
+            <span className="font-medium text-foreground">{spaceName}</span>
+            {documentName && (
+              <>
+                <ChevronRight className="h-4 w-4" />
+                <span>{documentName}</span>
+              </>
+            )}
           </>
         )}
       </div>
 
       {/* Actions */}
-      <div className="flex items-center gap-2">
-        {isDocumentsView && (
+      <div className="flex items-center gap-4">
+        {isDocumentsView && onViewModeChange && onUploadClick && (
           <>
             {/* View mode toggle */}
             <div className="flex items-center gap-1 bg-muted rounded-lg p-1">
@@ -103,39 +108,28 @@ export function Header({
         {/* User menu */}
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
-            <Button variant="ghost" size="icon" className="rounded-full h-9 w-9 p-0">
-              <Avatar className="h-8 w-8">
-                <AvatarImage src={user?.picture} alt={user?.name || 'User'} />
-                <AvatarFallback className="bg-primary text-primary-foreground text-sm">
-                  {getUserInitials()}
-                </AvatarFallback>
-              </Avatar>
+            <Button variant="ghost" size="icon" className=" ml-4 rounded-full h-9 w-9 p-0">
+              <ProfileAvatar user={user} size="md" />
             </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end">
-            <DropdownMenuItem
-              className="focus:bg-teal-50 focus:text-teal-900"
-              onClick={() => {
-                console.log('Profile clicked')
-              }}
-            >
-              Profile
-            </DropdownMenuItem>
-            <DropdownMenuItem
-              className="focus:bg-teal-50 focus:text-teal-900"
-              onClick={() => {
-                console.log('Settings clicked')
-              }}
-            >
-              Settings
-            </DropdownMenuItem>
-            <DropdownMenuSeparator />
-            <DropdownMenuItem onClick={onLogout} className="focus:bg-teal-50 focus:text-teal-900">
-              Logout
-            </DropdownMenuItem>
+            {!isSettingsPage && (
+              <DropdownMenuItem onClick={() => router.push(ROUTES.SETTINGS)} className="focus:bg-teal-50 focus:text-teal-900">
+                <Settings className="h-4 w-4 mr-1" />
+                Settings
+              </DropdownMenuItem>
+            )}
+            {onLogout && (
+              <>
+                {!isSettingsPage && <DropdownMenuSeparator />}
+                <DropdownMenuItem onClick={onLogout} className="focus:bg-teal-50 focus:text-teal-900">
+                  Logout
+                </DropdownMenuItem>
+              </>
+            )}
           </DropdownMenuContent>
         </DropdownMenu>
       </div>
     </header>
   )
-}
+})

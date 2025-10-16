@@ -1,5 +1,6 @@
 'use client'
 
+import { memo } from 'react'
 import { Checkbox } from '@/components/ui/checkbox'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -35,6 +36,7 @@ import {
 } from '@/components/ui/tooltip'
 import { DocumentType, getDocumentIcon, getTypeBadge, isUrlBasedType } from '@/utils/document-utils'
 import { isValidUrl } from '@/utils'
+import { downloadDocument } from '@/utils/download'
 
 interface DocumentCardProps {
   id: string
@@ -58,7 +60,7 @@ interface DocumentCardProps {
   onAddToContext?: (documentId: string) => void
 }
 
-export function DocumentCard({
+export const DocumentCard = memo(function DocumentCard({
   id,
   filename,
   type,
@@ -84,37 +86,12 @@ export function DocumentCard({
   // Use centralized helper to check if document type is URL-based
   const isUrlBased = isUrlBasedType(type)
 
-    // Download function for documents
+    // Download function for documents using centralized utility
     const handleDownload = async () => {
       try {
-        const token = localStorage.getItem('access_token')
-        const baseUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
-        const downloadUrl = `${baseUrl}/documents/view/${id}`
-
-        const response = await fetch(downloadUrl, {
-          headers: {
-            ...(token && { Authorization: `Bearer ${token}` }),
-          },
-        })
-
-        if (!response.ok) {
-          throw new Error(`Download failed: ${response.status} ${response.statusText}`)
-        }
-
-        const blob = await response.blob()
-
-        // Create blob URL and trigger download
-        const blobUrl = URL.createObjectURL(blob)
-        const link = document.createElement('a')
-        link.href = blobUrl
-        link.download = filename // Suggest the original filename
-        document.body.appendChild(link)
-        link.click()
-        document.body.removeChild(link)
-
-        // Clean up the blob URL after download
-        URL.revokeObjectURL(blobUrl)
+        await downloadDocument(id, filename)
       } catch (error) {
+        // Error is handled by the utility, but we could add user notification here if needed
       }
     }
 
@@ -413,4 +390,4 @@ export function DocumentCard({
       </ContextMenuContent>
     </ContextMenu>
   )
-}
+})

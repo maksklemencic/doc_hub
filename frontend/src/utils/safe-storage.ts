@@ -3,6 +3,7 @@
  */
 
 import toast from 'react-hot-toast'
+import { storageLogger } from '@/utils/logger'
 
 export enum StorageErrorType {
   QUOTA_EXCEEDED = 'QUOTA_EXCEEDED',
@@ -203,14 +204,14 @@ export function safeSetItem(
   } catch (error) {
     const storageError = detectStorageError(error)
 
-    console.warn(`Failed to save to localStorage (${key}):`, storageError)
+    storageLogger.warn(`Failed to save to localStorage (${key})`, storageError, { action: 'setItem', key })
 
     // Handle quota exceeded errors
     if (storageError.type === StorageErrorType.QUOTA_EXCEEDED && retryWithCleanup) {
       const freedBytes = cleanupOldSpaceData()
 
       if (freedBytes > 0) {
-        console.log(`Freed ${(freedBytes / 1024).toFixed(2)} KB of storage. Retrying...`)
+        storageLogger.info(`Freed ${(freedBytes / 1024).toFixed(2)} KB of storage. Retrying...`, null, { action: 'cleanup', freedBytes })
 
         // Retry once after cleanup
         try {
@@ -222,7 +223,7 @@ export function safeSetItem(
           }
           return true
         } catch (retryError) {
-          console.error('Retry failed after cleanup:', retryError)
+          storageLogger.error('Retry failed after cleanup:', retryError, { action: 'setItem', key, retry: true })
         }
       }
 
@@ -269,7 +270,7 @@ export function safeGetItem<T = any>(key: string, defaultValue: T | null = null)
       return item as unknown as T
     }
   } catch (error) {
-    console.warn(`Failed to read from localStorage (${key}):`, error)
+    storageLogger.warn(`Failed to read from localStorage (${key})`, error, { action: 'getItem', key })
     return defaultValue
   }
 }
@@ -288,7 +289,7 @@ export function safeRemoveItem(key: string): boolean {
     localStorage.removeItem(key)
     return true
   } catch (error) {
-    console.warn(`Failed to remove from localStorage (${key}):`, error)
+    storageLogger.warn(`Failed to remove from localStorage (${key})`, error, { action: 'removeItem', key })
     return false
   }
 }
@@ -306,7 +307,7 @@ export function safeClear(): boolean {
     localStorage.clear()
     return true
   } catch (error) {
-    console.warn('Failed to clear localStorage:', error)
+    storageLogger.warn('Failed to clear localStorage:', error, { action: 'clear' })
     return false
   }
 }
@@ -326,7 +327,7 @@ export function isStorageNearQuota(): boolean {
  */
 export function logStorageUsage(): void {
   if (!isStorageAvailable()) {
-    console.log('localStorage is not available')
+    storageLogger.info('localStorage is not available', null, { action: 'logUsage' })
     return
   }
 
@@ -334,10 +335,10 @@ export function logStorageUsage(): void {
   const formatted = getStorageSizeFormatted()
   const itemCount = localStorage.length
 
-  console.log('=== localStorage Usage ===')
-  console.log(`Total size: ${formatted} (${size} bytes)`)
-  console.log(`Item count: ${itemCount}`)
-  console.log(`Near quota: ${isStorageNearQuota() ? 'Yes' : 'No'}`)
+  storageLogger.info('=== localStorage Usage ===', null, { action: 'logUsage' })
+  storageLogger.info(`Total size: ${formatted} (${size} bytes)`, { size, formatted, itemCount }, { action: 'logUsage' })
+  storageLogger.info(`Item count: ${itemCount}`, { itemCount }, { action: 'logUsage' })
+  storageLogger.info(`Near quota: ${isStorageNearQuota() ? 'Yes' : 'No'}`, { nearQuota: isStorageNearQuota() }, { action: 'logUsage' })
 
   // Show top 10 largest items
   const items: Array<{ key: string; size: number }> = []
@@ -351,8 +352,5 @@ export function logStorageUsage(): void {
   }
 
   items.sort((a, b) => b.size - a.size)
-  console.log('Top 10 largest items:')
-  items.slice(0, 10).forEach((item, index) => {
-    console.log(`${index + 1}. ${item.key}: ${(item.size / 1024).toFixed(2)} KB`)
-  })
+  storageLogger.info('Top 10 largest items:', items.slice(0, 10), { action: 'logUsage' })
 }

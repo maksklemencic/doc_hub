@@ -8,6 +8,7 @@ import { useMessagesInfinite } from '@/hooks/chat/use-messages'
 import { useInfiniteScroll } from '@/hooks/chat/use-infinite-scroll'
 import { useChatMessages } from '@/hooks/chat/use-chat-messages'
 import { cn } from '@/lib/utils'
+import { chatLogger } from '@/utils/logger'
 
 interface ChatHistoryOverlayProps {
   spaceId: string
@@ -51,7 +52,12 @@ export function ChatHistoryOverlay({
       // Reset copied state after 2 seconds
       setTimeout(() => setCopiedMessageId(null), 2000)
     } catch (err) {
-      console.error('Failed to copy message:', err)
+      chatLogger.error('Failed to copy message to clipboard in history overlay', err, {
+        action: 'copyMessageHistory',
+        messageId,
+        contentLength: content.length,
+        spaceId
+      })
     }
   }
 
@@ -69,7 +75,6 @@ export function ChatHistoryOverlay({
   const handleSaveEdit = async (messageId: string, newContent: string) => {
     // In history view, we don't allow actual editing
     // This would require API integration to update the message
-    console.log('Edit not supported in history view:', messageId, newContent)
     handleCancelEdit()
   }
 

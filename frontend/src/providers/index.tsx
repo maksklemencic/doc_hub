@@ -6,6 +6,8 @@ import { Toaster } from 'react-hot-toast'
 import { AuthProvider } from '@/contexts/auth-context'
 import { SpacesProvider } from '@/contexts/spaces-context'
 import { ChatLayoutProvider } from '@/contexts/chat-layout-context'
+import { SidebarProvider } from '@/contexts/sidebar-context'
+import { LayoutProvider } from '@/contexts/layout-context'
 
 interface ProvidersProps {
   children: ReactNode
@@ -38,11 +40,15 @@ export function Providers({ children }: ProvidersProps) {
   return (
     <QueryClientProvider client={queryClient}>
       <AuthProvider>
-        <SpacesProvider>
-          <ChatLayoutProvider>
-            {children}
-          </ChatLayoutProvider>
-        </SpacesProvider>
+        <SidebarProvider>
+          <SpacesProvider>
+            <LayoutProvider>
+              <ChatLayoutProvider>
+                {children}
+              </ChatLayoutProvider>
+            </LayoutProvider>
+          </SpacesProvider>
+        </SidebarProvider>
         <Toaster
           position="top-right"
         />

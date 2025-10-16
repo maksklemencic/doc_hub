@@ -3,6 +3,7 @@
 import { useQuery } from '@tanstack/react-query'
 import { documentsApi } from '@/lib/api'
 import { useAuth } from '@/hooks/auth/use-auth'
+import { spaceLogger } from '@/utils/logger'
 
 // Hook to get document counts for multiple spaces
 export function useSpaceDocumentCounts(spaceIds: string[]) {
@@ -20,7 +21,11 @@ export function useSpaceDocumentCounts(spaceIds: string[]) {
             const response = await documentsApi.getSpaceDocuments(spaceId, 1, 0) // Only fetch 1 doc to get total count
             counts[spaceId] = response.pagination.total_count
           } catch (error) {
-            console.error(`Failed to fetch document count for space ${spaceId}:`, error)
+            spaceLogger.error('Failed to fetch document count for space', error, {
+              action: 'fetchDocumentCount',
+              spaceId,
+              fallbackCount: 0
+            })
             counts[spaceId] = 0
           }
         })

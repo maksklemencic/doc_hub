@@ -1,3 +1,4 @@
+import { memo } from 'react'
 import { DocumentCard } from '@/components/documents/document-card'
 import { DocumentResponse } from '@/lib/api'
 import { getDocumentType, formatFileSize, formatDate, getPageCount, getFileSize, DocumentType } from '@/utils/document-utils'
@@ -19,7 +20,7 @@ interface DocumentsGridProps {
   onAddToContext: (documentId: string) => void
 }
 
-export function DocumentsGrid({
+export const DocumentsGrid = memo(function DocumentsGrid({
   documents,
   selectedDocuments,
   gridColumns,
@@ -70,4 +71,4 @@ export function DocumentsGrid({
       })}
     </div>
   )
-}
+})

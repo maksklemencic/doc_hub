@@ -17,7 +17,7 @@ import {
   DragEndEvent,
   useDroppable,
 } from '@dnd-kit/core'
-import { useState, useRef, useEffect, useCallback } from 'react'
+import { useState, useRef, useEffect, useCallback, memo } from 'react'
 import { cn } from '@/lib/utils'
 import { iconMap, colorMap } from '@/utils/tab-utils'
 
@@ -46,7 +46,7 @@ interface SplitPaneViewProps {
   onChatDragEnd?: (position: 'bottom-full' | 'bottom-left' | 'bottom-right' | 'tab-left' | 'tab-right') => void
 }
 
-export function SplitPaneView({
+export const SplitPaneView = memo(function SplitPaneView({
   leftTabs,
   rightTabs,
   spaceId,
@@ -535,4 +535,4 @@ export function SplitPaneView({
       </DragOverlay>
     </DndContext>
   )
-}
+})

@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useRef, useEffect, useCallback } from 'react'
+import { useState, useRef, useEffect, useCallback, memo } from 'react'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { Sparkles } from 'lucide-react'
 import { cn } from '@/lib/utils'
@@ -25,7 +25,7 @@ interface SpaceChatProps {
   documents?: Array<{ id: string; filename: string }>
 }
 
-export function SpaceChat({ spaceId, spaceName, className, chatState = 'visible', onChatStateChange, initialMessage, hideHeader = false, documents = [] }: SpaceChatProps) {
+export const SpaceChat = memo(function SpaceChat({ spaceId, spaceName, className, chatState = 'visible', onChatStateChange, initialMessage, hideHeader = false, documents = [] }: SpaceChatProps) {
   const { user } = useAuth()
   const { getSpaceContext, setSpaceContext } = useSpacesContext()
   const [inputValue, setInputValue] = useState('')
@@ -282,4 +282,4 @@ export function SpaceChat({ spaceId, spaceName, className, chatState = 'visible'
       />
     </div>
   )
-}
+})

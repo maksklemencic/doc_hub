@@ -3,6 +3,8 @@ import { DocumentResponse } from '@/lib/api'
 import { getDocumentType, DocumentType } from '@/utils/document-utils'
 import { useDeleteDocument, useDeleteDocumentSilent } from '@/hooks/documents/use-documents'
 import toast from 'react-hot-toast'
+import { documentLogger } from '@/utils/logger'
+import { downloadMultipleDocuments } from '@/utils/download'
 
 interface UseBulkActionsProps {
   filteredDocuments: DocumentResponse[]
@@ -83,7 +85,7 @@ export function useBulkActions({
       try {
         await deleteDocumentMutation.mutateAsync(documentToDelete)
       } catch (error) {
-        console.error('Failed to delete document:', error)
+        documentLogger.error('Failed to delete document:', error, { action: 'deleteDocument', documentId: documentToDelete })
         toast.error('Failed to delete document. Please try again.')
       } finally {
         setIsDeleting(false)
@@ -104,7 +106,7 @@ export function useBulkActions({
         )
         toast.success(`${count} document${count > 1 ? 's' : ''} deleted successfully`)
       } catch (error) {
-        console.error('Failed to delete documents:', error)
+        documentLogger.error('Failed to delete documents:', error, { action: 'bulkDelete', documentIds: selectedIds })
         toast.error('Failed to delete documents. Please try again.')
       } finally {
         setIsDeleting(false)
@@ -126,72 +128,36 @@ export function useBulkActions({
     toast.success(`Added ${selectedIds.length} documents to chat context`)
   }, [selectedDocuments, onAddToContext])
 
-  // Bulk download selected documents - skip web-based ones
+  // Bulk download selected documents using centralized utility
   const handleBulkDownload = async () => {
     const selectedIds = Array.from(selectedDocuments)
 
-    // Filter out web-based documents
-    const downloadableDocuments = documents.filter(doc => {
-      const docType = getDocumentType(doc.mime_type)
-      return !(docType === DocumentType.youtube || docType === DocumentType.web) && selectedIds.includes(doc.id)
-    })
+    // Get selected documents that can be downloaded
+    const documentsToDownload = documents.filter(doc => selectedIds.includes(doc.id))
 
-    if (downloadableDocuments.length === 0) {
-      toast.error('No downloadable documents selected. Web and YouTube documents cannot be downloaded.')
-      return
-    }
-
-    let successCount = 0
-    let failedCount = 0
-
-    // Download documents sequentially
-    for (const doc of downloadableDocuments) {
-      try {
-        const token = typeof window !== 'undefined' ? localStorage.getItem('access_token') : null
-        const baseUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
-        const downloadUrl = `${baseUrl}/documents/view/${doc.id}`
-
-        const response = await fetch(downloadUrl, {
-          headers: {
-            ...(token && { Authorization: `Bearer ${token}` }),
+    try {
+      const { successCount, failedCount } = await downloadMultipleDocuments(
+        documentsToDownload,
+        {
+          skipUrlBased: true,
+          delayBetweenDownloads: 100,
+          onSuccess: (count) => {
+            if (failedCount === 0) {
+              toast.success(`Downloaded ${count} document${count > 1 ? 's' : ''} successfully`)
+            }
           },
-        })
-
-        if (!response.ok) {
-          throw new Error(`Download failed: ${response.status} ${response.statusText}`)
+          onError: (count) => {
+            if (successCount > 0) {
+              toast.error(`Downloaded ${successCount} document${successCount > 1 ? 's' : ''}, ${count} failed`)
+            } else {
+              toast.error('Failed to download documents. Please try again.')
+            }
+          }
         }
-
-        const blob = await response.blob()
-        const contentDisposition = response.headers.get('content-disposition')
-        const filename = contentDisposition
-          ? contentDisposition.split('filename=')[1]?.replace(/"/g, '') || doc.filename
-          : doc.filename
-
-        // Create blob URL and trigger download
-        const blobUrl = URL.createObjectURL(blob)
-        const link = document.createElement('a')
-        link.href = blobUrl
-        link.download = filename
-        document.body.appendChild(link)
-        link.click()
-        document.body.removeChild(link)
-        URL.revokeObjectURL(blobUrl)
-
-        successCount++
-        await new Promise(resolve => setTimeout(resolve, 100))
-      } catch (error) {
-        console.error(`Failed to download ${doc.filename}:`, error)
-        failedCount++
-      }
-    }
-
-    // Show success/error message
-    if (successCount === downloadableDocuments.length) {
-      toast.success(`Downloaded ${successCount} document${successCount > 1 ? 's' : ''} successfully`)
-    } else if (successCount > 0) {
-      toast.error(`Downloaded ${successCount} document${successCount > 1 ? 's' : ''}, ${failedCount} failed`)
-    } else {
-      toast.error('Failed to download documents. Please try again.')
+      )
+    } catch (error) {
+      // Handle case where no downloadable documents
+      toast.error(error instanceof Error ? error.message : 'Failed to download documents')
     }
   }
 

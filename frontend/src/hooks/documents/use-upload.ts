@@ -4,6 +4,7 @@ import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { uploadApi, ApiError, UploadResponse, WebDocumentUploadRequest, YouTubeUploadRequest } from '@/lib/api'
 import toast from 'react-hot-toast'
 import { documentsKeys } from './use-documents'
+import { uploadLogger } from '@/utils/logger'
 
 export function useUploadFile() {
   const queryClient = useQueryClient()
@@ -31,7 +32,13 @@ export function useUploadFile() {
       if (error instanceof Error && (error.name === 'AbortError' || error.message.includes('aborted'))) {
         return
       }
-      console.error('Upload error:', error)
+      uploadLogger.error('File upload failed', error, {
+        action: 'uploadFile',
+        fileName: variables.file.name,
+        fileSize: variables.file.size,
+        fileType: variables.file.type,
+        spaceId: variables.spaceId
+      })
       toast.error(`Failed to upload ${variables.file.name}: ${error.message}`)
     },
   })
@@ -59,7 +66,11 @@ export function useUploadWebDocument() {
       })
     },
     onError: (error, variables) => {
-      console.error('Web upload error:', error)
+      uploadLogger.error('Web document upload failed', error, {
+        action: 'uploadWebDocument',
+        url: variables.url,
+        spaceId: variables.space_id
+      })
       toast.error(`Failed to import from URL: ${error.message}`)
     },
   })
@@ -87,7 +98,11 @@ export function useUploadYouTubeVideo() {
       })
     },
     onError: (error, variables) => {
-      console.error('YouTube upload error:', error)
+      uploadLogger.error('YouTube video upload failed', error, {
+        action: 'uploadYouTubeVideo',
+        videoUrl: variables.url,
+        spaceId: variables.space_id
+      })
       toast.error(`Failed to import YouTube video: ${error.message}`)
     },
   })

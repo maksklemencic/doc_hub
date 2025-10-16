@@ -29,6 +29,7 @@ import {
   DocumentType,
   isUrlBasedType
 } from '@/utils/document-utils'
+import { downloadDocument } from '@/utils/download'
 
 interface DocumentsTableProps {
   documents: DocumentResponse[]
@@ -61,44 +62,13 @@ export function DocumentsTable({
   onOpenInRightPane,
   onAddToContext,
 }: DocumentsTableProps) {
-  // Download function for documents
-  const handleDownload = async (documentId: string) => {
+  // Download function for documents using centralized utility
+  const handleDownload = async (documentId: string, filename: string) => {
     try {
-      const token = typeof window !== 'undefined'
-        ? localStorage.getItem('access_token')
-        : null
-      const baseUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
-      const downloadUrl = `${baseUrl}/documents/view/${documentId}`
-
-      const response = await fetch(downloadUrl, {
-        headers: {
-          ...(token && { Authorization: `Bearer ${token}` }),
-        },
-      })
-
-      if (!response.ok) {
-        throw new Error(`Download failed: ${response.status} ${response.statusText}`)
-      }
-
-      const blob = await response.blob()
-      const contentDisposition = response.headers.get('content-disposition')
-      const filename = contentDisposition
-        ? contentDisposition.split('filename=')[1]?.replace(/"/g, '') || 'document'
-        : 'document'
-
-      // Create blob URL and trigger download
-      const blobUrl = URL.createObjectURL(blob)
-      const link = document.createElement('a')
-      link.href = blobUrl
-      link.download = filename // Suggest the original filename
-      document.body.appendChild(link)
-      link.click()
-      document.body.removeChild(link)
-
-      // Clean up the blob URL after download
-      URL.revokeObjectURL(blobUrl)
-      } catch (error) {
-      }
+      await downloadDocument(documentId, filename)
+    } catch (error) {
+      // Error is handled by the utility, but we could add user notification here if needed
+    }
   }
 
   return (
@@ -230,7 +200,7 @@ export function DocumentsTable({
                             variant="ghost"
                             size="sm"
                             className="hover:bg-teal-100 hover:text-teal-600"
-                            onClick={() => handleDownload(document.id)}
+                            onClick={() => handleDownload(document.id, document.filename)}
                           >
                             <Download className="h-4 w-4" />
                           </Button>
@@ -364,7 +334,7 @@ export function DocumentsTable({
                             Open in Right Pane
                           </ContextMenuItem>
                           <ContextMenuItem
-                            onClick={() => handleDownload(document.id)}
+                            onClick={() => handleDownload(document.id, document.filename)}
                             className="focus:bg-teal-50 focus:text-teal-900"
                           >
                             <Download className="mr-2 h-4 w-4" />

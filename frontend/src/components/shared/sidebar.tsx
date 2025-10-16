@@ -1,6 +1,7 @@
 'use client'
 
 import * as React from 'react'
+import { memo } from 'react'
 import { useState, useEffect } from 'react'
 import { Button } from '@/components/ui/button'
 import { ScrollArea } from '@/components/ui/scroll-area'
@@ -56,14 +57,10 @@ import { spacesApi } from '@/lib/api'
 import { useQueryClient } from '@tanstack/react-query'
 import toast from 'react-hot-toast'
 import { safeGetItem, safeSetItem } from '@/utils/safe-storage'
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from '@/components/ui/dialog'
+import { ROUTES } from '@/constants'
+import { useSidebar } from '@/contexts/sidebar-context'
+import { ConfirmDialog } from '@/components/ui/confirm-dialog'
+import { spaceLogger } from '@/utils/logger'
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -350,17 +347,13 @@ function SortableSpaceItem({
   )
 }
 
-export function Sidebar({ className }: SidebarProps) {
+export const Sidebar = memo(function Sidebar({ className }: SidebarProps) {
   const router = useRouter()
   const pathname = usePathname()
   const queryClient = useQueryClient()
 
-  // Sidebar state - pinned or collapsed
-  const [isPinned, setIsPinned] = useState(() => {
-    if (typeof window === 'undefined') return false
-    const stored = safeGetItem<string>(STORAGE_KEY, 'false')
-    return stored === 'true'
-  })
+  // Use global sidebar state from context
+  const { isExpanded, togglePin } = useSidebar()
 
   // TanStack Query hooks
   const { data: spacesData = [], isLoading } = useSpaces()
@@ -376,23 +369,6 @@ export function Sidebar({ className }: SidebarProps) {
   const [isReorderMode, setIsReorderMode] = useState(false)
   const [pendingReorderedSpaces, setPendingReorderedSpaces] = useState<any[] | null>(null)
   const reorderContainerRef = React.useRef<HTMLDivElement>(null)
-
-  // Save pinned state to localStorage
-  useEffect(() => {
-    if (typeof window === 'undefined') return
-    safeSetItem(STORAGE_KEY, isPinned.toString(), {
-      showToast: false, // Don't show toast for UI state
-      retryWithCleanup: true,
-    })
-  }, [isPinned])
-
-  const togglePinned = () => {
-    // Cancel creating when unpinning
-    if (isPinned) {
-      setCreatePopoverOpen(false)
-    }
-    setIsPinned(prev => !prev)
-  }
 
   // Click outside to close reorder mode
   useEffect(() => {
@@ -410,8 +386,8 @@ export function Sidebar({ className }: SidebarProps) {
     }
   }, [isReorderMode, pendingReorderedSpaces])
 
-  // Determine if sidebar should be expanded (only when pinned)
-  const isExpanded = isPinned
+  // For local UI state that depends on sidebar state
+  const isPinned = isExpanded
 
   // Get document counts for all spaces (exclude temporary IDs from optimistic updates)
   const spaceIds = spacesData.filter(space => !space.id.startsWith('temp-')).map(space => space.id)
@@ -559,7 +535,11 @@ export function Sidebar({ className }: SidebarProps) {
       setPendingReorderedSpaces(null)
       setIsReorderMode(false)
     } catch (error) {
-      console.error('Failed to update space order:', error)
+      spaceLogger.error('Failed to update space order', error, {
+        action: 'saveReorder',
+        spaceCount: pendingReorderedSpaces?.length,
+        isReorderMode
+      })
       toast.error('Failed to update space order.', { id: toastId })
       // Revert pending changes
       setPendingReorderedSpaces(null)
@@ -588,13 +568,13 @@ export function Sidebar({ className }: SidebarProps) {
                 variant="ghost"
                 size="icon"
                 className="h-8 w-8 text-muted-foreground hover:text-foreground hover:bg-muted"
-                onClick={togglePinned}
+                onClick={togglePin}
               >
                 {isPinned ? <PanelLeftClose className="h-4 w-4" /> : <PanelLeft className="h-4 w-4" />}
               </Button>
             </TooltipTrigger>
             <TooltipContent side="right">
-              <p>{isPinned ? "Unpin sidebar" : "Pin sidebar"}</p>
+              <p>{isExpanded ? "Unpin sidebar" : "Pin sidebar"}</p>
             </TooltipContent>
           </Tooltip>
         </TooltipProvider>
@@ -786,7 +766,7 @@ export function Sidebar({ className }: SidebarProps) {
             isExpanded ? "justify-start" : "justify-center p-2"
           )}
           onClick={() => {
-            console.log('Settings clicked')
+            router.push(ROUTES.SETTINGS)
           }}
           title={!isExpanded ? "Settings" : undefined}
         >
@@ -796,46 +776,28 @@ export function Sidebar({ className }: SidebarProps) {
       </div>
 
       {/* Delete Space Dialog */}
-      <Dialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Delete Space</DialogTitle>
-            <DialogDescription>
-              Are you sure you want to delete "<strong>{spaceToDelete?.name}</strong>"?
-              This action cannot be undone and will permanently remove the space and all its contents.
-            </DialogDescription>
-          </DialogHeader>
-          <DialogFooter>
-            <Button
-              variant="outline"
-              onClick={() => {
-                setDeleteDialogOpen(false)
-                setSpaceToDelete(null)
-              }}
-              disabled={deleteSpaceMutation.isPending}
-            >
-              Cancel
-            </Button>
-            <Button
-              variant="destructive"
-              onClick={handleConfirmDelete}
-              disabled={deleteSpaceMutation.isPending}
-            >
-              {deleteSpaceMutation.isPending ? (
-                <>
-                  <Spinner size="sm" className="mr-2" />
-                  Deleting...
-                </>
-              ) : (
-                <>
-                  <Trash2 className="mr-2 h-4 w-4" />
-                  Delete Space
-                </>
-              )}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      <ConfirmDialog
+        open={deleteDialogOpen}
+        onOpenChange={setDeleteDialogOpen}
+        title="Delete Space"
+        description={
+          <>
+            Are you sure you want to delete "<strong>{spaceToDelete?.name}</strong>"?
+            This action cannot be undone and will permanently remove the space and all its contents.
+          </>
+        }
+        confirmText="Delete Space"
+        cancelText="Cancel"
+        onConfirm={handleConfirmDelete}
+        onCancel={() => {
+          setDeleteDialogOpen(false)
+          setSpaceToDelete(null)
+        }}
+        loading={deleteSpaceMutation.isPending}
+        disabled={deleteSpaceMutation.isPending}
+        icon={Trash2}
+        variant="destructive"
+      />
     </div>
   )
-}
+})
